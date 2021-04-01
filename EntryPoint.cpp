@@ -43,6 +43,19 @@ int main()
     };
 
     VulkanContext Vulkan(vulkanOptions);
+
+    DeviceInitializeOptions deviceOptions;
+    deviceOptions.PreferredType = DeviceType::DISCRETE_GPU;
+    deviceOptions.ErrorCallback = [](const char* message)
+    {
+        std::cerr << "[ERROR Vulkan]: " << message << std::endl;
+    };
+    deviceOptions.InfoCallback = [](const char* message)
+    {
+        std::cout << "[INFO Vulkan]: " << message << std::endl;
+    };
+
+    Vulkan.InitializePhysicalDevice(window.CreateWindowSurface(Vulkan), deviceOptions);
     
     while (!window.ShouldClose())
     {

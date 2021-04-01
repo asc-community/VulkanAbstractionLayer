@@ -9,7 +9,7 @@ set(PROJECT_NAME, VulkanAbstractionLayer)
 set(SOURCES 
 "EntryPoint.cpp"
 "VulkanAbstractionLayer/Window.cpp"
- "VulkanAbstractionLayer/VulkanContext.cpp")
+ "VulkanAbstractionLayer/VulkanContext.cpp" "VulkanAbstractionLayer/VulkanSurface.cpp")
 
 find_package(Vulkan REQUIRED FATAL_ERROR)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw)

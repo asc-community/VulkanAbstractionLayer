@@ -30,13 +30,24 @@
 
 #include <algorithm>
 #include <cstring>
+#include <optional>
 
 namespace VulkanAbstractionLayer
 {
+    bool CheckVulkanPresentationSupport(const vk::Instance& instance, const vk::PhysicalDevice& physicalDevice, uint32_t familyQueueIndex);
+
+    constexpr vk::PhysicalDeviceType DeviceTypeMapping[] = {
+        vk::PhysicalDeviceType::eCpu,
+        vk::PhysicalDeviceType::eDiscreteGpu,
+        vk::PhysicalDeviceType::eIntegratedGpu,
+        vk::PhysicalDeviceType::eVirtualGpu,
+        vk::PhysicalDeviceType::eOther,
+    };
+
     void CheckRequestedLayers(const VulkanContextCreateOptions& options)
     {
         if (options.InfoCallback)
-            options.InfoCallback("checking requested layers");
+            options.InfoCallback("enumerating requested layers:");
 
         auto layers = vk::enumerateInstanceLayerProperties();
         for (const char* layerName : options.Layers)
@@ -44,16 +55,17 @@ namespace VulkanAbstractionLayer
             if (options.InfoCallback)
                 options.InfoCallback(layerName);
 
-            auto layerIt = std::find_if(layers.begin(), layers.end(), 
+            auto layerIt = std::find_if(layers.begin(), layers.end(),
                 [layerName](const vk::LayerProperties& layer)
                 {
                     return std::strcmp(layer.layerName.data(), layerName) == 0;
-                }); 
+                });
 
             if (layerIt == layers.end())
             {
                 if (options.ErrorCallback)
                     options.ErrorCallback("cannot enable requested layer");
+                return;
             }
         }
     }
@@ -61,7 +73,7 @@ namespace VulkanAbstractionLayer
     void CheckRequestedExtensions(const VulkanContextCreateOptions& options)
     {
         if (options.InfoCallback)
-            options.InfoCallback("checking requested extensions");
+            options.InfoCallback("enumerating requested extensions:");
 
         auto extensions = vk::enumerateInstanceExtensionProperties();
         for (const char* extensionName : options.Extensions)
@@ -78,8 +90,44 @@ namespace VulkanAbstractionLayer
             if (layerIt == extensions.end())
             {
                 options.ErrorCallback("cannot enable requested extension");
+                return;
             }
         }
+    }
+
+    std::optional<uint32_t> GetQueueFamilyIndex(const vk::Instance& instance, const vk::PhysicalDevice device, const vk::SurfaceKHR& surface)
+    {
+        auto queueFamilyProperties = device.getQueueFamilyProperties();
+        uint32_t index = 0;
+        for (const auto& property : queueFamilyProperties)
+        {
+            if ((property.queueCount > 0) &&
+                (device.getSurfaceSupportKHR(index, surface)) &&
+                (CheckVulkanPresentationSupport(instance, device, index)) &&
+                (property.queueFlags & vk::QueueFlagBits::eGraphics) &&
+                (property.queueFlags & vk::QueueFlagBits::eCompute))
+            {
+                return index;
+            }
+            index++;
+        }
+        return { };
+    }
+
+    void VulkanContext::Move(VulkanContext&& other)
+    {
+        this->instance = std::move(other.instance);
+        this->surface = std::move(other.surface);
+        this->physicalDevice = std::move(other.physicalDevice);
+        this->physicalDeviceProperties = std::move(other.physicalDeviceProperties);
+        this->queueFamilyIndex = std::move(other.queueFamilyIndex);
+        this->apiVersion = std::move(other.apiVersion);
+
+        other.surface = nullptr;
+        other.instance = nullptr;
+        other.physicalDevice = nullptr;
+        other.queueFamilyIndex = { };
+        other.apiVersion = { };
     }
 
     VulkanContext::VulkanContext(const VulkanContextCreateOptions& options)
@@ -102,6 +150,7 @@ namespace VulkanAbstractionLayer
         CheckRequestedLayers(options);
 
         this->instance = vk::createInstance(instanceCreateInfo);
+        this->apiVersion = applicationInfo.apiVersion;
 
         if (options.InfoCallback)
             options.InfoCallback("created vulkan instance object");
@@ -109,6 +158,78 @@ namespace VulkanAbstractionLayer
 
     VulkanContext::~VulkanContext()
     {
-        this->instance.destroy();
+        if((bool)this->surface ) this->instance.destroySurfaceKHR(this->surface);
+        if((bool)this->instance) this->instance.destroy();
+    }
+
+    VulkanContext::VulkanContext(VulkanContext&& other) noexcept
+    {
+        this->Move(std::move(other));
+    }
+
+    VulkanContext& VulkanContext::operator=(VulkanContext&& other) noexcept
+    {
+        this->Move(std::move(other));
+        return *this;
+    }
+
+    void VulkanContext::InitializePhysicalDevice(const WindowSurface& surface, const DeviceInitializeOptions& options)
+    {
+        this->surface = *reinterpret_cast<const VkSurfaceKHR*>(&surface);
+
+        if (!(bool)this->surface)
+        {
+            if (options.ErrorCallback)
+                options.ErrorCallback("failed to initialize surface");
+            return;
+        }
+        
+        if (options.InfoCallback)
+            options.InfoCallback("enumerating physical devices:");
+        
+        auto physicalDevices = this->instance.enumeratePhysicalDevices();
+        for (const auto& device : physicalDevices)
+        {
+            auto properties = device.getProperties();
+
+            if (options.InfoCallback) 
+                options.InfoCallback(properties.deviceName);
+
+            if (properties.apiVersion < this->apiVersion)
+            {
+                if (options.InfoCallback) 
+                    options.InfoCallback("skipping device as its Vulkan API version is less than required");
+                continue;
+            }
+
+            auto queueFamilyIndex = GetQueueFamilyIndex(this->instance, device, this->surface);
+            if (!queueFamilyIndex.has_value())
+            {
+                if (options.InfoCallback)
+                    options.InfoCallback("skipping device as its queue families does not satisfy the requirements");
+                continue;
+            }
+            
+            this->physicalDevice = device;
+            this->physicalDeviceProperties = properties;
+            this->queueFamilyIndex = queueFamilyIndex.value();
+            if (properties.deviceType == DeviceTypeMapping[(size_t)options.PreferredType])
+                break;
+        }
+
+        if (!(bool)this->physicalDevice)
+        {
+            if (options.ErrorCallback)
+                options.ErrorCallback("failed to find appropriate physical device");
+            return;
+        }
+        else
+        {
+            if (options.InfoCallback)
+            {
+                options.InfoCallback("selected physical device:");
+                options.InfoCallback(this->physicalDeviceProperties.deviceName);
+            }
+        }
     }
 }

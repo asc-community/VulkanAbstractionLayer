@@ -30,6 +30,8 @@
 
 namespace VulkanAbstractionLayer
 {
+    struct WindowSurface;
+
     struct VulkanContextCreateOptions
     {
         int VulkanApiMajorVersion = 1;
@@ -42,13 +44,44 @@ namespace VulkanAbstractionLayer
         const char* EngineName = "VulkanAbstractionLayer";
     };
 
+    enum class DeviceType
+    {
+        CPU = 0,
+        DISCRETE_GPU,
+        INTEGRATED_GPU,
+        VIRTUAL_GPU,
+        OTHER,
+    };
+
+    struct DeviceInitializeOptions
+    {
+        DeviceType PreferredType = DeviceType::DISCRETE_GPU;
+        void (*ErrorCallback)(const char*) = nullptr;
+        void (*InfoCallback)(const char*) = nullptr;
+    };
+
     class VulkanContext
     {
         vk::Instance instance;
+        vk::SurfaceKHR surface;
+        vk::PhysicalDevice physicalDevice;
+        vk::PhysicalDeviceProperties physicalDeviceProperties;
+        uint32_t queueFamilyIndex = { };
+        uint32_t apiVersion = { };
+
+        void Move(VulkanContext&& other);
     public:
         VulkanContext(const VulkanContextCreateOptions& options);
         ~VulkanContext();
+        VulkanContext(const VulkanContext&) = delete;
+        VulkanContext& operator=(const VulkanContext&) = delete;
+        VulkanContext(VulkanContext&& other) noexcept;
+        VulkanContext& operator=(VulkanContext&& other) noexcept;
 
         const vk::Instance& GetInstance() const { return this->instance; }
+        const vk::SurfaceKHR& GetSurface() const { return this->surface; }
+        const vk::PhysicalDevice& GetPhysicalDevice() const { return this->physicalDevice; }
+
+        void InitializePhysicalDevice(const WindowSurface& surface, const DeviceInitializeOptions& options);
     };
 }

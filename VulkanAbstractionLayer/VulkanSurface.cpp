@@ -26,53 +26,27 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "VectorMath.h"
+#include "VulkanContext.h"
 
-struct GLFWwindow;
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
-    struct WindowSurface;
-
-    struct WindowCreateOptions
+    struct WindowSurface
     {
-        bool TransparentFramebuffer = false;
-        bool Resizeable = true;
-        bool TileBar = true;
-        void (*ErrorCallback)(const char*) = nullptr;
-        Vector2 Size{ 800.0f, 600.0f };
-        Vector2 Position{ 0.0f, 0.0f };
-        const char* Title = "VulkanAbstractionLayer";
+        vk::SurfaceKHR Surface;
     };
 
-    class Window
+    const WindowSurface& CreateVulkanSurface(GLFWwindow* window, const VulkanContext& context)
     {
-        GLFWwindow* handle = nullptr;
-    public:
-        struct RequiredExtensions
-        {
-            const char** ExtensionNames = nullptr;
-            uint32_t ExtensionCount = 0;
-        };
+        static WindowSurface result;
+        (void)glfwCreateWindowSurface(context.GetInstance(), window, nullptr, (VkSurfaceKHR*)&result.Surface);
+        return result;
+    }
 
-        GLFWwindow* GetNativeHandle() { return this->handle; }
-        const GLFWwindow* GetNativeHandle() const { return this->handle; }
-        RequiredExtensions GetRequiredExtensions() const;
-
-        Window(const WindowCreateOptions& options);
-        Window(const Window&) = delete;
-        Window& operator=(const Window&) = delete;
-        Window(Window&& other) noexcept;
-        Window& operator=(Window&& other) noexcept;
-        ~Window();
-
-        void PollEvents() const;
-        bool ShouldClose() const;
-
-        void SetSize(const Vector2& size);
-        void SetPosition(const Vector3& position);
-
-        const WindowSurface& CreateWindowSurface(const VulkanContext& context);
-    };
+    bool CheckVulkanPresentationSupport(const vk::Instance& instance, const vk::PhysicalDevice& physicalDevice, uint32_t familyQueueIndex)
+    {
+        return glfwGetPhysicalDevicePresentationSupport(instance, physicalDevice, familyQueueIndex) == GLFW_TRUE;
+    }
 }

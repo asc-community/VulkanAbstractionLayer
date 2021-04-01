@@ -33,6 +33,8 @@
 
 namespace VulkanAbstractionLayer
 {
+    const WindowSurface& CreateVulkanSurface(GLFWwindow* window, const VulkanContext& context);
+
     Window::Window(const WindowCreateOptions& options)
     {
         if (glfwInit() != GLFW_TRUE)
@@ -112,5 +114,10 @@ namespace VulkanAbstractionLayer
     void Window::SetPosition(const Vector3& position)
     {
         glfwSetWindowPos(this->handle, (int)position.x, (int)position.y);
+    }
+
+    const WindowSurface& Window::CreateWindowSurface(const VulkanContext& context)
+    {
+        return CreateVulkanSurface(this->handle, context);
     }
 }
