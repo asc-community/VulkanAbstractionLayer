@@ -27,6 +27,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "VectorMath.h"
+#include <vector>
+#include <functional>
 
 struct GLFWwindow;
 
@@ -49,16 +51,11 @@ namespace VulkanAbstractionLayer
     class Window
     {
         GLFWwindow* handle = nullptr;
+        std::function<void(Window&, Vector2)> onResize;
     public:
-        struct RequiredExtensions
-        {
-            const char** ExtensionNames = nullptr;
-            uint32_t ExtensionCount = 0;
-        };
-
         GLFWwindow* GetNativeHandle() { return this->handle; }
         const GLFWwindow* GetNativeHandle() const { return this->handle; }
-        RequiredExtensions GetRequiredExtensions() const;
+        std::vector<const char*> GetRequiredExtensions() const;
 
         Window(const WindowCreateOptions& options);
         Window(const Window&) = delete;
@@ -72,6 +69,8 @@ namespace VulkanAbstractionLayer
 
         void SetSize(const Vector2& size);
         void SetPosition(const Vector3& position);
+
+        void OnResize(std::function<void(Window&, Vector2)> callback);
 
         const WindowSurface& CreateWindowSurface(const VulkanContext& context);
     };

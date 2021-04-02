@@ -64,7 +64,7 @@ namespace VulkanAbstractionLayer
             if (layerIt == layers.end())
             {
                 if (options.ErrorCallback)
-                    options.ErrorCallback("cannot enable requested layer");
+                    options.ErrorCallback(("cannot enable requested layer: " + std::string(layerName)).c_str());
                 return;
             }
         }
@@ -114,22 +114,6 @@ namespace VulkanAbstractionLayer
         return { };
     }
 
-    void VulkanContext::Move(VulkanContext&& other)
-    {
-        this->instance = std::move(other.instance);
-        this->surface = std::move(other.surface);
-        this->physicalDevice = std::move(other.physicalDevice);
-        this->physicalDeviceProperties = std::move(other.physicalDeviceProperties);
-        this->queueFamilyIndex = std::move(other.queueFamilyIndex);
-        this->apiVersion = std::move(other.apiVersion);
-
-        other.surface = nullptr;
-        other.instance = nullptr;
-        other.physicalDevice = nullptr;
-        other.queueFamilyIndex = { };
-        other.apiVersion = { };
-    }
-
     VulkanContext::VulkanContext(const VulkanContextCreateOptions& options)
     {
         vk::ApplicationInfo applicationInfo;
@@ -158,22 +142,21 @@ namespace VulkanAbstractionLayer
 
     VulkanContext::~VulkanContext()
     {
-        if((bool)this->surface ) this->instance.destroySurfaceKHR(this->surface);
-        if((bool)this->instance) this->instance.destroy();
+        for (const auto& imageView : this->swapchainImageViews)
+            if((bool)imageView) this->device.destroyImageView(imageView);
+
+        if ((bool)this->swapchain) this->device.destroySwapchainKHR(this->swapchain);
+        if ((bool)this->imageAvailableSemaphore) this->device.destroySemaphore(this->imageAvailableSemaphore);
+        if ((bool)this->renderingFinishedSemaphore) this->device.destroySemaphore(this->renderingFinishedSemaphore);
+        if ((bool)this->device) this->device.destroy();
+        if ((bool)this->surface) this->instance.destroySurfaceKHR(this->surface);
+        if ((bool)this->instance) this->instance.destroy();
+        this->presentImageCount = { };
+        this->queueFamilyIndex = { };
+        this->apiVersion = { };
     }
 
-    VulkanContext::VulkanContext(VulkanContext&& other) noexcept
-    {
-        this->Move(std::move(other));
-    }
-
-    VulkanContext& VulkanContext::operator=(VulkanContext&& other) noexcept
-    {
-        this->Move(std::move(other));
-        return *this;
-    }
-
-    void VulkanContext::InitializePhysicalDevice(const WindowSurface& surface, const DeviceInitializeOptions& options)
+    void VulkanContext::InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options)
     {
         this->surface = *reinterpret_cast<const VkSurfaceKHR*>(&surface);
 
@@ -183,21 +166,21 @@ namespace VulkanAbstractionLayer
                 options.ErrorCallback("failed to initialize surface");
             return;
         }
-        
+
         if (options.InfoCallback)
             options.InfoCallback("enumerating physical devices:");
-        
+
         auto physicalDevices = this->instance.enumeratePhysicalDevices();
         for (const auto& device : physicalDevices)
         {
             auto properties = device.getProperties();
 
-            if (options.InfoCallback) 
+            if (options.InfoCallback)
                 options.InfoCallback(properties.deviceName);
 
             if (properties.apiVersion < this->apiVersion)
             {
-                if (options.InfoCallback) 
+                if (options.InfoCallback)
                     options.InfoCallback("skipping device as its Vulkan API version is less than required");
                 continue;
             }
@@ -209,11 +192,11 @@ namespace VulkanAbstractionLayer
                     options.InfoCallback("skipping device as its queue families does not satisfy the requirements");
                 continue;
             }
-            
+
             this->physicalDevice = device;
             this->physicalDeviceProperties = properties;
             this->queueFamilyIndex = queueFamilyIndex.value();
-            if (properties.deviceType == DeviceTypeMapping[(size_t)options.PreferredType])
+            if (properties.deviceType == DeviceTypeMapping[(size_t)options.PreferredDeviceType])
                 break;
         }
 
@@ -227,9 +210,126 @@ namespace VulkanAbstractionLayer
         {
             if (options.InfoCallback)
             {
-                options.InfoCallback("selected physical device:");
-                options.InfoCallback(this->physicalDeviceProperties.deviceName);
+                options.InfoCallback((std::string("selected physical device: ") + this->physicalDeviceProperties.deviceName.data()).c_str());
             }
+        }
+
+        auto presentModes = this->physicalDevice.getSurfacePresentModesKHR(this->surface);
+        auto surfaceCapabilities = this->physicalDevice.getSurfaceCapabilitiesKHR(this->surface);
+        auto surfaceFormats = this->physicalDevice.getSurfaceFormatsKHR(this->surface);
+
+        // find best surface present mode
+        this->surfacePresentMode = vk::PresentModeKHR::eImmediate;
+        if (std::find(presentModes.begin(), presentModes.end(), vk::PresentModeKHR::eMailbox) != presentModes.end())
+            this->surfacePresentMode = vk::PresentModeKHR::eMailbox;
+
+        // determine present image count
+        this->presentImageCount = std::max(surfaceCapabilities.maxImageCount, 1u);
+
+        // find best surface format
+        this->surfaceFormat = surfaceFormats.front();
+        for (const auto& format : surfaceFormats)
+        {
+            if (format.format == vk::Format::eR8G8B8A8Unorm || format.format == vk::Format::eB8G8R8A8Unorm)
+                this->surfaceFormat = format;
+        }
+
+        if (options.InfoCallback)
+        {
+            options.InfoCallback(("selected surface present mode: " + vk::to_string(this->surfacePresentMode)).c_str());
+            options.InfoCallback(("selected surface format: " + vk::to_string(this->surfaceFormat.format)).c_str());
+            options.InfoCallback(("present image count: " + std::to_string(this->presentImageCount)).c_str());
+        }
+
+        vk::DeviceQueueCreateInfo deviceQueueCreateInfo;
+        std::array queuePriorities = { 1.0f };
+        deviceQueueCreateInfo.setQueueFamilyIndex(this->queueFamilyIndex);
+        deviceQueueCreateInfo.setQueuePriorities(queuePriorities);
+
+        auto deviceExtensions = options.DeviceExtensions;
+        deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+        vk::DeviceCreateInfo deviceCreateInfo;
+        deviceCreateInfo.setQueueCreateInfos(deviceQueueCreateInfo);
+        deviceCreateInfo.setPEnabledExtensionNames(deviceExtensions);
+
+        this->device = this->physicalDevice.createDevice(deviceCreateInfo);
+        this->deviceQueue = this->device.getQueue(this->queueFamilyIndex, 0);
+
+        if (options.InfoCallback)
+            options.InfoCallback("created logical device and device queues");
+        
+        this->imageAvailableSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
+        this->renderingFinishedSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
+
+        this->RecreateSwapchain(surfaceCapabilities.maxImageExtent.width, surfaceCapabilities.maxImageExtent.height);
+
+        if (options.InfoCallback)
+            options.InfoCallback("created swapchain");
+    }
+
+    void VulkanContext::RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight)
+    {
+        this->device.waitIdle();
+
+        auto surfaceCapabilities = this->physicalDevice.getSurfaceCapabilitiesKHR(this->surface);
+        auto surfaceExtent = vk::Extent2D(
+            std::clamp(surfaceWidth,  surfaceCapabilities.minImageExtent.width,  surfaceCapabilities.maxImageExtent.width ),
+            std::clamp(surfaceHeight, surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height)
+        );
+
+        vk::SwapchainCreateInfoKHR swapchainCreateInfo;
+        swapchainCreateInfo
+            .setSurface(this->surface)
+            .setMinImageCount(this->presentImageCount)
+            .setImageFormat(this->surfaceFormat.format)
+            .setImageColorSpace(this->surfaceFormat.colorSpace)
+            .setImageExtent(surfaceExtent)
+            .setImageArrayLayers(1)
+            .setImageUsage(vk::ImageUsageFlagBits::eColorAttachment)
+            .setImageSharingMode(vk::SharingMode::eExclusive)
+            .setPreTransform(surfaceCapabilities.currentTransform)
+            .setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque)
+            .setPresentMode(this->surfacePresentMode)
+            .setClipped(true)
+            .setOldSwapchain(this->swapchain);
+
+        this->swapchain = this->device.createSwapchainKHR(swapchainCreateInfo);
+
+        if (bool(swapchainCreateInfo.oldSwapchain))
+            this->device.destroySwapchainKHR(swapchainCreateInfo.oldSwapchain);
+
+        auto swapchainImages = this->device.getSwapchainImagesKHR(this->swapchain);
+        if(this->swapchainImageViews.size() != swapchainImages.size())
+            this->swapchainImageViews.resize(this->presentImageCount);
+
+        for (uint32_t i = 0; i <this->presentImageCount; i++)
+        {
+            vk::ImageSubresourceRange imageSubresourceRange;
+            imageSubresourceRange
+                .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                .setBaseMipLevel(0)
+                .setLevelCount(1)
+                .setBaseArrayLayer(0)
+                .setLayerCount(1);
+
+            vk::ImageViewCreateInfo imageViewCreateInfo;
+            imageViewCreateInfo
+                .setImage(swapchainImages[i])
+                .setViewType(vk::ImageViewType::e2D)
+                .setFormat(this->surfaceFormat.format)
+                .setSubresourceRange(imageSubresourceRange)
+                .setComponents(vk::ComponentMapping {
+                    vk::ComponentSwizzle::eIdentity,
+                    vk::ComponentSwizzle::eIdentity,
+                    vk::ComponentSwizzle::eIdentity,
+                    vk::ComponentSwizzle::eIdentity
+                });
+
+            if ((bool)this->swapchainImageViews[i])
+                this->device.destroyImageView(this->swapchainImageViews[i]);
+
+            this->swapchainImageViews[i] = this->device.createImageView(imageViewCreateInfo);
         }
     }
 }

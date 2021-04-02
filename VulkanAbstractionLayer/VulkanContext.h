@@ -27,6 +27,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <vulkan/vulkan.hpp>
+#include <vector>
 
 namespace VulkanAbstractionLayer
 {
@@ -38,8 +39,8 @@ namespace VulkanAbstractionLayer
         int VulkanApiMinorVersion = 0;
         void (*ErrorCallback)(const char*) = nullptr;
         void (*InfoCallback)(const char*) = nullptr;
-        vk::ArrayProxyNoTemporaries<const char* const> Extensions;
-        vk::ArrayProxyNoTemporaries<const char* const> Layers;
+        std::vector<const char*> Extensions;
+        std::vector<const char*> Layers;
         const char* ApplicationName = "VulkanAbstractionLayer";
         const char* EngineName = "VulkanAbstractionLayer";
     };
@@ -53,35 +54,47 @@ namespace VulkanAbstractionLayer
         OTHER,
     };
 
-    struct DeviceInitializeOptions
+    struct ContextInitializeOptions
     {
-        DeviceType PreferredType = DeviceType::DISCRETE_GPU;
+        DeviceType PreferredDeviceType = DeviceType::DISCRETE_GPU;
         void (*ErrorCallback)(const char*) = nullptr;
         void (*InfoCallback)(const char*) = nullptr;
+        std::vector<const char*> DeviceExtensions;
     };
 
     class VulkanContext
     {
         vk::Instance instance;
         vk::SurfaceKHR surface;
+        vk::SurfaceFormatKHR surfaceFormat;
+        vk::PresentModeKHR surfacePresentMode;
+        uint32_t presentImageCount = { };
         vk::PhysicalDevice physicalDevice;
         vk::PhysicalDeviceProperties physicalDeviceProperties;
+        vk::Device device;
+        vk::Queue deviceQueue;
+        vk::Semaphore imageAvailableSemaphore;
+        vk::Semaphore renderingFinishedSemaphore;
+        vk::SwapchainKHR swapchain;
+        std::vector<vk::ImageView> swapchainImageViews;
         uint32_t queueFamilyIndex = { };
         uint32_t apiVersion = { };
-
-        void Move(VulkanContext&& other);
     public:
         VulkanContext(const VulkanContextCreateOptions& options);
         ~VulkanContext();
         VulkanContext(const VulkanContext&) = delete;
         VulkanContext& operator=(const VulkanContext&) = delete;
-        VulkanContext(VulkanContext&& other) noexcept;
-        VulkanContext& operator=(VulkanContext&& other) noexcept;
+        VulkanContext(VulkanContext&& other) = delete;
+        VulkanContext& operator=(VulkanContext&& other) = delete;
 
         const vk::Instance& GetInstance() const { return this->instance; }
         const vk::SurfaceKHR& GetSurface() const { return this->surface; }
         const vk::PhysicalDevice& GetPhysicalDevice() const { return this->physicalDevice; }
+        const vk::Device& GetDevice() const { return this->device; }
+        const vk::Queue& GetPresentQueue() const { return this->deviceQueue; }
+        const vk::Queue& GetGraphicsQueue() const { return this->deviceQueue; }
 
-        void InitializePhysicalDevice(const WindowSurface& surface, const DeviceInitializeOptions& options);
+        void InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options);
+        void RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight);
     };
 }

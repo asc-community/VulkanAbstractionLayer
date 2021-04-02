@@ -64,19 +64,31 @@ namespace VulkanAbstractionLayer
         }
 
         glfwSetWindowPos(this->handle, (int)options.Position.x, (int)options.Position.y);
+        glfwSetWindowUserPointer(this->handle, (void*)this);
+        glfwSetWindowSizeCallback(this->handle, [](GLFWwindow* handle, int width, int height)
+        {
+            auto& window = *(Window*)glfwGetWindowUserPointer(handle);
+            if(window.onResize) window.onResize(window, Vector2((float)width, (float)height));
+        });
     }
 
     Window::Window(Window&& other) noexcept
     {
         this->handle = other.handle;
+        this->onResize = std::move(other.onResize);
         other.handle = nullptr;
+
+        glfwSetWindowUserPointer(this->handle, (void*)this);
     }
 
     Window& Window::operator=(Window&& other) noexcept
     {
         this->handle = other.handle;
+        this->onResize = std::move(other.onResize);
         other.handle = nullptr;
-        
+
+        glfwSetWindowUserPointer(this->handle, (void*)this);
+
         return *this;
     }
 
@@ -84,16 +96,16 @@ namespace VulkanAbstractionLayer
     {
         if (this->handle != nullptr)
         {
-            glfwTerminate();
+            glfwDestroyWindow(this->handle);
             this->handle = nullptr;
         }
     }
 
-    Window::RequiredExtensions Window::GetRequiredExtensions() const
+    std::vector<const char*> Window::GetRequiredExtensions() const
     {
-        RequiredExtensions result;
-        result.ExtensionNames = glfwGetRequiredInstanceExtensions(&result.ExtensionCount);
-        return result;
+        uint32_t extensionCount = 0;
+        const char** extensions = glfwGetRequiredInstanceExtensions(&extensionCount);
+        return std::vector<const char*>(extensions, extensions + extensionCount);
     }
 
     void Window::PollEvents() const
@@ -114,6 +126,11 @@ namespace VulkanAbstractionLayer
     void Window::SetPosition(const Vector3& position)
     {
         glfwSetWindowPos(this->handle, (int)position.x, (int)position.y);
+    }
+
+    void Window::OnResize(std::function<void(Window&, Vector2)> callback)
+    {
+        this->onResize = std::move(callback);
     }
 
     const WindowSurface& Window::CreateWindowSurface(const VulkanContext& context)
