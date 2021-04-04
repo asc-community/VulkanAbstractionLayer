@@ -118,14 +118,28 @@ namespace VulkanAbstractionLayer
         return glfwWindowShouldClose(this->handle);
     }
 
-    void Window::SetSize(const Vector2& size)
+    Vector2 Window::GetSize() const
+    {
+        int width = 0, height = 0;
+        glfwGetWindowSize(this->handle, &width, &height);
+        return Vector2((float)width, (float)height);
+    }
+
+    void Window::SetSize(Vector2 size)
     {
         glfwSetWindowSize(this->handle, (int)size.x, (int)size.y);
     }
 
-    void Window::SetPosition(const Vector3& position)
+    void Window::SetPosition(Vector2 position)
     {
         glfwSetWindowPos(this->handle, (int)position.x, (int)position.y);
+    }
+
+    Vector2 Window::GetPosition() const
+    {
+        int x = 0, y = 0;
+        glfwGetWindowPos(this->handle, &x, &y);
+        return Vector2((float)x, (float)y);
     }
 
     void Window::OnResize(std::function<void(Window&, Vector2)> callback)

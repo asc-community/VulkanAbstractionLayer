@@ -56,6 +56,10 @@ int main()
     while (!window.ShouldClose())
     {
         window.PollEvents();
+
+        Vulkan.StartFrame();
+        // rendering
+        Vulkan.EndFrame();
     }
 
     return 0;

@@ -28,54 +28,29 @@
 
 #pragma once
 
-#include "VectorMath.h"
-#include <vector>
-#include <functional>
-
-struct GLFWwindow;
+#include <vulkan/vulkan.hpp>
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
-    struct WindowSurface;
-
-    struct WindowCreateOptions
+    struct VirtualFrame
     {
-        bool TransparentFramebuffer = false;
-        bool Resizeable = true;
-        bool TileBar = true;
-        void (*ErrorCallback)(const char*) = nullptr;
-        Vector2 Size{ 800.0f, 600.0f };
-        Vector2 Position{ 0.0f, 0.0f };
-        const char* Title = "VulkanAbstractionLayer";
+        vk::CommandBuffer commandBuffer;
+        vk::Fence commandQueueFence;
+        vk::Framebuffer framebuffer;
     };
 
-    class Window
+    class VirtualFrameProvider
     {
-        GLFWwindow* handle = nullptr;
-        std::function<void(Window&, Vector2)> onResize;
+        std::vector<VirtualFrame> virtualFrames;
+        size_t currentFrame = 0;
     public:
-        GLFWwindow* GetNativeHandle() { return this->handle; }
-        const GLFWwindow* GetNativeHandle() const { return this->handle; }
-        std::vector<const char*> GetRequiredExtensions() const;
+        VirtualFrameProvider() = default;
+        void Init(size_t frameCount, const vk::Device& device, const vk::CommandPool& pool);
+        void Destroy(const vk::Device& device);
 
-        Window(const WindowCreateOptions& options);
-        Window(const Window&) = delete;
-        Window& operator=(const Window&) = delete;
-        Window(Window&& other) noexcept;
-        Window& operator=(Window&& other) noexcept;
-        ~Window();
-
-        void PollEvents() const;
-        bool ShouldClose() const;
-
-        void SetSize(Vector2 size);
-        Vector2 GetSize() const;
-        void SetPosition(Vector2 position);
-        Vector2 GetPosition() const;
-
-        void OnResize(std::function<void(Window&, Vector2)> callback);
-
-        const WindowSurface& CreateWindowSurface(const VulkanContext& context);
+        void StartFrame();
+        VirtualFrame& GetCurrentFrame();
+        VirtualFrame& GetNextFrame();
+        void EndFrame();
     };
 }

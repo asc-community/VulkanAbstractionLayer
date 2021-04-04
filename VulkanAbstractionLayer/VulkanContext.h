@@ -26,8 +26,12 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#pragma once
+
 #include <vulkan/vulkan.hpp>
 #include <vector>
+
+#include "VirtualFrame.h"
 
 namespace VulkanAbstractionLayer
 {
@@ -60,6 +64,7 @@ namespace VulkanAbstractionLayer
         void (*ErrorCallback)(const char*) = nullptr;
         void (*InfoCallback)(const char*) = nullptr;
         std::vector<const char*> DeviceExtensions;
+        size_t virtualFrameCount = 3;
     };
 
     class VulkanContext
@@ -75,8 +80,11 @@ namespace VulkanAbstractionLayer
         vk::Queue deviceQueue;
         vk::Semaphore imageAvailableSemaphore;
         vk::Semaphore renderingFinishedSemaphore;
+        vk::CommandPool commandPool;
         vk::SwapchainKHR swapchain;
+        vk::DescriptorPool descriptorPool;
         std::vector<vk::ImageView> swapchainImageViews;
+        VirtualFrameProvider virtualFrames;
         uint32_t queueFamilyIndex = { };
         uint32_t apiVersion = { };
     public:
@@ -93,8 +101,12 @@ namespace VulkanAbstractionLayer
         const vk::Device& GetDevice() const { return this->device; }
         const vk::Queue& GetPresentQueue() const { return this->deviceQueue; }
         const vk::Queue& GetGraphicsQueue() const { return this->deviceQueue; }
+        const vk::CommandPool& GetCommandPool() const { return this->commandPool; }
+        const vk::DescriptorPool& GetDescriptorPool() const { return this->descriptorPool; }
 
         void InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options);
         void RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight);
+        void StartFrame();
+        void EndFrame();
     };
 }

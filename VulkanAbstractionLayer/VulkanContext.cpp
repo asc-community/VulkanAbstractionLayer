@@ -142,6 +142,10 @@ namespace VulkanAbstractionLayer
 
     VulkanContext::~VulkanContext()
     {
+        this->virtualFrames.Destroy(this->device);
+        if ((bool)this->descriptorPool) this->device.destroyDescriptorPool(this->descriptorPool);
+        if ((bool)this->commandPool) this->device.destroyCommandPool(this->commandPool);
+
         for (const auto& imageView : this->swapchainImageViews)
             if((bool)imageView) this->device.destroyImageView(imageView);
 
@@ -169,7 +173,8 @@ namespace VulkanAbstractionLayer
 
         if (options.InfoCallback)
             options.InfoCallback("enumerating physical devices:");
-
+        
+        // enumerate physical devices
         auto physicalDevices = this->instance.enumeratePhysicalDevices();
         for (const auto& device : physicalDevices)
         {
@@ -214,6 +219,8 @@ namespace VulkanAbstractionLayer
             }
         }
 
+        // collect surface present info
+
         auto presentModes = this->physicalDevice.getSurfacePresentModesKHR(this->surface);
         auto surfaceCapabilities = this->physicalDevice.getSurfaceCapabilitiesKHR(this->surface);
         auto surfaceFormats = this->physicalDevice.getSurfaceFormatsKHR(this->surface);
@@ -241,6 +248,8 @@ namespace VulkanAbstractionLayer
             options.InfoCallback(("present image count: " + std::to_string(this->presentImageCount)).c_str());
         }
 
+        // logical device and device queue
+
         vk::DeviceQueueCreateInfo deviceQueueCreateInfo;
         std::array queuePriorities = { 1.0f };
         deviceQueueCreateInfo.setQueueFamilyIndex(this->queueFamilyIndex);
@@ -258,14 +267,37 @@ namespace VulkanAbstractionLayer
 
         if (options.InfoCallback)
             options.InfoCallback("created logical device and device queues");
-        
-        this->imageAvailableSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
-        this->renderingFinishedSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
 
         this->RecreateSwapchain(surfaceCapabilities.maxImageExtent.width, surfaceCapabilities.maxImageExtent.height);
 
         if (options.InfoCallback)
             options.InfoCallback("created swapchain");
+
+        this->imageAvailableSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
+        this->renderingFinishedSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
+
+        vk::CommandPoolCreateInfo commandPoolCreateInfo;
+        commandPoolCreateInfo
+            .setQueueFamilyIndex(this->queueFamilyIndex)
+            .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer | vk::CommandPoolCreateFlagBits::eTransient);
+
+        this->commandPool = this->device.createCommandPool(commandPoolCreateInfo);
+
+        // TODO: rework
+        std::array descriptorPoolSizes = {
+            vk::DescriptorPoolSize {
+                vk::DescriptorType::eCombinedImageSampler,
+                1
+            }
+        };
+        vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+        descriptorPoolCreateInfo
+            .setPoolSizes(descriptorPoolSizes)
+            .setMaxSets(2);
+
+        this->descriptorPool = this->device.createDescriptorPool(descriptorPoolCreateInfo);
+
+        this->virtualFrames.Init(options.virtualFrameCount, this->device, this->commandPool);
     }
 
     void VulkanContext::RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight)
@@ -300,7 +332,8 @@ namespace VulkanAbstractionLayer
             this->device.destroySwapchainKHR(swapchainCreateInfo.oldSwapchain);
 
         auto swapchainImages = this->device.getSwapchainImagesKHR(this->swapchain);
-        if(this->swapchainImageViews.size() != swapchainImages.size())
+        this->presentImageCount = swapchainImages.size();
+        if(this->swapchainImageViews.size() != this->presentImageCount)
             this->swapchainImageViews.resize(this->presentImageCount);
 
         for (uint32_t i = 0; i <this->presentImageCount; i++)
@@ -331,5 +364,15 @@ namespace VulkanAbstractionLayer
 
             this->swapchainImageViews[i] = this->device.createImageView(imageViewCreateInfo);
         }
+    }
+
+    void VulkanContext::StartFrame()
+    {
+        this->virtualFrames.StartFrame();
+    }
+
+    void VulkanContext::EndFrame()
+    {
+        this->virtualFrames.EndFrame();
     }
 }
