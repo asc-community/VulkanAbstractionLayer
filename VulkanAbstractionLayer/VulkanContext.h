@@ -30,6 +30,7 @@
 
 #include <vulkan/vulkan.hpp>
 #include <vector>
+#include "vk_mem_alloc.h"
 
 #include "VirtualFrame.h"
 
@@ -83,6 +84,7 @@ namespace VulkanAbstractionLayer
         vk::CommandPool commandPool;
         vk::SwapchainKHR swapchain;
         vk::DescriptorPool descriptorPool;
+        VmaAllocator allocator;
         std::vector<vk::ImageView> swapchainImageViews;
         VirtualFrameProvider virtualFrames;
         uint32_t queueFamilyIndex = { };
@@ -103,6 +105,7 @@ namespace VulkanAbstractionLayer
         const vk::Queue& GetGraphicsQueue() const { return this->deviceQueue; }
         const vk::CommandPool& GetCommandPool() const { return this->commandPool; }
         const vk::DescriptorPool& GetDescriptorPool() const { return this->descriptorPool; }
+        const VmaAllocator& GetAllocator() const { return this->allocator; }
 
         void InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options);
         void RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight);

@@ -3,6 +3,7 @@
 
 #include "VulkanAbstractionLayer/Window.h"
 #include "VulkanAbstractionLayer/VulkanContext.h"
+#include "VulkanAbstractionLayer/Buffer.h"
 
 using namespace VulkanAbstractionLayer;
 
@@ -52,7 +53,7 @@ int main()
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
     });
-
+    
     while (!window.ShouldClose())
     {
         window.PollEvents();

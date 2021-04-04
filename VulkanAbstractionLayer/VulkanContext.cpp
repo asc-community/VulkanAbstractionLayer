@@ -143,6 +143,9 @@ namespace VulkanAbstractionLayer
     VulkanContext::~VulkanContext()
     {
         this->virtualFrames.Destroy(this->device);
+        
+        vmaDestroyAllocator(this->allocator);
+
         if ((bool)this->descriptorPool) this->device.destroyDescriptorPool(this->descriptorPool);
         if ((bool)this->commandPool) this->device.destroyCommandPool(this->commandPool);
 
@@ -296,6 +299,19 @@ namespace VulkanAbstractionLayer
             .setMaxSets(2);
 
         this->descriptorPool = this->device.createDescriptorPool(descriptorPoolCreateInfo);
+
+        if (options.InfoCallback)
+            options.InfoCallback("created command buffer pool and descriptor pool");
+
+        VmaAllocatorCreateInfo allocatorInfo = {};
+        allocatorInfo.vulkanApiVersion = this->apiVersion;
+        allocatorInfo.physicalDevice = this->physicalDevice;
+        allocatorInfo.device = this->device;
+        allocatorInfo.instance = this->instance;
+        vmaCreateAllocator(&allocatorInfo, &this->allocator);
+
+        if (options.InfoCallback)
+            options.InfoCallback("created vulkan memory allocator");
 
         this->virtualFrames.Init(options.virtualFrameCount, this->device, this->commandPool);
     }
