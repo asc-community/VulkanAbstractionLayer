@@ -27,48 +27,142 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "VirtualFrame.h"
+#include "VulkanContext.h"
 
 namespace VulkanAbstractionLayer
 {
-    void VirtualFrameProvider::EndFrame()
+    void VirtualFrameProvider::EndFrame(const VulkanContext& context)
     {
+        auto& frame = this->GetCurrentFrame();
+
+        vk::ImageSubresourceRange subresourceRange{
+                vk::ImageAspectFlagBits::eColor,
+                0, // base mip level
+                1, // level count
+                0, // base layer
+                1  // layer count
+        };
+
+        auto& presentImage = context.GetSwapchainImage(this->presentImageIndex);
+
+        vk::ImageMemoryBarrier presentImageUndefinedToClear;
+        presentImageUndefinedToClear
+            .setSrcAccessMask(vk::AccessFlagBits::eMemoryRead)
+            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setOldLayout(vk::ImageLayout::eUndefined)
+            .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
+            .setSrcQueueFamilyIndex(context.GetQueueFamilyIndex())
+            .setDstQueueFamilyIndex(context.GetQueueFamilyIndex())
+            .setImage(presentImage.GetNativeHandle())
+            .setSubresourceRange(subresourceRange);
+       
+        frame.CommandBuffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eTransfer,
+            { }, // dependency flags
+            { }, // memory barriers
+            { }, // buffer barriers
+            presentImageUndefinedToClear
+        );
+
+        vk::ClearColorValue color = std::array{ 1.0f, 0.7f, 0.0f, 1.0f };
+        frame.CommandBuffer.clearColorImage(presentImage.GetNativeHandle(), vk::ImageLayout::eTransferDstOptimal, color, subresourceRange);
+
+        vk::ImageMemoryBarrier presentImageClearToPresent;
+        presentImageClearToPresent
+            .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
+            .setOldLayout(vk::ImageLayout::eTransferDstOptimal)
+            .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
+            .setSrcQueueFamilyIndex(context.GetQueueFamilyIndex())
+            .setDstQueueFamilyIndex(context.GetQueueFamilyIndex())
+            .setImage(presentImage.GetNativeHandle())
+            .setSubresourceRange(subresourceRange);
+
+        frame.CommandBuffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eBottomOfPipe,
+            { }, // dependency flags
+            { }, // memory barriers
+            { }, // buffer barriers
+            presentImageClearToPresent
+        );
+
+        frame.CommandBuffer.end();
+
+        std::array waitDstStageMask = { (vk::PipelineStageFlags)vk::PipelineStageFlagBits::eTransfer };
+
+        vk::SubmitInfo submitInfo;
+        submitInfo
+            .setWaitSemaphores(context.GetImageAvailableSemaphore())
+            .setWaitDstStageMask(waitDstStageMask)
+            .setSignalSemaphores(context.GetRenderingFinishedSemaphore())
+            .setCommandBuffers(frame.CommandBuffer);
+
+        context.GetGraphicsQueue().submit(std::array{ submitInfo }, frame.CommandQueueFence);
+
+        vk::PresentInfoKHR presentInfo;
+        presentInfo
+            .setWaitSemaphores(context.GetRenderingFinishedSemaphore())
+            .setSwapchains(context.GetSwapchain())
+            .setImageIndices(this->presentImageIndex);
+
+        auto presetSucceeded = context.GetPresentQueue().presentKHR(presentInfo);
+        assert(presetSucceeded == vk::Result::eSuccess);
+
         this->currentFrame = (this->currentFrame + 1) % this->virtualFrames.size();
     }
 
-    void VirtualFrameProvider::Init(size_t frameCount, const vk::Device& device, const vk::CommandPool& pool)
+    void VirtualFrameProvider::RecreateFramebuffer(const VulkanContext& context)
+    {
+        VirtualFrame& frame = this->GetCurrentFrame();
+    }
+
+    void VirtualFrameProvider::Init(size_t frameCount, const VulkanContext& context)
     {
         this->virtualFrames.resize(frameCount);
 
         vk::CommandBufferAllocateInfo commandBufferAllocateInfo;
         commandBufferAllocateInfo
-            .setCommandPool(pool)
-            .setCommandBufferCount(frameCount)
+            .setCommandPool(context.GetCommandPool())
+            .setCommandBufferCount((uint32_t)frameCount)
             .setLevel(vk::CommandBufferLevel::ePrimary);
         
-        auto commandBuffers = device.allocateCommandBuffers(commandBufferAllocateInfo);
+        auto commandBuffers = context.GetDevice().allocateCommandBuffers(commandBufferAllocateInfo);
 
         for (size_t i = 0; i < frameCount; i++)
         {
             VirtualFrame& virtualFrame = this->virtualFrames[i];
-            virtualFrame.commandBuffer = std::move(commandBuffers[i]);
-            virtualFrame.commandQueueFence = device.createFence(vk::FenceCreateInfo{ vk::FenceCreateFlagBits::eSignaled });
+            virtualFrame.CommandBuffer = std::move(commandBuffers[i]);
+            virtualFrame.CommandQueueFence = context.GetDevice().createFence(vk::FenceCreateInfo{ vk::FenceCreateFlagBits::eSignaled });
             // virtualFrame.framebuffer is recreated on StartFrame
         }
     }
 
-    void VirtualFrameProvider::Destroy(const vk::Device& device)
+    void VirtualFrameProvider::Destroy(const VulkanContext& context)
     {
         for (const auto& virtualFrame : this->virtualFrames)
         {
-            if((bool)virtualFrame.commandQueueFence) device.destroyFence(virtualFrame.commandQueueFence);
-            if((bool)virtualFrame.framebuffer) device.destroyFramebuffer(virtualFrame.framebuffer);
+            if((bool)virtualFrame.CommandQueueFence) context.GetDevice().destroyFence(virtualFrame.CommandQueueFence);
         }
         this->virtualFrames.clear();
     }
 
-    void VirtualFrameProvider::StartFrame()
+    void VirtualFrameProvider::StartFrame(const VulkanContext& context)
     {
-       
+        auto acquireNextImage = context.GetDevice().acquireNextImageKHR(context.GetSwapchain(), UINT64_MAX, context.GetImageAvailableSemaphore());
+        assert(acquireNextImage.result == vk::Result::eSuccess || acquireNextImage.result == vk::Result::eSuboptimalKHR);
+        this->presentImageIndex = acquireNextImage.value;
+        
+        auto& frame = this->GetCurrentFrame();
+
+        vk::Result waitFenceResult = context.GetDevice().waitForFences(frame.CommandQueueFence, false, UINT64_MAX);
+        assert(waitFenceResult == vk::Result::eSuccess);
+        context.GetDevice().resetFences(frame.CommandQueueFence);
+
+        vk::CommandBufferBeginInfo commandBufferBeginInfo;
+        commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+        frame.CommandBuffer.begin(commandBufferBeginInfo);
     }
 
     VirtualFrame& VirtualFrameProvider::GetCurrentFrame()

@@ -30,9 +30,12 @@
 
 #include <vulkan/vulkan.hpp>
 #include <vector>
-#include "vk_mem_alloc.h"
 
 #include "VirtualFrame.h"
+#include "Image.h"
+
+struct VmaAllocator_T;
+using VmaAllocator = VmaAllocator_T*;
 
 namespace VulkanAbstractionLayer
 {
@@ -74,6 +77,7 @@ namespace VulkanAbstractionLayer
         vk::SurfaceKHR surface;
         vk::SurfaceFormatKHR surfaceFormat;
         vk::PresentModeKHR surfacePresentMode;
+        vk::Extent2D surfaceExtent;
         uint32_t presentImageCount = { };
         vk::PhysicalDevice physicalDevice;
         vk::PhysicalDeviceProperties physicalDeviceProperties;
@@ -85,7 +89,7 @@ namespace VulkanAbstractionLayer
         vk::SwapchainKHR swapchain;
         vk::DescriptorPool descriptorPool;
         VmaAllocator allocator;
-        std::vector<vk::ImageView> swapchainImageViews;
+        std::vector<Image> swapchainImages;
         VirtualFrameProvider virtualFrames;
         uint32_t queueFamilyIndex = { };
         uint32_t apiVersion = { };
@@ -99,13 +103,19 @@ namespace VulkanAbstractionLayer
 
         const vk::Instance& GetInstance() const { return this->instance; }
         const vk::SurfaceKHR& GetSurface() const { return this->surface; }
+        const vk::Extent2D& GetSurfaceExtent() const { return this->surfaceExtent; }
         const vk::PhysicalDevice& GetPhysicalDevice() const { return this->physicalDevice; }
         const vk::Device& GetDevice() const { return this->device; }
         const vk::Queue& GetPresentQueue() const { return this->deviceQueue; }
         const vk::Queue& GetGraphicsQueue() const { return this->deviceQueue; }
+        const vk::Semaphore& GetRenderingFinishedSemaphore() const { return this->renderingFinishedSemaphore; }
+        const vk::Semaphore& GetImageAvailableSemaphore() const { return this->imageAvailableSemaphore; }
+        const vk::SwapchainKHR& GetSwapchain() const { return this->swapchain; }
         const vk::CommandPool& GetCommandPool() const { return this->commandPool; }
         const vk::DescriptorPool& GetDescriptorPool() const { return this->descriptorPool; }
+        uint32_t GetQueueFamilyIndex() const { return this->queueFamilyIndex; }
         const VmaAllocator& GetAllocator() const { return this->allocator; }
+        const Image& GetSwapchainImage(size_t index) const { return this->swapchainImages[index]; }
 
         void InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options);
         void RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight);

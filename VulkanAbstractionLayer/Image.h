@@ -29,32 +29,36 @@
 #pragma once
 
 #include <vulkan/vulkan.hpp>
+#include "VulkanMemoryAllocator.h"
+
+struct VmaAllocator_T;
+struct VmaAllocation_T;
+using VmaAllocator = VmaAllocator_T*;
+using VmaAllocation = VmaAllocation_T*;
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
-
-    struct VirtualFrame
+    class Image
     {
-        vk::CommandBuffer CommandBuffer;
-        vk::Fence CommandQueueFence;
-    };
+        vk::Image handle;
+        vk::ImageView view;
+        vk::Extent2D extent = { 0u, 0u };
+        VmaAllocator allocator;
+        VmaAllocation allocation = { };
 
-    class VirtualFrameProvider
-    {
-        std::vector<VirtualFrame> virtualFrames;
-        uint32_t presentImageIndex = 0;
-        size_t currentFrame = 0;
-
-        void RecreateFramebuffer(const VulkanContext& context);
+        void Destroy();
     public:
-        VirtualFrameProvider() = default;
-        void Init(size_t frameCount, const VulkanContext& context);
-        void Destroy(const VulkanContext& device);
+        Image(VmaAllocator allocator) : allocator(allocator) { }
+        Image(const vk::Image& image, vk::Format format, VmaAllocator allocator);
+        Image(const Image&) = delete;
+        Image& operator=(const Image&) = delete;
+        Image(Image&& other) noexcept;
+        Image& operator=(Image&& other) noexcept;
+        ~Image();
 
-        void StartFrame(const VulkanContext& context);
-        VirtualFrame& GetCurrentFrame();
-        VirtualFrame& GetNextFrame();
-        void EndFrame(const VulkanContext& context);
+        vk::Image GetNativeHandle() const { return this->handle; }
+        vk::ImageView GetNativeView() const { return this->view; }
+        size_t GetWidth() const { return (size_t)this->extent.width; }
+        size_t GetHeight() const { return (size_t)this->extent.height; }
     };
 }

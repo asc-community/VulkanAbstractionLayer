@@ -29,6 +29,10 @@
 #pragma once
 
 #include <cstdint>
+#include <vulkan/vulkan.hpp>
+
+struct VmaAllocator_T;
+using VmaAllocator = VmaAllocator_T*;
 
 namespace VulkanAbstractionLayer
 {
@@ -43,4 +47,5 @@ namespace VulkanAbstractionLayer
     };
 
     uint32_t MemoryUsageToNative(MemoryUsage usage);
+    vk::Device VmaGetDevice(VmaAllocator allocator);
 }

@@ -43,4 +43,9 @@ namespace VulkanAbstractionLayer
         };
         return mappingTable[(size_t)usage];
     }
+
+    vk::Device VmaGetDevice(VmaAllocator allocator)
+    {
+        return allocator->m_hDevice;
+    }
 }

@@ -77,7 +77,7 @@ namespace VulkanAbstractionLayer
 
     void Buffer::FlushMemory(size_t byteSize, size_t offset)
     {
-        vmaFlushAllocation(this->allocator, this->allocation, offset, byteSize);
+        (void)vmaFlushAllocation(this->allocator, this->allocation, offset, byteSize);
     }
 
     void Buffer::LoadData(const uint8_t* data, size_t byteSize, size_t offset)

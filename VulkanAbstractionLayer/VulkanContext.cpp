@@ -28,6 +28,8 @@
 
 #include "VulkanContext.h"
 
+#include "vk_mem_alloc.h"
+
 #include <algorithm>
 #include <cstring>
 #include <optional>
@@ -95,7 +97,7 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    std::optional<uint32_t> GetQueueFamilyIndex(const vk::Instance& instance, const vk::PhysicalDevice device, const vk::SurfaceKHR& surface)
+    std::optional<uint32_t> DetermineQueueFamilyIndex(const vk::Instance& instance, const vk::PhysicalDevice device, const vk::SurfaceKHR& surface)
     {
         auto queueFamilyProperties = device.getQueueFamilyProperties();
         uint32_t index = 0;
@@ -142,15 +144,16 @@ namespace VulkanAbstractionLayer
 
     VulkanContext::~VulkanContext()
     {
-        this->virtualFrames.Destroy(this->device);
-        
-        vmaDestroyAllocator(this->allocator);
+        this->device.waitIdle();
 
+        this->virtualFrames.Destroy(*this);
+       
         if ((bool)this->descriptorPool) this->device.destroyDescriptorPool(this->descriptorPool);
         if ((bool)this->commandPool) this->device.destroyCommandPool(this->commandPool);
 
-        for (const auto& imageView : this->swapchainImageViews)
-            if((bool)imageView) this->device.destroyImageView(imageView);
+        this->swapchainImages.clear();
+
+        vmaDestroyAllocator(this->allocator);
 
         if ((bool)this->swapchain) this->device.destroySwapchainKHR(this->swapchain);
         if ((bool)this->imageAvailableSemaphore) this->device.destroySemaphore(this->imageAvailableSemaphore);
@@ -193,7 +196,7 @@ namespace VulkanAbstractionLayer
                 continue;
             }
 
-            auto queueFamilyIndex = GetQueueFamilyIndex(this->instance, device, this->surface);
+            auto queueFamilyIndex = DetermineQueueFamilyIndex(this->instance, device, this->surface);
             if (!queueFamilyIndex.has_value())
             {
                 if (options.InfoCallback)
@@ -271,6 +274,16 @@ namespace VulkanAbstractionLayer
         if (options.InfoCallback)
             options.InfoCallback("created logical device and device queues");
 
+        VmaAllocatorCreateInfo allocatorInfo = {};
+        allocatorInfo.vulkanApiVersion = this->apiVersion;
+        allocatorInfo.physicalDevice = this->physicalDevice;
+        allocatorInfo.device = this->device;
+        allocatorInfo.instance = this->instance;
+        vmaCreateAllocator(&allocatorInfo, &this->allocator);
+
+        if (options.InfoCallback)
+            options.InfoCallback("created vulkan memory allocator");
+
         this->RecreateSwapchain(surfaceCapabilities.maxImageExtent.width, surfaceCapabilities.maxImageExtent.height);
 
         if (options.InfoCallback)
@@ -303,17 +316,7 @@ namespace VulkanAbstractionLayer
         if (options.InfoCallback)
             options.InfoCallback("created command buffer pool and descriptor pool");
 
-        VmaAllocatorCreateInfo allocatorInfo = {};
-        allocatorInfo.vulkanApiVersion = this->apiVersion;
-        allocatorInfo.physicalDevice = this->physicalDevice;
-        allocatorInfo.device = this->device;
-        allocatorInfo.instance = this->instance;
-        vmaCreateAllocator(&allocatorInfo, &this->allocator);
-
-        if (options.InfoCallback)
-            options.InfoCallback("created vulkan memory allocator");
-
-        this->virtualFrames.Init(options.virtualFrameCount, this->device, this->commandPool);
+        this->virtualFrames.Init(options.virtualFrameCount, *this);
     }
 
     void VulkanContext::RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight)
@@ -321,7 +324,7 @@ namespace VulkanAbstractionLayer
         this->device.waitIdle();
 
         auto surfaceCapabilities = this->physicalDevice.getSurfaceCapabilitiesKHR(this->surface);
-        auto surfaceExtent = vk::Extent2D(
+        this->surfaceExtent = vk::Extent2D(
             std::clamp(surfaceWidth,  surfaceCapabilities.minImageExtent.width,  surfaceCapabilities.maxImageExtent.width ),
             std::clamp(surfaceHeight, surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height)
         );
@@ -332,9 +335,9 @@ namespace VulkanAbstractionLayer
             .setMinImageCount(this->presentImageCount)
             .setImageFormat(this->surfaceFormat.format)
             .setImageColorSpace(this->surfaceFormat.colorSpace)
-            .setImageExtent(surfaceExtent)
+            .setImageExtent(this->surfaceExtent)
             .setImageArrayLayers(1)
-            .setImageUsage(vk::ImageUsageFlagBits::eColorAttachment)
+            .setImageUsage(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst)
             .setImageSharingMode(vk::SharingMode::eExclusive)
             .setPreTransform(surfaceCapabilities.currentTransform)
             .setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque)
@@ -348,47 +351,23 @@ namespace VulkanAbstractionLayer
             this->device.destroySwapchainKHR(swapchainCreateInfo.oldSwapchain);
 
         auto swapchainImages = this->device.getSwapchainImagesKHR(this->swapchain);
-        this->presentImageCount = swapchainImages.size();
-        if(this->swapchainImageViews.size() != this->presentImageCount)
-            this->swapchainImageViews.resize(this->presentImageCount);
+        this->presentImageCount = (uint32_t)swapchainImages.size();
+        this->swapchainImages.clear();
+        this->swapchainImages.reserve(this->presentImageCount);
 
         for (uint32_t i = 0; i <this->presentImageCount; i++)
         {
-            vk::ImageSubresourceRange imageSubresourceRange;
-            imageSubresourceRange
-                .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                .setBaseMipLevel(0)
-                .setLevelCount(1)
-                .setBaseArrayLayer(0)
-                .setLayerCount(1);
-
-            vk::ImageViewCreateInfo imageViewCreateInfo;
-            imageViewCreateInfo
-                .setImage(swapchainImages[i])
-                .setViewType(vk::ImageViewType::e2D)
-                .setFormat(this->surfaceFormat.format)
-                .setSubresourceRange(imageSubresourceRange)
-                .setComponents(vk::ComponentMapping {
-                    vk::ComponentSwizzle::eIdentity,
-                    vk::ComponentSwizzle::eIdentity,
-                    vk::ComponentSwizzle::eIdentity,
-                    vk::ComponentSwizzle::eIdentity
-                });
-
-            if ((bool)this->swapchainImageViews[i])
-                this->device.destroyImageView(this->swapchainImageViews[i]);
-
-            this->swapchainImageViews[i] = this->device.createImageView(imageViewCreateInfo);
+            this->swapchainImages.emplace_back(swapchainImages[i], this->surfaceFormat.format, this->allocator);
         }
     }
 
     void VulkanContext::StartFrame()
     {
-        this->virtualFrames.StartFrame();
+        this->virtualFrames.StartFrame(*this);
     }
 
     void VulkanContext::EndFrame()
     {
-        this->virtualFrames.EndFrame();
+        this->virtualFrames.EndFrame(*this);
     }
 }
