@@ -35,52 +35,29 @@ namespace VulkanAbstractionLayer
     {
         auto& frame = this->GetCurrentFrame();
 
-        vk::ImageSubresourceRange subresourceRange{
-                vk::ImageAspectFlagBits::eColor,
-                0, // base mip level
-                1, // level count
-                0, // base layer
-                1  // layer count
-        };
-
         auto& presentImage = context.GetSwapchainImage(this->presentImageIndex);
 
-        vk::ImageMemoryBarrier presentImageUndefinedToClear;
-        presentImageUndefinedToClear
-            .setSrcAccessMask(vk::AccessFlagBits::eMemoryRead)
-            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
-            .setOldLayout(vk::ImageLayout::eUndefined)
-            .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
-            .setSrcQueueFamilyIndex(context.GetQueueFamilyIndex())
-            .setDstQueueFamilyIndex(context.GetQueueFamilyIndex())
-            .setImage(presentImage.GetNativeHandle())
-            .setSubresourceRange(subresourceRange);
-       
-        frame.CommandBuffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eTopOfPipe,
-            vk::PipelineStageFlagBits::eTransfer,
-            { }, // dependency flags
-            { }, // memory barriers
-            { }, // buffer barriers
-            presentImageUndefinedToClear
-        );
-
-        vk::ClearColorValue color = std::array{ 1.0f, 0.7f, 0.0f, 1.0f };
-        frame.CommandBuffer.clearColorImage(presentImage.GetNativeHandle(), vk::ImageLayout::eTransferDstOptimal, color, subresourceRange);
+        vk::ImageSubresourceRange subresourceRange{
+            vk::ImageAspectFlagBits::eColor,
+            0, // base mip level
+            1, // level count
+            0, // base layer
+            1  // layer count
+        };
 
         vk::ImageMemoryBarrier presentImageClearToPresent;
         presentImageClearToPresent
-            .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
             .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
-            .setOldLayout(vk::ImageLayout::eTransferDstOptimal)
+            .setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
             .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
             .setSrcQueueFamilyIndex(context.GetQueueFamilyIndex())
             .setDstQueueFamilyIndex(context.GetQueueFamilyIndex())
             .setImage(presentImage.GetNativeHandle())
             .setSubresourceRange(subresourceRange);
-
+        
         frame.CommandBuffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
             vk::PipelineStageFlagBits::eBottomOfPipe,
             { }, // dependency flags
             { }, // memory barriers
@@ -163,6 +140,36 @@ namespace VulkanAbstractionLayer
         vk::CommandBufferBeginInfo commandBufferBeginInfo;
         commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
         frame.CommandBuffer.begin(commandBufferBeginInfo);
+
+        auto& presentImage = context.GetSwapchainImage(this->presentImageIndex);
+
+        vk::ImageSubresourceRange subresourceRange{
+            vk::ImageAspectFlagBits::eColor,
+            0, // base mip level
+            1, // level count
+            0, // base layer
+            1  // layer count
+        };
+
+        vk::ImageMemoryBarrier presentImageUndefinedToWrite;
+        presentImageUndefinedToWrite
+            .setSrcAccessMask(vk::AccessFlagBits::eMemoryRead)
+            .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
+            .setOldLayout(vk::ImageLayout::eUndefined)
+            .setNewLayout(vk::ImageLayout::eColorAttachmentOptimal)
+            .setSrcQueueFamilyIndex(context.GetQueueFamilyIndex())
+            .setDstQueueFamilyIndex(context.GetQueueFamilyIndex())
+            .setImage(presentImage.GetNativeHandle())
+            .setSubresourceRange(subresourceRange);
+        
+        frame.CommandBuffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            { }, // dependency flags
+            { }, // memory barriers
+            { }, // buffer barriers
+            presentImageUndefinedToWrite
+        );
     }
 
     VirtualFrame& VirtualFrameProvider::GetCurrentFrame()
@@ -173,5 +180,20 @@ namespace VulkanAbstractionLayer
     VirtualFrame& VirtualFrameProvider::GetNextFrame()
     {
         return this->virtualFrames[(this->currentFrame + 1) % this->virtualFrames.size()];
+    }
+
+    const VirtualFrame& VirtualFrameProvider::GetCurrentFrame() const
+    {
+        return this->virtualFrames[this->currentFrame];
+    }
+
+    const VirtualFrame& VirtualFrameProvider::GetNextFrame() const
+    {
+        return this->virtualFrames[(this->currentFrame + 1) % this->virtualFrames.size()];
+    }
+
+    uint32_t VirtualFrameProvider::GetPresentImageIndex() const
+    {
+        return this->presentImageIndex;
     }
 }

@@ -103,6 +103,7 @@ namespace VulkanAbstractionLayer
 
         const vk::Instance& GetInstance() const { return this->instance; }
         const vk::SurfaceKHR& GetSurface() const { return this->surface; }
+        const vk::Format GetSurfaceFormat() const { return this->surfaceFormat.format; }
         const vk::Extent2D& GetSurfaceExtent() const { return this->surfaceExtent; }
         const vk::PhysicalDevice& GetPhysicalDevice() const { return this->physicalDevice; }
         const vk::Device& GetDevice() const { return this->device; }
@@ -114,12 +115,16 @@ namespace VulkanAbstractionLayer
         const vk::CommandPool& GetCommandPool() const { return this->commandPool; }
         const vk::DescriptorPool& GetDescriptorPool() const { return this->descriptorPool; }
         uint32_t GetQueueFamilyIndex() const { return this->queueFamilyIndex; }
+        uint32_t GetPresentImageCount() const { return this->presentImageCount; }
         const VmaAllocator& GetAllocator() const { return this->allocator; }
         const Image& GetSwapchainImage(size_t index) const { return this->swapchainImages[index]; }
+        const Image& GetCurrentSwapchainImage() const { return this->swapchainImages[this->virtualFrames.GetPresentImageIndex()]; }
 
         void InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options);
         void RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight);
         void StartFrame();
+        VirtualFrame& GetCurrentFrame() { return this->virtualFrames.GetCurrentFrame(); }
+        const VirtualFrame& GetCurrentFrame() const { return this->virtualFrames.GetCurrentFrame(); }
         void EndFrame();
     };
 }

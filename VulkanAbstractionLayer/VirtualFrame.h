@@ -55,6 +55,9 @@ namespace VulkanAbstractionLayer
         void StartFrame(const VulkanContext& context);
         VirtualFrame& GetCurrentFrame();
         VirtualFrame& GetNextFrame();
+        const VirtualFrame& GetCurrentFrame() const;
+        const VirtualFrame& GetNextFrame() const;
+        uint32_t GetPresentImageIndex() const;
         void EndFrame(const VulkanContext& context);
     };
 }

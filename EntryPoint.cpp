@@ -3,6 +3,8 @@
 
 #include "VulkanAbstractionLayer/Window.h"
 #include "VulkanAbstractionLayer/VulkanContext.h"
+#include "VulkanAbstractionLayer/ImGuiContext.h"
+#include "imgui.h"
 
 using namespace VulkanAbstractionLayer;
 
@@ -52,15 +54,111 @@ int main()
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
     });
+
+    vk::AttachmentDescription attachmentDescription;
+    attachmentDescription
+        .setFormat(Vulkan.GetSurfaceFormat())
+        .setSamples(vk::SampleCountFlagBits::e1)
+        .setLoadOp(vk::AttachmentLoadOp::eClear)
+        .setStoreOp(vk::AttachmentStoreOp::eStore)
+        .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+        .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+        .setInitialLayout(vk::ImageLayout::eUndefined)
+        .setFinalLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
+    vk::AttachmentReference colorAttachmentReference;
+    colorAttachmentReference
+        .setAttachment(0)
+        .setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
+    vk::SubpassDescription subpassDescription;
+    subpassDescription
+        .setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+        .setColorAttachments(colorAttachmentReference);
+
+    std::array dependencies = {
+        vk::SubpassDependency {
+            VK_SUBPASS_EXTERNAL,
+            0,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            vk::AccessFlagBits::eMemoryRead,
+            vk::AccessFlagBits::eColorAttachmentWrite,
+            vk::DependencyFlagBits::eByRegion
+        },
+        vk::SubpassDependency {
+            0,
+            VK_SUBPASS_EXTERNAL,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits::eBottomOfPipe,
+            vk::AccessFlagBits::eColorAttachmentWrite,
+            vk::AccessFlagBits::eMemoryRead,
+            vk::DependencyFlagBits::eByRegion
+        },
+    };
+
+    vk::RenderPassCreateInfo renderPassCreateInfo;
+    renderPassCreateInfo
+        .setAttachments(attachmentDescription)
+        .setSubpasses(subpassDescription)
+        .setDependencies(dependencies);
+
+    auto renderPass = Vulkan.GetDevice().createRenderPass(renderPassCreateInfo);
+
+    VulkanAbstractionLayer::ImGuiContext::Init(Vulkan, window, renderPass);
+
+    std::vector<vk::Framebuffer> presentImageFramebuffers(deviceOptions.virtualFrameCount);
+    size_t framebufferImageArrayIndex = 0;
     
     while (!window.ShouldClose())
     {
         window.PollEvents();
 
         Vulkan.StartFrame();
-        // rendering
+        VulkanAbstractionLayer::ImGuiContext::StartFrame(Vulkan);
+
+        ImGui::ShowDemoWindow();
+
+        std::array attachments = { Vulkan.GetCurrentSwapchainImage().GetNativeView() };
+        vk::FramebufferCreateInfo framebufferCreateInfo;
+        framebufferCreateInfo
+            .setRenderPass(renderPass)
+            .setAttachments(attachments)
+            .setWidth(Vulkan.GetSurfaceExtent().width)
+            .setHeight(Vulkan.GetSurfaceExtent().height)
+            .setLayers(1);
+
+        auto& framebuffer = presentImageFramebuffers[framebufferImageArrayIndex];
+        if ((bool)framebuffer) Vulkan.GetDevice().destroyFramebuffer(framebuffer);
+        framebuffer = Vulkan.GetDevice().createFramebuffer(framebufferCreateInfo);
+        framebufferImageArrayIndex = (framebufferImageArrayIndex + 1) % deviceOptions.virtualFrameCount;
+
+        auto& commandBuffer = Vulkan.GetCurrentFrame().CommandBuffer;
+
+        std::array clearValues = { vk::ClearValue{ vk::ClearColorValue{ std::array { 0.8f, 0.6f, 0.0f, 1.0f } } } };
+        vk::RenderPassBeginInfo renderPassBeginInfo;
+        renderPassBeginInfo
+            .setRenderPass(renderPass)
+            .setFramebuffer(framebuffer)
+            .setClearValues(clearValues)
+            .setRenderArea(vk::Rect2D{ vk::Offset2D{ 0u, 0u }, Vulkan.GetSurfaceExtent() });
+
+        commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+        VulkanAbstractionLayer::ImGuiContext::RenderFrame(Vulkan);
+        commandBuffer.endRenderPass();
+
+        VulkanAbstractionLayer::ImGuiContext::EndFrame(Vulkan);
         Vulkan.EndFrame();
     }
+
+    Vulkan.GetDevice().waitIdle();
+
+    for(auto framebuffer : presentImageFramebuffers)
+        if ((bool)framebuffer) Vulkan.GetDevice().destroyFramebuffer(framebuffer);
+
+    Vulkan.GetDevice().destroyRenderPass(renderPass);
+
+    VulkanAbstractionLayer::ImGuiContext::Destroy(Vulkan);
 
     return 0;
 }
