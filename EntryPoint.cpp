@@ -3,7 +3,6 @@
 
 #include "VulkanAbstractionLayer/Window.h"
 #include "VulkanAbstractionLayer/VulkanContext.h"
-#include "VulkanAbstractionLayer/Buffer.h"
 
 using namespace VulkanAbstractionLayer;
 

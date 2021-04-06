@@ -57,7 +57,7 @@ namespace VulkanAbstractionLayer
             .setSubresourceRange(subresourceRange);
        
         frame.CommandBuffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eTopOfPipe,
             vk::PipelineStageFlagBits::eTransfer,
             { }, // dependency flags
             { }, // memory barriers
