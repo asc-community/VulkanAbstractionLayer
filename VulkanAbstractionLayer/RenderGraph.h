@@ -28,24 +28,48 @@
 
 #pragma once
 
-namespace vk
-{
-    class CommandBuffer;
-    class RenderPass;
-}
+#include "RenderPass.h"
+#include "Image.h"
+#include "StringId.h"
+
+#include <vector>
+#include <functional>
 
 namespace VulkanAbstractionLayer
 {
+    class CommandBuffer;
+    class Image;
     class VulkanContext;
-    class Window;
+    class RenderPass;
 
-    class ImGuiVulkanContext
+    struct RenderGraphNode
     {
+        using RenderCallback = std::function<void(CommandBuffer&)>;
+
+        StringId Name;
+        RenderPass Pass;
+        RenderCallback OnRender;
+    };
+
+    class RenderGraph
+    {
+        using PresentCallback = std::function<void(CommandBuffer&, const Image&, const Image&)>;
+        using DestroyCallback = std::function<void(const RenderPass&)>;
+
+        std::vector<RenderGraphNode> nodes;
+        Image output;
+        PresentCallback onPresent;
+        DestroyCallback onDestroy;
+
     public:
-        static void Init(const VulkanContext& context, const Window& window, const vk::RenderPass& renderPass);
-        static void Destroy();
-        static void StartFrame();
-        static void RenderFrame(const vk::CommandBuffer& commandBuffer);
-        static void EndFrame();
+        RenderGraph(std::vector<RenderGraphNode> nodes, Image output, PresentCallback onPresent, DestroyCallback onDestroy);
+        ~RenderGraph();
+        RenderGraph(RenderGraph&&) = default;
+        RenderGraph& operator=(RenderGraph&& other);
+
+        void ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer);
+        void Execute(CommandBuffer& commandBuffer);
+        void Present(CommandBuffer& commandBuffer, const Image& presentImage);
+        const RenderGraphNode& GetNodeByName(StringId name) const;
     };
 }

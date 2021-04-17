@@ -26,26 +26,9 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-namespace vk
-{
-    class CommandBuffer;
-    class RenderPass;
-}
+#include "RenderPass.h"
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
-    class Window;
 
-    class ImGuiVulkanContext
-    {
-    public:
-        static void Init(const VulkanContext& context, const Window& window, const vk::RenderPass& renderPass);
-        static void Destroy();
-        static void StartFrame();
-        static void RenderFrame(const vk::CommandBuffer& commandBuffer);
-        static void EndFrame();
-    };
 }

@@ -81,8 +81,11 @@ namespace VulkanAbstractionLayer
 
         Buffer(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage, VmaAllocator allocator);
         void Init(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage);
+
         vk::Buffer GetNativeHandle() const { return this->handle; }
         size_t GetByteSize() const { return this->byteSize; }
+        VmaAllocator GetAllocator() const { return this->allocator; }
+
         uint8_t* MapMemory();
         void UnmapMemory();
         void FlushMemory();

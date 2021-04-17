@@ -15,6 +15,9 @@ set(SOURCES
 "VulkanAbstractionLayer/Buffer.cpp" 
 "VulkanAbstractionLayer/VulkanMemoryAllocator.cpp" 
 "VulkanAbstractionLayer/Image.cpp"
+"VulkanAbstractionLayer/RenderGraphBuilder.cpp"
+"VulkanAbstractionLayer/RenderGraph.cpp"
+"VulkanAbstractionLayer/ImGuiContext.cpp"
 
 "submodules/imgui/imgui.cpp"
 "submodules/imgui/imgui_demo.cpp"
@@ -22,8 +25,7 @@ set(SOURCES
 "submodules/imgui/imgui_tables.cpp"
 "submodules/imgui/imgui_widgets.cpp"
 "submodules/imgui/backends/imgui_impl_vulkan.cpp"
-"submodules/imgui/backends/imgui_impl_glfw.cpp"
- "VulkanAbstractionLayer/ImGuiContext.cpp")
+"submodules/imgui/backends/imgui_impl_glfw.cpp" "VulkanAbstractionLayer/CommandBuffer.cpp" "VulkanAbstractionLayer/RenderPass.cpp")
 
 find_package(Vulkan REQUIRED FATAL_ERROR)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw)

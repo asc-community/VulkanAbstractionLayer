@@ -43,22 +43,31 @@ namespace VulkanAbstractionLayer
         vk::Image handle;
         vk::ImageView view;
         vk::Extent2D extent = { 0u, 0u };
+        vk::Format format = vk::Format::eUndefined;
         VmaAllocator allocator;
         VmaAllocation allocation = { };
 
         void Destroy();
+        void InitExternal(const vk::Image& image, vk::Format format);
     public:
         Image(VmaAllocator allocator) : allocator(allocator) { }
-        Image(const vk::Image& image, vk::Format format, VmaAllocator allocator);
+        Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, VmaAllocator allocator);
+        Image(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, VmaAllocator allocator);
         Image(const Image&) = delete;
         Image& operator=(const Image&) = delete;
         Image(Image&& other) noexcept;
         Image& operator=(Image&& other) noexcept;
         ~Image();
 
+        void Init(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
+
         vk::Image GetNativeHandle() const { return this->handle; }
         vk::ImageView GetNativeView() const { return this->view; }
+        vk::Format GetFormat() const { return this->format; }
         size_t GetWidth() const { return (size_t)this->extent.width; }
         size_t GetHeight() const { return (size_t)this->extent.height; }
+        VmaAllocator GetAllocator() const { return this->allocator; }
+
+        static Image CreateReference(const Image& image);
     };
 }

@@ -35,7 +35,7 @@
 
 namespace VulkanAbstractionLayer
 {
-    void ImGuiContext::Init(const VulkanContext& context, const Window& window, const vk::RenderPass& renderPass)
+    void ImGuiVulkanContext::Init(const VulkanContext& context, const Window& window, const vk::RenderPass& renderPass)
     {
         ImGui::CreateContext();
         ImGui_ImplGlfw_InitForVulkan(window.GetNativeHandle(), true);
@@ -68,27 +68,27 @@ namespace VulkanAbstractionLayer
         ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 
-    void ImGuiContext::Destroy(const VulkanContext& context)
+    void ImGuiVulkanContext::Destroy()
     {
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
     }
 
-    void ImGuiContext::StartFrame(const VulkanContext& context)
+    void ImGuiVulkanContext::StartFrame()
     {
         ImGui_ImplGlfw_NewFrame();
         ImGui_ImplVulkan_NewFrame();
         ImGui::NewFrame();
     }
 
-    void ImGuiContext::RenderFrame(const VulkanContext& context)
+    void ImGuiVulkanContext::RenderFrame(const vk::CommandBuffer& commandBuffer)
     {
         ImGui::Render();
         ImDrawData* drawData = ImGui::GetDrawData();
-        ImGui_ImplVulkan_RenderDrawData(drawData, context.GetCurrentFrame().CommandBuffer);
+        ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
     }
 
-    void ImGuiContext::EndFrame(const VulkanContext& context)
+    void ImGuiVulkanContext::EndFrame()
     {
         ImGui::EndFrame();
     }

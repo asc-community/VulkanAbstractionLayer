@@ -52,7 +52,7 @@ namespace VulkanAbstractionLayer
             .setSharingMode(vk::SharingMode::eExclusive)
             .setQueueFamilyIndices(BufferQueueFamiliyIndicies);
 
-        VmaAllocationCreateInfo allocationInfo = {};
+        VmaAllocationCreateInfo allocationInfo = { };
         allocationInfo.usage = (VmaMemoryUsage)MemoryUsageToNative(memoryUsage);
 
         (void)vmaCreateBuffer(this->allocator, (VkBufferCreateInfo*)&bufferCreateInfo, &allocationInfo, (VkBuffer*)&this->handle, &this->allocation, nullptr);

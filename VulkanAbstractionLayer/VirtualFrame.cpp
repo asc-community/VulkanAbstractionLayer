@@ -31,70 +31,6 @@
 
 namespace VulkanAbstractionLayer
 {
-    void VirtualFrameProvider::EndFrame(const VulkanContext& context)
-    {
-        auto& frame = this->GetCurrentFrame();
-
-        auto& presentImage = context.GetSwapchainImage(this->presentImageIndex);
-
-        vk::ImageSubresourceRange subresourceRange{
-            vk::ImageAspectFlagBits::eColor,
-            0, // base mip level
-            1, // level count
-            0, // base layer
-            1  // layer count
-        };
-
-        vk::ImageMemoryBarrier presentImageClearToPresent;
-        presentImageClearToPresent
-            .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
-            .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
-            .setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
-            .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
-            .setSrcQueueFamilyIndex(context.GetQueueFamilyIndex())
-            .setDstQueueFamilyIndex(context.GetQueueFamilyIndex())
-            .setImage(presentImage.GetNativeHandle())
-            .setSubresourceRange(subresourceRange);
-        
-        frame.CommandBuffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eColorAttachmentOutput,
-            vk::PipelineStageFlagBits::eBottomOfPipe,
-            { }, // dependency flags
-            { }, // memory barriers
-            { }, // buffer barriers
-            presentImageClearToPresent
-        );
-
-        frame.CommandBuffer.end();
-
-        std::array waitDstStageMask = { (vk::PipelineStageFlags)vk::PipelineStageFlagBits::eTransfer };
-
-        vk::SubmitInfo submitInfo;
-        submitInfo
-            .setWaitSemaphores(context.GetImageAvailableSemaphore())
-            .setWaitDstStageMask(waitDstStageMask)
-            .setSignalSemaphores(context.GetRenderingFinishedSemaphore())
-            .setCommandBuffers(frame.CommandBuffer);
-
-        context.GetGraphicsQueue().submit(std::array{ submitInfo }, frame.CommandQueueFence);
-
-        vk::PresentInfoKHR presentInfo;
-        presentInfo
-            .setWaitSemaphores(context.GetRenderingFinishedSemaphore())
-            .setSwapchains(context.GetSwapchain())
-            .setImageIndices(this->presentImageIndex);
-
-        auto presetSucceeded = context.GetPresentQueue().presentKHR(presentInfo);
-        assert(presetSucceeded == vk::Result::eSuccess);
-
-        this->currentFrame = (this->currentFrame + 1) % this->virtualFrames.size();
-    }
-
-    void VirtualFrameProvider::RecreateFramebuffer(const VulkanContext& context)
-    {
-        VirtualFrame& frame = this->GetCurrentFrame();
-    }
-
     void VirtualFrameProvider::Init(size_t frameCount, const VulkanContext& context)
     {
         this->virtualFrames.resize(frameCount);
@@ -140,6 +76,11 @@ namespace VulkanAbstractionLayer
         vk::CommandBufferBeginInfo commandBufferBeginInfo;
         commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
         frame.CommandBuffer.begin(commandBufferBeginInfo);
+    }
+
+    void VirtualFrameProvider::EndFrame(const VulkanContext& context)
+    {
+        auto& frame = this->GetCurrentFrame();
 
         auto& presentImage = context.GetSwapchainImage(this->presentImageIndex);
 
@@ -151,25 +92,54 @@ namespace VulkanAbstractionLayer
             1  // layer count
         };
 
-        vk::ImageMemoryBarrier presentImageUndefinedToWrite;
-        presentImageUndefinedToWrite
-            .setSrcAccessMask(vk::AccessFlagBits::eMemoryRead)
-            .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
-            .setOldLayout(vk::ImageLayout::eUndefined)
-            .setNewLayout(vk::ImageLayout::eColorAttachmentOptimal)
-            .setSrcQueueFamilyIndex(context.GetQueueFamilyIndex())
-            .setDstQueueFamilyIndex(context.GetQueueFamilyIndex())
+        vk::ImageMemoryBarrier presentImageTransferDstToPresent;
+        presentImageTransferDstToPresent
+            .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
+            .setOldLayout(vk::ImageLayout::eTransferDstOptimal)
+            .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
             .setImage(presentImage.GetNativeHandle())
             .setSubresourceRange(subresourceRange);
-        
+
         frame.CommandBuffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eTopOfPipe,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eBottomOfPipe,
             { }, // dependency flags
             { }, // memory barriers
             { }, // buffer barriers
-            presentImageUndefinedToWrite
+            presentImageTransferDstToPresent
         );
+
+        frame.CommandBuffer.end();
+
+        std::array waitDstStageMask = { (vk::PipelineStageFlags)vk::PipelineStageFlagBits::eTransfer };
+
+        vk::SubmitInfo submitInfo;
+        submitInfo
+            .setWaitSemaphores(context.GetImageAvailableSemaphore())
+            .setWaitDstStageMask(waitDstStageMask)
+            .setSignalSemaphores(context.GetRenderingFinishedSemaphore())
+            .setCommandBuffers(frame.CommandBuffer);
+
+        context.GetGraphicsQueue().submit(std::array{ submitInfo }, frame.CommandQueueFence);
+
+        vk::PresentInfoKHR presentInfo;
+        presentInfo
+            .setWaitSemaphores(context.GetRenderingFinishedSemaphore())
+            .setSwapchains(context.GetSwapchain())
+            .setImageIndices(this->presentImageIndex);
+
+        auto presetSucceeded = context.GetPresentQueue().presentKHR(presentInfo);
+        assert(presetSucceeded == vk::Result::eSuccess);
+
+        this->currentFrame = (this->currentFrame + 1) % this->virtualFrames.size();
+    }
+
+    void VirtualFrameProvider::RecreateFramebuffer(const VulkanContext& context)
+    {
+        VirtualFrame& frame = this->GetCurrentFrame();
     }
 
     VirtualFrame& VirtualFrameProvider::GetCurrentFrame()

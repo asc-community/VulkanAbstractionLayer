@@ -28,24 +28,23 @@
 
 #pragma once
 
-namespace vk
-{
-    class CommandBuffer;
-    class RenderPass;
-}
+#include <vulkan/vulkan.hpp>
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
-    class Window;
+    class RenderPass;
+    class Image;
 
-    class ImGuiVulkanContext
+    class CommandBuffer
     {
+        vk::CommandBuffer handle;
     public:
-        static void Init(const VulkanContext& context, const Window& window, const vk::RenderPass& renderPass);
-        static void Destroy();
-        static void StartFrame();
-        static void RenderFrame(const vk::CommandBuffer& commandBuffer);
-        static void EndFrame();
+        CommandBuffer(vk::CommandBuffer commandBuffer)
+            : handle(std::move(commandBuffer)) { }
+
+        const vk::CommandBuffer& GetNativeHandle() const { return this->handle; }
+        void BeginRenderPass(const RenderPass& renderPass);
+        void EndRenderPass();
+        void CopyImage(const Image& source, vk::ImageLayout sourceLayout, const Image& distance, vk::ImageLayout distanceLayout);
     };
 }

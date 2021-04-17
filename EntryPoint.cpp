@@ -4,6 +4,9 @@
 #include "VulkanAbstractionLayer/Window.h"
 #include "VulkanAbstractionLayer/VulkanContext.h"
 #include "VulkanAbstractionLayer/ImGuiContext.h"
+#include "VulkanAbstractionLayer/RenderGraph.h"
+#include "VulkanAbstractionLayer/RenderGraphBuilder.h"
+#include "VulkanAbstractionLayer/CommandBuffer.h"
 #include "imgui.h"
 
 using namespace VulkanAbstractionLayer;
@@ -21,6 +24,38 @@ void VulkanErrorCallback(const char* message)
 void WindowErrorCallback(const char* message)
 {
     std::cerr << "[ERROR Window]: " << message << std::endl;
+}
+
+RenderGraph CreateRenderGraph(const Image& outputImage, const VulkanContext& context)
+{
+    RenderGraphBuilder renderGraphBuilder;
+    renderGraphBuilder
+        .AddImageReference("Output"_id, &outputImage)
+        .AddRenderPass(RenderPassBuilder{ "ImGuiPass"_id }
+            .AddWriteOnlyColorAttachment("Output"_id, ClearColor{ 0.8f, 0.6f, 0.0f, 1.0f })
+            .AddOnRenderCallback(
+                [](CommandBuffer& commandBuffer)
+                {
+                    ImGuiVulkanContext::RenderFrame(commandBuffer.GetNativeHandle());
+                }
+            )
+        )
+        .SetOutputName("Output"_id);
+
+    return renderGraphBuilder.Build(context);
+}
+
+Image CreateOutputImage(const VulkanContext& context)
+{
+    Image result{ context.GetAllocator() };
+    result.Init(
+        context.GetSurfaceExtent().width,
+        context.GetSurfaceExtent().height,
+        context.GetSurfaceFormat(),
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
+        MemoryUsage::GPU_ONLY
+    );
+    return result;
 }
 
 int main()
@@ -50,115 +85,40 @@ int main()
     deviceOptions.InfoCallback = VulkanInfoCallback;
 
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
-    window.OnResize([&Vulkan](Window& window, Vector2 size) mutable
+
+    Image outputImage = CreateOutputImage(Vulkan);
+    RenderGraph renderGraph = CreateRenderGraph(outputImage, Vulkan);
+
+    window.OnResize([&Vulkan, &outputImage, &renderGraph](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
+        outputImage = CreateOutputImage(Vulkan);
+        renderGraph = CreateRenderGraph(outputImage, Vulkan);
     });
-
-    vk::AttachmentDescription attachmentDescription;
-    attachmentDescription
-        .setFormat(Vulkan.GetSurfaceFormat())
-        .setSamples(vk::SampleCountFlagBits::e1)
-        .setLoadOp(vk::AttachmentLoadOp::eClear)
-        .setStoreOp(vk::AttachmentStoreOp::eStore)
-        .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-        .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-        .setInitialLayout(vk::ImageLayout::eUndefined)
-        .setFinalLayout(vk::ImageLayout::eColorAttachmentOptimal);
-
-    vk::AttachmentReference colorAttachmentReference;
-    colorAttachmentReference
-        .setAttachment(0)
-        .setLayout(vk::ImageLayout::eColorAttachmentOptimal);
-
-    vk::SubpassDescription subpassDescription;
-    subpassDescription
-        .setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
-        .setColorAttachments(colorAttachmentReference);
-
-    std::array dependencies = {
-        vk::SubpassDependency {
-            VK_SUBPASS_EXTERNAL,
-            0,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput,
-            vk::AccessFlagBits::eMemoryRead,
-            vk::AccessFlagBits::eColorAttachmentWrite,
-            vk::DependencyFlagBits::eByRegion
-        },
-        vk::SubpassDependency {
-            0,
-            VK_SUBPASS_EXTERNAL,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput,
-            vk::PipelineStageFlagBits::eBottomOfPipe,
-            vk::AccessFlagBits::eColorAttachmentWrite,
-            vk::AccessFlagBits::eMemoryRead,
-            vk::DependencyFlagBits::eByRegion
-        },
-    };
-
-    vk::RenderPassCreateInfo renderPassCreateInfo;
-    renderPassCreateInfo
-        .setAttachments(attachmentDescription)
-        .setSubpasses(subpassDescription)
-        .setDependencies(dependencies);
-
-    auto renderPass = Vulkan.GetDevice().createRenderPass(renderPassCreateInfo);
-
-    VulkanAbstractionLayer::ImGuiContext::Init(Vulkan, window, renderPass);
-
-    std::vector<vk::Framebuffer> presentImageFramebuffers(deviceOptions.virtualFrameCount);
-    size_t framebufferImageArrayIndex = 0;
     
+    ImGuiVulkanContext::Init(Vulkan, window, renderGraph.GetNodeByName("ImGuiPass"_id).Pass.GetNativeHandle());
+
     while (!window.ShouldClose())
     {
         window.PollEvents();
 
         Vulkan.StartFrame();
-        VulkanAbstractionLayer::ImGuiContext::StartFrame(Vulkan);
+        ImGuiVulkanContext::StartFrame();
 
         ImGui::ShowDemoWindow();
 
-        std::array attachments = { Vulkan.GetCurrentSwapchainImage().GetNativeView() };
-        vk::FramebufferCreateInfo framebufferCreateInfo;
-        framebufferCreateInfo
-            .setRenderPass(renderPass)
-            .setAttachments(attachments)
-            .setWidth(Vulkan.GetSurfaceExtent().width)
-            .setHeight(Vulkan.GetSurfaceExtent().height)
-            .setLayers(1);
+        CommandBuffer commandBuffer{ Vulkan.GetCurrentFrame().CommandBuffer };
 
-        auto& framebuffer = presentImageFramebuffers[framebufferImageArrayIndex];
-        if ((bool)framebuffer) Vulkan.GetDevice().destroyFramebuffer(framebuffer);
-        framebuffer = Vulkan.GetDevice().createFramebuffer(framebufferCreateInfo);
-        framebufferImageArrayIndex = (framebufferImageArrayIndex + 1) % deviceOptions.virtualFrameCount;
+        renderGraph.Execute(commandBuffer);
+        renderGraph.Present(commandBuffer, Vulkan.GetCurrentSwapchainImage());
 
-        auto& commandBuffer = Vulkan.GetCurrentFrame().CommandBuffer;
-
-        std::array clearValues = { vk::ClearValue{ vk::ClearColorValue{ std::array { 0.8f, 0.6f, 0.0f, 1.0f } } } };
-        vk::RenderPassBeginInfo renderPassBeginInfo;
-        renderPassBeginInfo
-            .setRenderPass(renderPass)
-            .setFramebuffer(framebuffer)
-            .setClearValues(clearValues)
-            .setRenderArea(vk::Rect2D{ vk::Offset2D{ 0u, 0u }, Vulkan.GetSurfaceExtent() });
-
-        commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-        VulkanAbstractionLayer::ImGuiContext::RenderFrame(Vulkan);
-        commandBuffer.endRenderPass();
-
-        VulkanAbstractionLayer::ImGuiContext::EndFrame(Vulkan);
+        ImGuiVulkanContext::EndFrame();
         Vulkan.EndFrame();
     }
 
     Vulkan.GetDevice().waitIdle();
 
-    for(auto framebuffer : presentImageFramebuffers)
-        if ((bool)framebuffer) Vulkan.GetDevice().destroyFramebuffer(framebuffer);
-
-    Vulkan.GetDevice().destroyRenderPass(renderPass);
-
-    VulkanAbstractionLayer::ImGuiContext::Destroy(Vulkan);
+    ImGuiVulkanContext::Destroy();
 
     return 0;
 }
