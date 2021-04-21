@@ -34,6 +34,7 @@
 
 #include "StringId.h"
 #include "RenderGraph.h"
+#include "GraphicShader.h"
 
 namespace VulkanAbstractionLayer
 {
@@ -89,18 +90,23 @@ namespace VulkanAbstractionLayer
         AttachmentInitialState InitialState = AttachmentInitialState::DISCARD;
     };
 
+    struct GraphicPipeline
+    {
+        GraphicShader Shader;
+    };
+
     class RenderPassBuilder
     {
         StringId name = 0;
-        std::function<void(CommandBuffer&)> onRenderCallback;
+        RenderGraphNode::RenderCallback onRenderCallback;
         std::vector<ReadOnlyColorAttachment> inputColorAttachments;
         std::vector<WriteOnlyColorAttachment> outputColorAttachments;
         WriteOnlyDepthAttachment depthAttachment;
-
+        std::optional<GraphicPipeline> graphicPipeline;
     public:
         RenderPassBuilder(StringId name);
 
-        RenderPassBuilder& AddOnRenderCallback(std::function<void(CommandBuffer&)> callback);
+        RenderPassBuilder& AddOnRenderCallback(RenderGraphNode::RenderCallback callback);
         RenderPassBuilder& AddReadOnlyColorAttachment(StringId name);
         RenderPassBuilder& AddWriteOnlyColorAttachment(StringId name);
         RenderPassBuilder& AddWriteOnlyColorAttachment(StringId name, ClearColor clear);
@@ -108,6 +114,7 @@ namespace VulkanAbstractionLayer
         RenderPassBuilder& SetWriteOnlyDepthAttachment(StringId name);
         RenderPassBuilder& SetWriteOnlyDepthAttachment(StringId name, ClearDepthSpencil clear);
         RenderPassBuilder& SetWriteOnlyDepthAttachment(StringId name, AttachmentInitialState state);
+        RenderPassBuilder& SetPipeline(GraphicPipeline pipeline);
 
         friend class RenderGraphBuilder;
     };
@@ -115,14 +122,14 @@ namespace VulkanAbstractionLayer
     class RenderGraphBuilder
     {
         std::vector<RenderPassBuilder> renderPasses;
-        std::unordered_map<StringId, const Image*> imageReferences;
+        std::unordered_map<StringId, Image> images;
         StringId outputName;
 
         RenderPass BuildRenderPass(const VulkanContext& context, const RenderPassBuilder& renderPassBuilder);
         AttachmentLayout ResolveRenderPassDependencies(StringId outputName);
     public:
         RenderGraphBuilder& AddRenderPass(RenderPassBuilder renderPass);
-        RenderGraphBuilder& AddImageReference(StringId name, const Image* image);
+        RenderGraphBuilder& AddImageReference(StringId name, const Image& image);
         RenderGraphBuilder& SetOutputName(StringId name);
         RenderGraph Build(const VulkanContext& context);
     };

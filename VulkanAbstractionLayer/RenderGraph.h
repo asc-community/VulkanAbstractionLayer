@@ -41,14 +41,25 @@ namespace VulkanAbstractionLayer
     class Image;
     class VulkanContext;
     class RenderPass;
+    class RenderGraph;
+
+    struct RenderState
+    {
+        RenderGraph& Graph;
+        CommandBuffer& Commands;
+        const std::vector<StringId>& ColorAttachments;
+
+        const Image& GetColorAttachment(size_t index) const;
+    };
 
     struct RenderGraphNode
     {
-        using RenderCallback = std::function<void(CommandBuffer&)>;
+        using RenderCallback = std::function<void(RenderState)>;
 
         StringId Name;
         RenderPass Pass;
         RenderCallback OnRender;
+        std::vector<StringId> ColorAttachments;
     };
 
     class RenderGraph
@@ -57,19 +68,21 @@ namespace VulkanAbstractionLayer
         using DestroyCallback = std::function<void(const RenderPass&)>;
 
         std::vector<RenderGraphNode> nodes;
-        Image output;
+        std::unordered_map<StringId, Image> images;
+        StringId outputName;
         PresentCallback onPresent;
         DestroyCallback onDestroy;
 
     public:
-        RenderGraph(std::vector<RenderGraphNode> nodes, Image output, PresentCallback onPresent, DestroyCallback onDestroy);
+        RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, DestroyCallback onDestroy);
         ~RenderGraph();
         RenderGraph(RenderGraph&&) = default;
-        RenderGraph& operator=(RenderGraph&& other);
+        RenderGraph& operator=(RenderGraph&& other) noexcept;
 
         void ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer);
         void Execute(CommandBuffer& commandBuffer);
         void Present(CommandBuffer& commandBuffer, const Image& presentImage);
         const RenderGraphNode& GetNodeByName(StringId name) const;
+        const Image& GetImageByName(StringId name) const;
     };
 }

@@ -38,11 +38,15 @@ namespace VulkanAbstractionLayer
         vk::Rect2D renderArea;
         vk::Framebuffer framebuffer;
         std::vector<vk::ClearValue> clearValues;
+        vk::Pipeline pipeline;
+        vk::PipelineLayout pipelineLayout;
     public:
-        RenderPass(vk::RenderPass renderPass, vk::Rect2D renderArea, vk::Framebuffer framebuffer, std::vector<vk::ClearValue> clearValues)
-            : handle(std::move(renderPass)), renderArea(std::move(renderArea)), framebuffer(std::move(framebuffer)), clearValues(std::move(clearValues)) { }
+        RenderPass(vk::RenderPass renderPass, vk::Pipeline pipeline, vk::PipelineLayout pipelineLayout, vk::Rect2D renderArea, vk::Framebuffer framebuffer, std::vector<vk::ClearValue> clearValues)
+            : handle(renderPass), pipeline(pipeline), pipelineLayout(pipelineLayout), renderArea(renderArea), framebuffer(framebuffer), clearValues(clearValues) { }
 
         const vk::RenderPass& GetNativeHandle() const { return this->handle; }
+        const vk::Pipeline& GetPipeline() const { return this->pipeline; }
+        const vk::PipelineLayout& GetPipelineLayout() const { return this->pipelineLayout; }
         const vk::Rect2D& GetRenderArea() const { return this->renderArea; }
         const vk::Framebuffer& GetFramebuffer() const { return this->framebuffer; }
         const std::vector<vk::ClearValue>& GetClearValues() const { return this->clearValues; }

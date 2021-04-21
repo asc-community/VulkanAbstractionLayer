@@ -25,13 +25,15 @@ set(SOURCES
 "submodules/imgui/imgui_tables.cpp"
 "submodules/imgui/imgui_widgets.cpp"
 "submodules/imgui/backends/imgui_impl_vulkan.cpp"
-"submodules/imgui/backends/imgui_impl_glfw.cpp" "VulkanAbstractionLayer/CommandBuffer.cpp" "VulkanAbstractionLayer/RenderPass.cpp")
+"submodules/imgui/backends/imgui_impl_glfw.cpp" "VulkanAbstractionLayer/CommandBuffer.cpp" "VulkanAbstractionLayer/RenderPass.cpp" "VulkanAbstractionLayer/ShaderLoader.cpp")
 
 find_package(Vulkan REQUIRED FATAL_ERROR)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang)
 set(GLFW_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw/include)
 set(GLM_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glm)
 set(IMGUI_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/imgui)
+set(GLSLANG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang/glslang/Public ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang/SPIRV)
 set(VMA_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/VulkanMemoryAllocator/src)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -42,7 +44,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${GLM_INCLUDE_DIR} 
     ${IMGUI_INCLUDE_DIR}
     ${VMA_INCLUDE_DIR}
+    ${GLSLANG_INCLUDE_DIR}
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw MachineIndependent SPIRV)
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC -D APPLICATION_WORKING_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}")

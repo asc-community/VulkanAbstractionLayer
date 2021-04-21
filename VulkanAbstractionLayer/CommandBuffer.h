@@ -34,6 +34,24 @@ namespace VulkanAbstractionLayer
 {
     class RenderPass;
     class Image;
+    
+    struct Rect2D
+    {
+        int32_t OffsetWidth = { };
+        int32_t OffsetHeight = { };
+        uint32_t Width = { };
+        uint32_t Height = { };
+    };
+
+    struct Viewport
+    {
+        float OffsetWidth = { };
+        float OffsetHeight = { };
+        float Width = { };
+        float Height = { };
+        float MinDepth = { };
+        float MaxDepth = { };
+    };
 
     class CommandBuffer
     {
@@ -45,6 +63,11 @@ namespace VulkanAbstractionLayer
         const vk::CommandBuffer& GetNativeHandle() const { return this->handle; }
         void BeginRenderPass(const RenderPass& renderPass);
         void EndRenderPass();
+        void Draw(uint32_t vertexCount, uint32_t instanceCount) { this->Draw(vertexCount, instanceCount, 0, 0); }
+        void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
+        void SetViewport(const Viewport& viewport);
+        void SetScissor(const Rect2D& scissor);
+        void SetRenderArea(const Image& image);
         void CopyImage(const Image& source, vk::ImageLayout sourceLayout, const Image& distance, vk::ImageLayout distanceLayout);
     };
 }

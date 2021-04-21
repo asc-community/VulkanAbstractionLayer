@@ -42,11 +42,51 @@ namespace VulkanAbstractionLayer
             .setClearValues(renderPass.GetClearValues());
 
         this->handle.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+
+        vk::Pipeline graphicPipeline = renderPass.GetPipeline();
+        if ((bool)graphicPipeline) this->handle.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicPipeline);
     }
 
     void CommandBuffer::EndRenderPass()
     {
         this->handle.endRenderPass();
+    }
+
+    void CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
+    {
+        this->handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+    }
+
+    void CommandBuffer::SetViewport(const Viewport& viewport)
+    {
+        this->handle.setViewport(0, vk::Viewport{ 
+            viewport.OffsetWidth, 
+            viewport.OffsetHeight, 
+            viewport.Width, 
+            viewport.Height, 
+            viewport.MinDepth, 
+            viewport.MaxDepth 
+        });
+    }
+
+    void CommandBuffer::SetScissor(const Rect2D& scissor)
+    {
+        this->handle.setScissor(0, vk::Rect2D{
+            vk::Offset2D{
+                scissor.OffsetWidth,
+                scissor.OffsetHeight
+            },
+            vk::Extent2D{
+                scissor.Width,
+                scissor.Height
+            }
+        });
+    }
+
+    void CommandBuffer::SetRenderArea(const Image& image)
+    {
+        this->SetViewport(Viewport{ 0.0f, 0.0f, (float)image.GetWidth(), (float)image.GetHeight(), 0.0f, 1.0f });
+        this->SetScissor(Rect2D{ 0, 0, image.GetWidth(), image.GetHeight() });
     }
 
     void CommandBuffer::CopyImage(const Image& source, vk::ImageLayout sourceLayout, const Image& distance, vk::ImageLayout distanceLayout)

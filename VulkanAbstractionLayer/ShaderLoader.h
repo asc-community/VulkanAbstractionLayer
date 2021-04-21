@@ -28,46 +28,17 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
-#include "VulkanMemoryAllocator.h"
+#include <vector>
+#include <string>
 
-struct VmaAllocator_T;
-struct VmaAllocation_T;
-using VmaAllocator = VmaAllocator_T*;
-using VmaAllocation = VmaAllocation_T*;
+#include "ShaderType.h"
 
 namespace VulkanAbstractionLayer
 {
-    class Image
+    class ShaderLoader
     {
-        vk::Image handle;
-        vk::ImageView view;
-        vk::Extent2D extent = { 0u, 0u };
-        vk::Format format = vk::Format::eUndefined;
-        VmaAllocator allocator;
-        VmaAllocation allocation = { };
-
-        void Destroy();
-        void InitExternal(const vk::Image& image, vk::Format format);
     public:
-        Image(VmaAllocator allocator) : allocator(allocator) { }
-        Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, VmaAllocator allocator);
-        Image(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, VmaAllocator allocator);
-        Image(const Image&) = delete;
-        Image& operator=(const Image&) = delete;
-        Image(Image&& other) noexcept;
-        Image& operator=(Image&& other) noexcept;
-        ~Image();
-
-        void Init(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
-
-        vk::Image GetNativeHandle() const { return this->handle; }
-        vk::ImageView GetNativeView() const { return this->view; }
-        vk::Format GetFormat() const { return this->format; }
-        uint32_t GetWidth() const { return this->extent.width; }
-        uint32_t GetHeight() const { return this->extent.height; }
-        VmaAllocator GetAllocator() const { return this->allocator; }
-
-        static Image CreateReference(const Image& image);
+        static std::vector<uint32_t> LoadFromBinary(const std::string& filepath);
+        static std::vector<uint32_t> LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion);
     };
 }

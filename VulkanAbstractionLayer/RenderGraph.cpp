@@ -32,15 +32,17 @@
 
 namespace VulkanAbstractionLayer
 {
-    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, Image output, PresentCallback onPresent, DestroyCallback onDestroy)
-        : nodes(std::move(nodes)), output(std::move(output)), onPresent(std::move(onPresent)), onDestroy(std::move(onDestroy))
+    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, DestroyCallback onDestroy)
+        : nodes(std::move(nodes)), images(std::move(images)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onDestroy(std::move(onDestroy))
     {
     }
 
     void RenderGraph::ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer)
     {
         commandBuffer.BeginRenderPass(node.Pass);
-        node.OnRender(commandBuffer);
+
+        node.OnRender(RenderState{ *this, commandBuffer, node.ColorAttachments });
+
         commandBuffer.EndRenderPass();
     }
 
@@ -54,7 +56,7 @@ namespace VulkanAbstractionLayer
 
     void RenderGraph::Present(CommandBuffer& commandBuffer, const Image& presentImage)
     {
-        this->onPresent(commandBuffer, this->output, presentImage);
+        this->onPresent(commandBuffer, this->images.at(this->outputName), presentImage);
     }
 
     const RenderGraphNode& RenderGraph::GetNodeByName(StringId name) const
@@ -64,10 +66,14 @@ namespace VulkanAbstractionLayer
         return *it;
     }
 
-    RenderGraph& RenderGraph::operator=(RenderGraph&& other)
+    RenderGraph& RenderGraph::operator=(RenderGraph&& other) noexcept
     {
-        this->~RenderGraph();
-        return *new(this) RenderGraph(std::move(other));
+        if (this != std::addressof(other))
+        {
+            this->~RenderGraph();
+            return *std::launder(new(this) RenderGraph(std::move(other)));
+        }
+        else return *this;
     }
 
     RenderGraph::~RenderGraph()
@@ -77,5 +83,16 @@ namespace VulkanAbstractionLayer
             this->onDestroy(node.Pass);
         }
         this->nodes.clear();
+        this->images.clear();
+    }
+
+    const Image& RenderGraph::GetImageByName(StringId name) const
+    {
+        return this->images.at(name);
+    }
+
+    const Image& RenderState::GetColorAttachment(size_t index) const
+    {
+        return this->Graph.GetImageByName(this->ColorAttachments[index]);
     }
 }

@@ -29,6 +29,7 @@
 #include "VulkanContext.h"
 
 #include "vk_mem_alloc.h"
+#include "ShaderLang.h"
 
 #include <algorithm>
 #include <cstring>
@@ -154,6 +155,8 @@ namespace VulkanAbstractionLayer
         this->swapchainImages.clear();
 
         vmaDestroyAllocator(this->allocator);
+
+        glslang::FinalizeProcess();
 
         if ((bool)this->swapchain) this->device.destroySwapchainKHR(this->swapchain);
         if ((bool)this->imageAvailableSemaphore) this->device.destroySemaphore(this->imageAvailableSemaphore);
@@ -284,6 +287,10 @@ namespace VulkanAbstractionLayer
         if (options.InfoCallback)
             options.InfoCallback("created vulkan memory allocator");
 
+        glslang::InitializeProcess();
+        if (options.InfoCallback)
+            options.InfoCallback("initialized glslang compiler");
+
         this->RecreateSwapchain(surfaceCapabilities.maxImageExtent.width, surfaceCapabilities.maxImageExtent.height);
 
         if (options.InfoCallback)
@@ -335,6 +342,14 @@ namespace VulkanAbstractionLayer
             std::clamp(surfaceWidth,  surfaceCapabilities.minImageExtent.width,  surfaceCapabilities.maxImageExtent.width ),
             std::clamp(surfaceHeight, surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height)
         );
+
+        if (this->surfaceExtent == vk::Extent2D{ 0, 0 })
+        {
+            this->surfaceExtent = vk::Extent2D{ 1, 1 };
+            this->renderingEnabled = false;
+            return;
+        }
+        this->renderingEnabled = true;
 
         vk::SwapchainCreateInfoKHR swapchainCreateInfo;
         swapchainCreateInfo

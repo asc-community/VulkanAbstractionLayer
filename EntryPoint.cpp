@@ -7,6 +7,7 @@
 #include "VulkanAbstractionLayer/RenderGraph.h"
 #include "VulkanAbstractionLayer/RenderGraphBuilder.h"
 #include "VulkanAbstractionLayer/CommandBuffer.h"
+#include "VulkanAbstractionLayer/ShaderLoader.h"
 #include "imgui.h"
 
 using namespace VulkanAbstractionLayer;
@@ -26,23 +27,96 @@ void WindowErrorCallback(const char* message)
     std::cerr << "[ERROR Window]: " << message << std::endl;
 }
 
-RenderGraph CreateRenderGraph(const Image& outputImage, const VulkanContext& context)
+struct RenderGraphResources
+{
+    Image OutputImage;
+    vk::ShaderModule VertexShader;
+    vk::ShaderModule FragmentShader;
+    vk::DescriptorSetLayout DescriptorSetLayout;
+};
+
+vk::ShaderModule CreateShaderModuleFromSource(const VulkanContext& context, const std::filesystem::path& filename, ShaderType type)
+{
+    auto bytecode = ShaderLoader::LoadFromSource(filename.string(), type, ShaderLanguage::GLSL, context.GetAPIVersion());
+    vk::ShaderModuleCreateInfo createInfo;
+    createInfo
+        .setPCode(bytecode.data())
+        .setCodeSize(bytecode.size() * sizeof(uint32_t));
+
+    return context.GetDevice().createShaderModule(createInfo);
+}
+
+vk::ShaderModule CreateShaderModuleFromBinary(const VulkanContext& context, const std::string& filename, ShaderType type)
+{
+    (void)type;
+    auto bytecode = ShaderLoader::LoadFromBinary(filename);
+    vk::ShaderModuleCreateInfo createInfo;
+    createInfo
+        .setPCode(bytecode.data())
+        .setCodeSize(bytecode.size() * sizeof(uint32_t));
+
+    return context.GetDevice().createShaderModule(createInfo);
+}
+
+RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const VulkanContext& context)
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddImageReference("Output"_id, &outputImage)
-        .AddRenderPass(RenderPassBuilder{ "ImGuiPass"_id }
+        .AddImageReference("Output"_id, resources.OutputImage)
+        .AddRenderPass(RenderPassBuilder{ "TrianglePass"_id }
+            .SetPipeline(GraphicPipeline{
+                GraphicShader{
+                    resources.VertexShader,
+                    resources.FragmentShader,
+                    resources.DescriptorSetLayout,
+                    {
+                        // VertexBinding{
+                        //     {
+                        //         VertexAttributeLayout{
+                        //             // position
+                        //         },
+                        //         VertexAttributeLayout{
+                        //             // uv
+                        //         }
+                        //     },
+                        //     vk::VertexInputRate::eVertex
+                        // }
+                    }
+                }
+            })
             .AddWriteOnlyColorAttachment("Output"_id, ClearColor{ 0.8f, 0.6f, 0.0f, 1.0f })
             .AddOnRenderCallback(
-                [](CommandBuffer& commandBuffer)
+                [](RenderState state)
                 {
-                    ImGuiVulkanContext::RenderFrame(commandBuffer.GetNativeHandle());
+                    auto& output = state.GetColorAttachment(0);
+                    state.Commands.SetRenderArea(output);
+                    state.Commands.Draw(3, 1);
+                }
+            )
+        )
+        .AddRenderPass(RenderPassBuilder{ "ImGuiPass"_id }
+            .AddWriteOnlyColorAttachment("Output"_id, AttachmentInitialState::LOAD)
+            .AddOnRenderCallback(
+                [](RenderState state)
+                {
+                    ImGuiVulkanContext::RenderFrame(state.Commands.GetNativeHandle());
                 }
             )
         )
         .SetOutputName("Output"_id);
 
     return renderGraphBuilder.Build(context);
+}
+
+vk::DescriptorSetLayout CreateDescriptorSetLayout(const VulkanContext& context)
+{
+    std::array<vk::DescriptorSetLayoutBinding, 0> layoutBindings = {
+    };
+
+    vk::DescriptorSetLayoutCreateInfo createInfo;
+    createInfo.setBindings(layoutBindings);
+
+    return context.GetDevice().createDescriptorSetLayout(createInfo);
 }
 
 Image CreateOutputImage(const VulkanContext& context)
@@ -86,14 +160,19 @@ int main()
 
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
-    Image outputImage = CreateOutputImage(Vulkan);
-    RenderGraph renderGraph = CreateRenderGraph(outputImage, Vulkan);
+    RenderGraphResources renderGraphResources{
+        CreateOutputImage(Vulkan),
+        CreateShaderModuleFromSource(Vulkan, "main_vertex.glsl", ShaderType::VERTEX),
+        CreateShaderModuleFromSource(Vulkan, "main_fragment.glsl", ShaderType::FRAGMENT),
+        CreateDescriptorSetLayout(Vulkan)
+    };
+    RenderGraph renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
 
-    window.OnResize([&Vulkan, &outputImage, &renderGraph](Window& window, Vector2 size) mutable
+    window.OnResize([&Vulkan, &renderGraphResources, &renderGraph](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
-        outputImage = CreateOutputImage(Vulkan);
-        renderGraph = CreateRenderGraph(outputImage, Vulkan);
+        renderGraphResources.OutputImage = CreateOutputImage(Vulkan);
+        renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
     });
     
     ImGuiVulkanContext::Init(Vulkan, window, renderGraph.GetNodeByName("ImGuiPass"_id).Pass.GetNativeHandle());
@@ -102,21 +181,28 @@ int main()
     {
         window.PollEvents();
 
-        Vulkan.StartFrame();
-        ImGuiVulkanContext::StartFrame();
+        if (Vulkan.IsRenderingEnabled())
+        {
+            Vulkan.StartFrame();
+            ImGuiVulkanContext::StartFrame();
 
-        ImGui::ShowDemoWindow();
+            ImGui::ShowDemoWindow();
 
-        CommandBuffer commandBuffer{ Vulkan.GetCurrentFrame().CommandBuffer };
+            CommandBuffer commandBuffer{ Vulkan.GetCurrentFrame().CommandBuffer };
 
-        renderGraph.Execute(commandBuffer);
-        renderGraph.Present(commandBuffer, Vulkan.GetCurrentSwapchainImage());
+            renderGraph.Execute(commandBuffer);
+            renderGraph.Present(commandBuffer, Vulkan.GetCurrentSwapchainImage());
 
-        ImGuiVulkanContext::EndFrame();
-        Vulkan.EndFrame();
+            ImGuiVulkanContext::EndFrame();
+            Vulkan.EndFrame();
+        }
     }
 
     Vulkan.GetDevice().waitIdle();
+
+    Vulkan.GetDevice().destroyDescriptorSetLayout(renderGraphResources.DescriptorSetLayout);
+    Vulkan.GetDevice().destroyShaderModule(renderGraphResources.VertexShader);
+    Vulkan.GetDevice().destroyShaderModule(renderGraphResources.FragmentShader);
 
     ImGuiVulkanContext::Destroy();
 

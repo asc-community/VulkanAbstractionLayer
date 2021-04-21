@@ -48,7 +48,6 @@ namespace VulkanAbstractionLayer
             VirtualFrame& virtualFrame = this->virtualFrames[i];
             virtualFrame.CommandBuffer = std::move(commandBuffers[i]);
             virtualFrame.CommandQueueFence = context.GetDevice().createFence(vk::FenceCreateInfo{ vk::FenceCreateFlagBits::eSignaled });
-            // virtualFrame.framebuffer is recreated on StartFrame
         }
     }
 
@@ -92,6 +91,7 @@ namespace VulkanAbstractionLayer
             1  // layer count
         };
 
+        // here we assume that present image is not written directly, but transfered from other image
         vk::ImageMemoryBarrier presentImageTransferDstToPresent;
         presentImageTransferDstToPresent
             .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)

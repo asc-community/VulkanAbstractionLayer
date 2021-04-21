@@ -28,46 +28,53 @@
 
 #pragma once
 
+#include "ShaderType.h"
 #include <vulkan/vulkan.hpp>
-#include "VulkanMemoryAllocator.h"
-
-struct VmaAllocator_T;
-struct VmaAllocation_T;
-using VmaAllocator = VmaAllocator_T*;
-using VmaAllocation = VmaAllocation_T*;
 
 namespace VulkanAbstractionLayer
 {
-    class Image
+    struct VertexAttributeLayout
     {
-        vk::Image handle;
-        vk::ImageView view;
-        vk::Extent2D extent = { 0u, 0u };
-        vk::Format format = vk::Format::eUndefined;
-        VmaAllocator allocator;
-        VmaAllocation allocation = { };
+        uint32_t ByteSize = 4 * sizeof(float);
+        vk::Format Format = vk::Format::eR32G32B32A32Sfloat;
+    };
 
-        void Destroy();
-        void InitExternal(const vk::Image& image, vk::Format format);
+    struct VertexBinding
+    {
+        std::vector<VertexAttributeLayout> Attributes;
+        vk::VertexInputRate InputRate;
+    };
+
+    class GraphicShader
+    {
+        vk::ShaderModule vertexShader;
+        vk::ShaderModule fragmentShader;
+
+        std::vector<VertexBinding> vertexBindings;
+        vk::DescriptorSetLayout descriptorSetLayout;
     public:
-        Image(VmaAllocator allocator) : allocator(allocator) { }
-        Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, VmaAllocator allocator);
-        Image(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, VmaAllocator allocator);
-        Image(const Image&) = delete;
-        Image& operator=(const Image&) = delete;
-        Image(Image&& other) noexcept;
-        Image& operator=(Image&& other) noexcept;
-        ~Image();
 
-        void Init(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
+        GraphicShader(vk::ShaderModule vertexShader, vk::ShaderModule fragmentShader, vk::DescriptorSetLayout descriptorSetLayout, std::vector<VertexBinding> vertexBindings)
+            : vertexShader(std::move(vertexShader)), fragmentShader(std::move(fragmentShader)), descriptorSetLayout(std::move(descriptorSetLayout)), vertexBindings(std::move(vertexBindings))
+        {
 
-        vk::Image GetNativeHandle() const { return this->handle; }
-        vk::ImageView GetNativeView() const { return this->view; }
-        vk::Format GetFormat() const { return this->format; }
-        uint32_t GetWidth() const { return this->extent.width; }
-        uint32_t GetHeight() const { return this->extent.height; }
-        VmaAllocator GetAllocator() const { return this->allocator; }
+        }
 
-        static Image CreateReference(const Image& image);
+        const auto& GetVertexBindings() const { return this->vertexBindings; }
+        const auto& GetDescriptorSetLayout() const { return this->descriptorSetLayout; }
+
+        const vk::ShaderModule& GetNativeShader(ShaderType type) const
+        {
+            switch (type)
+            {
+            case ShaderType::VERTEX:
+                return this->vertexShader;
+            case ShaderType::FRAGMENT:
+                return this->fragmentShader;
+            default:
+                assert(false);
+                return *(vk::ShaderModule*)nullptr;
+            }
+        }
     };
 }

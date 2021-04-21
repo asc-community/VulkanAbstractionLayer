@@ -40,9 +40,12 @@ int main()
     {
         window.PollEvents();
 
-        Vulkan.StartFrame();
-        // rendering
-        Vulkan.EndFrame();
+        if(Vulkan.IsRenderingEnabled())
+        {
+            Vulkan.StartFrame();
+            // rendering
+            Vulkan.EndFrame();
+        }
     }
 
     return 0;

@@ -37,7 +37,7 @@ namespace VulkanAbstractionLayer
         this->name = name;
     }
 
-    RenderPassBuilder& RenderPassBuilder::AddOnRenderCallback(std::function<void(CommandBuffer&)> callback)
+    RenderPassBuilder& RenderPassBuilder::AddOnRenderCallback(RenderGraphNode::RenderCallback callback)
     {
         this->onRenderCallback = std::move(callback);
         return *this;
@@ -85,6 +85,12 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
+    RenderPassBuilder& RenderPassBuilder::SetPipeline(GraphicPipeline pipeline)
+    {
+        this->graphicPipeline = pipeline;
+        return *this;
+    }
+
     std::array LayoutTable = {
         vk::ImageLayout::eUndefined,
         vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -110,7 +116,7 @@ namespace VulkanAbstractionLayer
         for (size_t attachmentIndex = 0; attachmentIndex < renderPassBuilder.outputColorAttachments.size(); attachmentIndex++)
         {
             const WriteOnlyColorAttachment& outputColorAttachment = renderPassBuilder.outputColorAttachments[attachmentIndex];
-            const Image& imageReference = *this->imageReferences.at(outputColorAttachment.Name);
+            const Image& imageReference = this->images.at(outputColorAttachment.Name);
 
             if (renderAreaWidth == 0 && renderAreaHeight == 0)
             {
@@ -190,7 +196,138 @@ namespace VulkanAbstractionLayer
         
         auto renderArea = vk::Rect2D{ vk::Offset2D{ 0u, 0u }, vk::Extent2D{ renderAreaWidth, renderAreaHeight } };
         
-        return RenderPass{ std::move(renderPass), std::move(renderArea), std::move(framebuffer), std::move(clearValues) };
+        vk::Pipeline pipeline;
+        vk::PipelineLayout pipelineLayout;
+        if (renderPassBuilder.graphicPipeline.has_value())
+        {
+            const auto& graphicPipeline = renderPassBuilder.graphicPipeline.value();
+
+            std::array shaderStageCreateInfos = {
+                vk::PipelineShaderStageCreateInfo {
+                    vk::PipelineShaderStageCreateFlags{ },
+                    vk::ShaderStageFlagBits::eVertex,
+                    graphicPipeline.Shader.GetNativeShader(ShaderType::VERTEX),
+                    "main"
+                },
+                vk::PipelineShaderStageCreateInfo {
+                    vk::PipelineShaderStageCreateFlags{ },
+                    vk::ShaderStageFlagBits::eFragment,
+                    graphicPipeline.Shader.GetNativeShader(ShaderType::FRAGMENT),
+                    "main"
+                }
+            };
+            
+            auto& vertexBindings = graphicPipeline.Shader.GetVertexBindings();
+
+            std::vector<vk::VertexInputBindingDescription> vertexBindingDescriptions;
+            std::vector<vk::VertexInputAttributeDescription> vertexAttributeDescriptions;
+            uint32_t vertexBindingId = 0, attributeLocationId = 0;
+
+            for (const auto& vertexBinding : vertexBindings)
+            {
+                uint32_t vertexBindingOffset = 0;
+                for (const auto& attribute : vertexBinding.Attributes)
+                {
+                    vertexAttributeDescriptions.push_back(
+                        vk::VertexInputAttributeDescription{
+                            attributeLocationId,
+                            vertexBindingId,
+                            attribute.Format,
+                            vertexBindingOffset,
+                    });
+                    attributeLocationId++;
+                    vertexBindingOffset += attribute.ByteSize;
+                }
+                vertexBindingId++;
+
+                vertexBindingDescriptions.push_back(
+                    vk::VertexInputBindingDescription{
+                        vertexBindingId,
+                        vertexBindingOffset,
+                        vertexBinding.InputRate
+                });
+            }
+
+            vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo;
+            vertexInputStateCreateInfo
+                .setVertexBindingDescriptions(vertexBindingDescriptions)
+                .setVertexAttributeDescriptions(vertexAttributeDescriptions);
+
+            vk::PipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
+            inputAssemblyStateCreateInfo
+                .setPrimitiveRestartEnable(false)
+                .setTopology(vk::PrimitiveTopology::eTriangleList);
+
+            vk::PipelineViewportStateCreateInfo viewportStateCreateInfo;
+            viewportStateCreateInfo
+                .setViewportCount(1) // defined dynamic
+                .setScissorCount(1); // defined dynamic
+
+            vk::PipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
+            rasterizationStateCreateInfo
+                .setPolygonMode(vk::PolygonMode::eFill)
+                .setCullMode(vk::CullModeFlagBits::eBack)
+                .setFrontFace(vk::FrontFace::eCounterClockwise)
+                .setLineWidth(1.0f);
+
+            vk::PipelineMultisampleStateCreateInfo multisampleStateCreateInfo;
+            multisampleStateCreateInfo
+                .setRasterizationSamples(vk::SampleCountFlagBits::e1)
+                .setMinSampleShading(1.0f);
+
+            vk::PipelineColorBlendAttachmentState colorBlendAttachmentState;
+            colorBlendAttachmentState
+                .setBlendEnable(true)
+                .setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha)
+                .setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha)
+                .setColorBlendOp(vk::BlendOp::eAdd)
+                .setSrcAlphaBlendFactor(vk::BlendFactor::eOne)
+                .setDstAlphaBlendFactor(vk::BlendFactor::eZero)
+                .setAlphaBlendOp(vk::BlendOp::eAdd)
+                .setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+
+            vk::PipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
+            colorBlendStateCreateInfo
+                .setLogicOpEnable(false)
+                .setLogicOp(vk::LogicOp::eCopy)
+                .setAttachments(colorBlendAttachmentState)
+                .setBlendConstants({ 0.0f, 0.0f, 0.0f, 0.0f });
+
+            std::array dynamicStates = {
+                vk::DynamicState::eViewport,
+                vk::DynamicState::eScissor,
+            };
+
+            vk::PipelineDynamicStateCreateInfo dynamicStateCreateInfo;
+            dynamicStateCreateInfo.setDynamicStates(dynamicStates);
+
+            vk::PipelineLayoutCreateInfo layoutCreateInfo;
+            layoutCreateInfo.setSetLayouts(graphicPipeline.Shader.GetDescriptorSetLayout());
+
+            pipelineLayout = context.GetDevice().createPipelineLayout(layoutCreateInfo);
+
+            vk::GraphicsPipelineCreateInfo pipelineCreateInfo;
+            pipelineCreateInfo
+                .setStages(shaderStageCreateInfos)
+                .setPVertexInputState(&vertexInputStateCreateInfo)
+                .setPInputAssemblyState(&inputAssemblyStateCreateInfo)
+                .setPTessellationState(nullptr)
+                .setPViewportState(&viewportStateCreateInfo)
+                .setPRasterizationState(&rasterizationStateCreateInfo)
+                .setPMultisampleState(&multisampleStateCreateInfo)
+                .setPDepthStencilState(nullptr)
+                .setPColorBlendState(&colorBlendStateCreateInfo)
+                .setPDynamicState(&dynamicStateCreateInfo)
+                .setLayout(pipelineLayout)
+                .setRenderPass(renderPass)
+                .setSubpass(0)
+                .setBasePipelineHandle(vk::Pipeline{ })
+                .setBasePipelineIndex(0);
+
+            pipeline = context.GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
+        }
+
+        return RenderPass{ renderPass, pipeline, pipelineLayout, renderArea, framebuffer, clearValues };
     }
 
     AttachmentLayout RenderGraphBuilder::ResolveRenderPassDependencies(StringId outputName)
@@ -220,9 +357,9 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
-    RenderGraphBuilder& RenderGraphBuilder::AddImageReference(StringId name, const Image* image)
+    RenderGraphBuilder& RenderGraphBuilder::AddImageReference(StringId name, const Image& image)
     {
-        this->imageReferences[name] = image;
+        this->images.emplace(name, Image::CreateReference(image));
         return *this;
     }
 
@@ -239,14 +376,19 @@ namespace VulkanAbstractionLayer
         std::vector<RenderGraphNode> nodes;
         for (auto& renderPass : this->renderPasses)
         {
+            std::vector<StringId> colorAttachments;
+            for (const auto& colorAttachment : renderPass.outputColorAttachments)
+                colorAttachments.push_back(colorAttachment.Name);
+
             nodes.push_back(RenderGraphNode{
                 renderPass.name,
                 this->BuildRenderPass(context, renderPass),
-                std::move(renderPass.onRenderCallback)
+                std::move(renderPass.onRenderCallback),
+                std::move(colorAttachments)
             });
         }
 
-        Image output = Image::CreateReference(*this->imageReferences.at(this->outputName));
+        Image output = Image::CreateReference(this->images.at(this->outputName));
 
         auto OnPresent = [outputLayout](CommandBuffer& commandBuffer, const Image& outputImage, const Image& presentImage)
         {
@@ -255,11 +397,12 @@ namespace VulkanAbstractionLayer
 
         auto OnDestroy = [device = context.GetDevice()](const RenderPass& pass)
         {
-            device.destroyRenderPass(pass.GetNativeHandle());
-            device.destroyFramebuffer(pass.GetFramebuffer());
+            if((bool)pass.GetPipeline())       device.destroyPipeline(pass.GetPipeline());
+            if((bool)pass.GetPipelineLayout()) device.destroyPipelineLayout(pass.GetPipelineLayout());
+            if((bool)pass.GetFramebuffer())    device.destroyFramebuffer(pass.GetFramebuffer());
+            if((bool)pass.GetNativeHandle())   device.destroyRenderPass(pass.GetNativeHandle());
         };
 
-        RenderGraph renderGraph{ std::move(nodes), std::move(output), std::move(OnPresent), std::move(OnDestroy) };
-        return renderGraph;
+        return RenderGraph{ std::move(nodes), std::move(this->images), std::move(this->outputName), std::move(OnPresent), std::move(OnDestroy) };
     }
 }
