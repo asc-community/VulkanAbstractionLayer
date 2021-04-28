@@ -52,14 +52,14 @@ namespace VulkanAbstractionLayer
     public:
         Image(VmaAllocator allocator) : allocator(allocator) { }
         Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, VmaAllocator allocator);
-        Image(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, VmaAllocator allocator);
+        Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, VmaAllocator allocator);
         Image(const Image&) = delete;
         Image& operator=(const Image&) = delete;
         Image(Image&& other) noexcept;
         Image& operator=(Image&& other) noexcept;
         ~Image();
 
-        void Init(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
+        void Init(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
 
         vk::Image GetNativeHandle() const { return this->handle; }
         vk::ImageView GetNativeView() const { return this->view; }

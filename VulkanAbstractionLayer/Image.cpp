@@ -84,7 +84,7 @@ namespace VulkanAbstractionLayer
         this->InitExternal(image, format);
     }
 
-    Image::Image(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, VmaAllocator allocator)
+    Image::Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, VmaAllocator allocator)
         : Image(allocator)
     {
         this->Init(width, height, format, usage, memoryUsage);
@@ -131,13 +131,13 @@ namespace VulkanAbstractionLayer
         this->Destroy();
     }
 
-    void Image::Init(size_t width, size_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage)
+    void Image::Init(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage)
     {
         vk::ImageCreateInfo imageCreateInfo;
         imageCreateInfo
             .setImageType(vk::ImageType::e2D)
             .setFormat(format)
-            .setExtent(vk::Extent3D{ (uint32_t)width, (uint32_t)height, 1 })
+            .setExtent(vk::Extent3D{ width, height, 1 })
             .setSamples(vk::SampleCountFlagBits::e1)
             .setMipLevels(1)
             .setArrayLayers(1)

@@ -29,7 +29,6 @@ void WindowErrorCallback(const char* message)
 
 struct RenderGraphResources
 {
-    Image OutputImage;
     vk::ShaderModule VertexShader;
     vk::ShaderModule FragmentShader;
     vk::DescriptorSetLayout DescriptorSetLayout;
@@ -62,7 +61,6 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddImageReference("Output"_id, resources.OutputImage)
         .AddRenderPass(RenderPassBuilder{ "TrianglePass"_id }
             .SetPipeline(GraphicPipeline{
                 GraphicShader{
@@ -119,19 +117,6 @@ vk::DescriptorSetLayout CreateDescriptorSetLayout(const VulkanContext& context)
     return context.GetDevice().createDescriptorSetLayout(createInfo);
 }
 
-Image CreateOutputImage(const VulkanContext& context)
-{
-    Image result{ context.GetAllocator() };
-    result.Init(
-        context.GetSurfaceExtent().width,
-        context.GetSurfaceExtent().height,
-        context.GetSurfaceFormat(),
-        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
-        MemoryUsage::GPU_ONLY
-    );
-    return result;
-}
-
 int main()
 {
     std::filesystem::current_path(APPLICATION_WORKING_DIRECTORY);
@@ -161,7 +146,6 @@ int main()
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
     RenderGraphResources renderGraphResources{
-        CreateOutputImage(Vulkan),
         CreateShaderModuleFromSource(Vulkan, "main_vertex.glsl", ShaderType::VERTEX),
         CreateShaderModuleFromSource(Vulkan, "main_fragment.glsl", ShaderType::FRAGMENT),
         CreateDescriptorSetLayout(Vulkan)
@@ -171,7 +155,6 @@ int main()
     window.OnResize([&Vulkan, &renderGraphResources, &renderGraph](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
-        renderGraphResources.OutputImage = CreateOutputImage(Vulkan);
         renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
     });
     
@@ -185,7 +168,7 @@ int main()
         {
             Vulkan.StartFrame();
             ImGuiVulkanContext::StartFrame();
-
+            
             ImGui::ShowDemoWindow();
 
             CommandBuffer commandBuffer{ Vulkan.GetCurrentFrame().CommandBuffer };
