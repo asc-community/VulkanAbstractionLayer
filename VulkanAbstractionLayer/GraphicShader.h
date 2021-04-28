@@ -33,16 +33,38 @@
 
 namespace VulkanAbstractionLayer
 {
-    struct VertexAttributeLayout
+    struct VertexAttribute
     {
-        uint32_t ByteSize = 4 * sizeof(float);
-        vk::Format Format = vk::Format::eR32G32B32A32Sfloat;
+        enum Type : uint8_t
+        {
+            FLOAT = 0,
+            FLOAT_VEC2,
+            FLOAT_VEC3,
+            FLOAT_VEC4,
+            INT,
+            INT_VEC2,
+            INT_VEC3,
+            INT_VEC4,
+            MAT2,
+            MAT3,
+            MAT4,
+        } AttributeType;
+
+        int32_t ByteSize;
+
+        template<typename T>
+        static VertexAttribute OfType();
     };
 
     struct VertexBinding
     {
-        std::vector<VertexAttributeLayout> Attributes;
-        vk::VertexInputRate InputRate;
+        enum class Rate : uint8_t
+        {
+            PER_VERTEX = 0,
+            PER_INSTANCE
+        } InputRate;
+
+        std::vector<VertexAttribute> Attributes;
     };
 
     class GraphicShader

@@ -29,6 +29,7 @@
 #include "CommandBuffer.h"
 #include "RenderPass.h"
 #include "Image.h"
+#include "Buffer.h"
 
 namespace VulkanAbstractionLayer
 {
@@ -55,6 +56,21 @@ namespace VulkanAbstractionLayer
     void CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
     {
         this->handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+    }
+
+    void CommandBuffer::BindVertexBuffer(const Buffer& vertexBuffer)
+    {
+        this->handle.bindVertexBuffers(0, vertexBuffer.GetNativeHandle(), { 0 });
+    }
+
+    void CommandBuffer::BindIndexBufferInt32(const Buffer& indexBuffer)
+    {
+        this->handle.bindIndexBuffer(indexBuffer.GetNativeHandle(), 0, vk::IndexType::eUint32);
+    }
+
+    void CommandBuffer::BindIndexBufferInt16(const Buffer& indexBuffer)
+    {
+        this->handle.bindIndexBuffer(indexBuffer.GetNativeHandle(), 0, vk::IndexType::eUint16);
     }
 
     void CommandBuffer::SetViewport(const Viewport& viewport)

@@ -8,6 +8,7 @@
 #include "VulkanAbstractionLayer/RenderGraphBuilder.h"
 #include "VulkanAbstractionLayer/CommandBuffer.h"
 #include "VulkanAbstractionLayer/ShaderLoader.h"
+#include "VulkanAbstractionLayer/Buffer.h"
 #include "imgui.h"
 
 using namespace VulkanAbstractionLayer;
@@ -31,6 +32,7 @@ struct RenderGraphResources
 {
     vk::ShaderModule VertexShader;
     vk::ShaderModule FragmentShader;
+    Buffer VertexBuffer;
     vk::DescriptorSetLayout DescriptorSetLayout;
 };
 
@@ -68,27 +70,24 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     resources.FragmentShader,
                     resources.DescriptorSetLayout,
                     {
-                        // VertexBinding{
-                        //     {
-                        //         VertexAttributeLayout{
-                        //             // position
-                        //         },
-                        //         VertexAttributeLayout{
-                        //             // uv
-                        //         }
-                        //     },
-                        //     vk::VertexInputRate::eVertex
-                        // }
+                        VertexBinding{
+                            VertexBinding::Rate::PER_VERTEX,
+                            {
+                                VertexAttribute::OfType<Vector4>(),
+                                VertexAttribute::OfType<Vector2>(),
+                            },
+                        }
                     }
                 }
             })
             .AddWriteOnlyColorAttachment("Output"_id, ClearColor{ 0.8f, 0.6f, 0.0f, 1.0f })
             .AddOnRenderCallback(
-                [](RenderState state)
+                [&resources](RenderState state)
                 {
                     auto& output = state.GetColorAttachment(0);
                     state.Commands.SetRenderArea(output);
-                    state.Commands.Draw(3, 1);
+                    state.Commands.BindVertexBuffer(resources.VertexBuffer);
+                    state.Commands.Draw(6, 1);
                 }
             )
         )
@@ -115,6 +114,50 @@ vk::DescriptorSetLayout CreateDescriptorSetLayout(const VulkanContext& context)
     createInfo.setBindings(layoutBindings);
 
     return context.GetDevice().createDescriptorSetLayout(createInfo);
+}
+
+Buffer CreateVertexBuffer(const VulkanContext& context)
+{
+    Buffer buffer{ context.GetAllocator() };
+
+    struct Vertex
+    {
+        Vector4 Position;
+        Vector2 TexCoord;
+    };
+
+    std::array vertexData = {
+       Vertex {
+           Vector4 { -0.9f, -0.6f, 0.0f, 1.0f },
+           Vector2 { 0.0f, 0.0f },
+       },
+       Vertex {
+           Vector4 { -0.9f, 0.6f, 0.0f, 1.0f },
+           Vector2 { 0.0f, 1.0f },
+       },
+       Vertex {
+           Vector4 { 0.9f, -0.6f, 0.0f, 1.0f },
+           Vector2 { 1.0f, 0.0f },
+       },
+       Vertex {
+           Vector4 { 0.9f, 0.6f, 0.0f, 1.0f },
+           Vector2 { 1.0f, 1.0f },
+       },
+       Vertex {
+           Vector4 { 0.9f, -0.6f, 0.0f, 1.0f },
+           Vector2 { 1.0f, 0.0f },
+       },
+       Vertex {
+           Vector4 { -0.9f, 0.6f, 0.0f, 1.0f },
+           Vector2 { 0.0f, 1.0f },
+       },
+    };
+
+    constexpr size_t byteSize = vertexData.size() * sizeof(Vertex);
+
+    buffer.Init(byteSize, BufferUsageType::VERTEX_BUFFER, MemoryUsage::CPU_TO_GPU);
+    buffer.LoadData((uint8_t*)vertexData.data(), byteSize, 0);
+    return buffer;
 }
 
 int main()
@@ -148,7 +191,8 @@ int main()
     RenderGraphResources renderGraphResources{
         CreateShaderModuleFromSource(Vulkan, "main_vertex.glsl", ShaderType::VERTEX),
         CreateShaderModuleFromSource(Vulkan, "main_fragment.glsl", ShaderType::FRAGMENT),
-        CreateDescriptorSetLayout(Vulkan)
+        CreateVertexBuffer(Vulkan),
+        CreateDescriptorSetLayout(Vulkan),
     };
     RenderGraph renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
 

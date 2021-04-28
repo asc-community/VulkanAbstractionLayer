@@ -34,6 +34,7 @@ namespace VulkanAbstractionLayer
 {
     class RenderPass;
     class Image;
+    class Buffer;
     
     struct Rect2D
     {
@@ -65,6 +66,9 @@ namespace VulkanAbstractionLayer
         void EndRenderPass();
         void Draw(uint32_t vertexCount, uint32_t instanceCount) { this->Draw(vertexCount, instanceCount, 0, 0); }
         void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
+        void BindVertexBuffer(const Buffer& vertexBuffer);
+        void BindIndexBufferInt32(const Buffer& indexBuffer);
+        void BindIndexBufferInt16(const Buffer& indexBuffer);
         void SetViewport(const Viewport& viewport);
         void SetScissor(const Rect2D& scissor);
         void SetRenderArea(const Image& image);

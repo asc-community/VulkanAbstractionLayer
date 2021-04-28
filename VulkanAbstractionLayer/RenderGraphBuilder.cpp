@@ -106,6 +106,11 @@ namespace VulkanAbstractionLayer
         vk::AttachmentLoadOp::eLoad,
     };
 
+    std::array InputRateTable = {
+        vk::VertexInputRate::eVertex,
+        vk::VertexInputRate::eInstance,
+    };
+
     vk::ImageUsageFlags AttachmentLayoutToImageUsage(AttachmentLayout layout)
     {
         switch (layout)
@@ -125,6 +130,37 @@ namespace VulkanAbstractionLayer
         default:
             assert(false);
             return vk::ImageUsageFlagBits{ };
+        }
+    }
+
+    std::pair<vk::Format, int32_t> VertexAttributeTypeToFormat(VertexAttribute::Type type)
+    {
+        switch (type)
+        {
+        case VertexAttribute::FLOAT:
+            return { vk::Format::eR32Sfloat, 1 };
+        case VertexAttribute::FLOAT_VEC2:
+            return { vk::Format::eR32G32Sfloat, 1 };
+        case VertexAttribute::FLOAT_VEC3:
+            return { vk::Format::eR32G32B32Sfloat, 1 };
+        case VertexAttribute::FLOAT_VEC4:
+            return { vk::Format::eR32G32B32A32Sfloat, 1 };
+        case VertexAttribute::INT:
+            return { vk::Format::eR32Sint, 1 };
+        case VertexAttribute::INT_VEC2:
+            return { vk::Format::eR32G32Sint, 1 };
+        case VertexAttribute::INT_VEC3:
+            return { vk::Format::eR32G32B32Sint, 1 };
+        case VertexAttribute::INT_VEC4:
+            return { vk::Format::eR32G32B32A32Sint, 1 };
+        case VertexAttribute::MAT2:
+            return { vk::Format::eR32G32Sfloat, 2 };
+        case VertexAttribute::MAT3:
+            return { vk::Format::eR32G32B32Sfloat, 3 };
+        case VertexAttribute::MAT4:
+            return { vk::Format::eR32G32B32A32Sfloat, 4 };
+        default:
+            return { vk::Format::eUndefined, 0 };
         }
     }
 
@@ -252,24 +288,28 @@ namespace VulkanAbstractionLayer
                 uint32_t vertexBindingOffset = 0;
                 for (const auto& attribute : vertexBinding.Attributes)
                 {
-                    vertexAttributeDescriptions.push_back(
-                        vk::VertexInputAttributeDescription{
-                            attributeLocationId,
-                            vertexBindingId,
-                            attribute.Format,
-                            vertexBindingOffset,
-                    });
-                    attributeLocationId++;
-                    vertexBindingOffset += attribute.ByteSize;
+                    auto [format, locations] = VertexAttributeTypeToFormat(attribute.AttributeType);
+                    for (size_t i = 0; i < locations; i++)
+                    {
+                        vertexAttributeDescriptions.push_back(
+                            vk::VertexInputAttributeDescription{
+                                attributeLocationId,
+                                vertexBindingId,
+                                format,
+                                vertexBindingOffset,
+                            });
+                        attributeLocationId++;
+                        vertexBindingOffset += attribute.ByteSize / locations;
+                    }
                 }
-                vertexBindingId++;
 
                 vertexBindingDescriptions.push_back(
                     vk::VertexInputBindingDescription{
                         vertexBindingId,
                         vertexBindingOffset,
-                        vertexBinding.InputRate
+                        InputRateTable[(size_t)vertexBinding.InputRate]
                 });
+                vertexBindingId++;
             }
 
             vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo;

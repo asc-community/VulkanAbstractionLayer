@@ -199,6 +199,12 @@ namespace VulkanAbstractionLayer
         bool isLinked = program.link(EShMessages::EShMsgDefault);
         if (!isLinked) return result;
 
+        program.buildReflection();
+
+
+
+        program.dumpReflection();
+
         auto intermediate = program.getIntermediate(ShaderTypeTable[(size_t)type]);
         glslang::GlslangToSpv(*intermediate, result);
         return result;

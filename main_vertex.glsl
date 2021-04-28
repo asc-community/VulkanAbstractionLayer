@@ -1,12 +1,17 @@
 #version 460
 
+layout(location = 0) in vec4 iPosition;
+layout(location = 1) in vec2 iTexCoord;
+
 out gl_PerVertex
 {
     vec4 gl_Position;
 };
 
+layout(location = 0) out vec2 vTexCoord;
+
 void main() 
 {
-    vec2 pos[3] = vec2[3](vec2(-0.7, 0.7), vec2(0.7, 0.7), vec2(0.0, -0.7));
-    gl_Position = vec4(pos[gl_VertexIndex], 0.0, 1.0);
+    gl_Position = iPosition;
+    vTexCoord = iTexCoord; 
 }

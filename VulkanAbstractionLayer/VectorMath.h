@@ -37,4 +37,8 @@ namespace VulkanAbstractionLayer
     using Matrix2x2 = glm::mat2;
     using Matrix3x3 = glm::mat3;
     using Matrix4x4 = glm::mat4;
+
+    using VectorInt2 = glm::vec<2, int32_t>;
+    using VectorInt3 = glm::vec<3, int32_t>;
+    using VectorInt4 = glm::vec<4, int32_t>;
 }
