@@ -29,60 +29,37 @@
 #pragma once
 
 #include "ShaderType.h"
+#include "ShaderReflection.h"
 #include <vulkan/vulkan.hpp>
 
 namespace VulkanAbstractionLayer
 {
-    struct VertexAttribute
-    {
-        enum Type : uint8_t
-        {
-            FLOAT = 0,
-            FLOAT_VEC2,
-            FLOAT_VEC3,
-            FLOAT_VEC4,
-            INT,
-            INT_VEC2,
-            INT_VEC3,
-            INT_VEC4,
-            MAT2,
-            MAT3,
-            MAT4,
-        } AttributeType;
-
-        int32_t ByteSize;
-
-        template<typename T>
-        static VertexAttribute OfType();
-    };
-
-    struct VertexBinding
-    {
-        enum class Rate : uint8_t
-        {
-            PER_VERTEX = 0,
-            PER_INSTANCE
-        } InputRate;
-
-        std::vector<VertexAttribute> Attributes;
-    };
+    class VulkanContext;
 
     class GraphicShader
     {
+        vk::Device device;
         vk::ShaderModule vertexShader;
         vk::ShaderModule fragmentShader;
 
-        std::vector<VertexBinding> vertexBindings;
+        std::vector<VertexAttribute> vertexAttributes;
         vk::DescriptorSetLayout descriptorSetLayout;
+
+        void Destroy();
     public:
+        GraphicShader(const VulkanContext& context);
+        GraphicShader(
+            std::vector<uint32_t> vertexBytecode, std::vector<uint32_t> fragmentBytecode, 
+            std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout, const VulkanContext& context);
 
-        GraphicShader(vk::ShaderModule vertexShader, vk::ShaderModule fragmentShader, vk::DescriptorSetLayout descriptorSetLayout, std::vector<VertexBinding> vertexBindings)
-            : vertexShader(std::move(vertexShader)), fragmentShader(std::move(fragmentShader)), descriptorSetLayout(std::move(descriptorSetLayout)), vertexBindings(std::move(vertexBindings))
-        {
+        void Init(std::vector<uint32_t> vertexBytecode, std::vector<uint32_t> fragmentBytecode,
+            std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout);
 
-        }
+        GraphicShader(GraphicShader&& other) noexcept;
+        GraphicShader& operator=(GraphicShader&& other) noexcept;
+        ~GraphicShader();
 
-        const auto& GetVertexBindings() const { return this->vertexBindings; }
+        const auto& GetVertexAttributes() const { return this->vertexAttributes; }
         const auto& GetDescriptorSetLayout() const { return this->descriptorSetLayout; }
 
         const vk::ShaderModule& GetNativeShader(ShaderType type) const

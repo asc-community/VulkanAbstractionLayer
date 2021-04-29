@@ -32,8 +32,8 @@
 
 namespace VulkanAbstractionLayer
 {
-    Buffer::Buffer(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage, VmaAllocator allocator)
-        : Buffer(allocator)
+    Buffer::Buffer(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage, const VulkanContext& context)
+        : Buffer(context)
     {
         this->Init(byteSize, usage, memoryUsage);
     }
@@ -96,6 +96,11 @@ namespace VulkanAbstractionLayer
             (void)vmaDestroyBuffer(this->allocator, this->handle, this->allocation);
             this->handle = vk::Buffer{ };
         }
+    }
+
+    Buffer::Buffer(const VulkanContext& context)
+        : allocator(ContextGetAllocator(context))
+    {
     }
 
     Buffer::Buffer(Buffer&& other) noexcept

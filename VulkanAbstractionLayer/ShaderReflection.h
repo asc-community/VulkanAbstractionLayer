@@ -1,3 +1,5 @@
+// Copyright(c) 2021, #Momo
+// All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met :
@@ -24,39 +26,46 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#define VMA_IMPLEMENTATION
+#pragma once
 
-#include "VulkanContext.h"
-#include "VulkanMemoryAllocator.h"
-#include "vk_mem_alloc.h"
+#include <cstdint>
+#include <utility>
 
 namespace VulkanAbstractionLayer
 {
-    uint32_t MemoryUsageToNative(MemoryUsage usage)
+    struct VertexAttribute
     {
-        constexpr uint32_t mappingTable[] = {
-            VMA_MEMORY_USAGE_GPU_ONLY,
-            VMA_MEMORY_USAGE_CPU_ONLY,
-            VMA_MEMORY_USAGE_CPU_TO_GPU,
-            VMA_MEMORY_USAGE_GPU_TO_CPU,
-            VMA_MEMORY_USAGE_CPU_COPY,
-            VMA_MEMORY_USAGE_GPU_LAZILY_ALLOCATED,
-        };
-        return mappingTable[(size_t)usage];
-    }
+        enum Type : uint8_t
+        {
+            FLOAT = 0,
+            FLOAT_VEC2,
+            FLOAT_VEC3,
+            FLOAT_VEC4,
+            INT,
+            INT_VEC2,
+            INT_VEC3,
+            INT_VEC4,
+            MAT2,
+            MAT3,
+            MAT4,
+        } AttributeType;
 
-    vk::Device VmaGetDevice(VmaAllocator allocator)
-    {
-        return allocator->m_hDevice;
-    }
+        int32_t ByteSize;
 
-    vk::Device ContextGetDevice(const VulkanContext& context)
-    {
-        return context.GetDevice();
-    }
+        template<typename T>
+        static VertexAttribute OfType();
+    };
 
-    VmaAllocator ContextGetAllocator(const VulkanContext& context)
+    struct VertexBinding
     {
-        return context.GetAllocator();
-    }
+        enum class Rate : uint8_t
+        {
+            PER_VERTEX = 0,
+            PER_INSTANCE
+        } InputRate;
+
+        uint32_t BindingRange;
+
+        constexpr static uint32_t BindingRangeAll = uint32_t(-1);
+    };
 }

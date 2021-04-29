@@ -28,14 +28,17 @@
 
 #pragma once
 
-#include <cstdint>
 #include <vulkan/vulkan.hpp>
 
 struct VmaAllocator_T;
+struct VmaAllocation_T;
 using VmaAllocator = VmaAllocator_T*;
+using VmaAllocation = VmaAllocation_T*;
 
 namespace VulkanAbstractionLayer
 {
+    class VulkanContext;
+
     enum class MemoryUsage
     {
         GPU_ONLY = 0, // device local for fast GPU access
@@ -48,4 +51,6 @@ namespace VulkanAbstractionLayer
 
     uint32_t MemoryUsageToNative(MemoryUsage usage);
     vk::Device VmaGetDevice(VmaAllocator allocator);
+    vk::Device ContextGetDevice(const VulkanContext& context);
+    VmaAllocator ContextGetAllocator(const VulkanContext& context);
 }

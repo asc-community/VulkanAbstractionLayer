@@ -32,13 +32,24 @@
 #include <string>
 
 #include "ShaderType.h"
+#include "ShaderReflection.h"
 
 namespace VulkanAbstractionLayer
 {
     class ShaderLoader
     {
     public:
+        struct LoadedShader
+        {
+            using Bytecode = std::vector<uint32_t>;
+            using Attributes = std::vector<VertexAttribute>;
+
+            Bytecode Data;
+            Attributes VertexAttributes;
+        };
+
         static std::vector<uint32_t> LoadFromBinary(const std::string& filepath);
         static std::vector<uint32_t> LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion);
+        static LoadedShader LoadFromSourceWithReflection(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion);
     };
 }

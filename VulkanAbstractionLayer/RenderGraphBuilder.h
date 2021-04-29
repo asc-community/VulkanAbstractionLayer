@@ -95,6 +95,7 @@ namespace VulkanAbstractionLayer
     struct GraphicPipeline
     {
         GraphicShader Shader;
+        std::vector<VertexBinding> VertexBindings;
     };
 
     class RenderPassBuilder
@@ -107,6 +108,8 @@ namespace VulkanAbstractionLayer
         std::optional<GraphicPipeline> graphicPipeline;
     public:
         RenderPassBuilder(StringId name);
+        RenderPassBuilder(RenderPassBuilder&&) = default;
+        RenderPassBuilder& operator=(RenderPassBuilder&&) = default;
 
         RenderPassBuilder& AddOnRenderCallback(RenderGraphNode::RenderCallback callback);
         RenderPassBuilder& AddReadOnlyColorAttachment(StringId name);
@@ -132,7 +135,8 @@ namespace VulkanAbstractionLayer
         AttachmentLayout ResolveImageTransitions(StringId outputName);
         AttachmentHashMap AllocateAttachments(const VulkanContext& context);
     public:
-        RenderGraphBuilder& AddRenderPass(RenderPassBuilder renderPass);
+        RenderGraphBuilder& AddRenderPass(RenderPassBuilder&& renderPass);
+        RenderGraphBuilder& AddRenderPass(RenderPassBuilder& renderPass);
         RenderGraphBuilder& SetOutputName(StringId name);
         RenderGraph Build(const VulkanContext& context);
     };

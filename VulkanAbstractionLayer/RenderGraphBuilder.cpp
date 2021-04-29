@@ -87,7 +87,7 @@ namespace VulkanAbstractionLayer
 
     RenderPassBuilder& RenderPassBuilder::SetPipeline(GraphicPipeline pipeline)
     {
-        this->graphicPipeline = pipeline;
+        this->graphicPipeline = std::move(pipeline);
         return *this;
     }
 
@@ -277,39 +277,52 @@ namespace VulkanAbstractionLayer
                 }
             };
             
-            auto& vertexBindings = graphicPipeline.Shader.GetVertexBindings();
+            auto& vertexAttributes = graphicPipeline.Shader.GetVertexAttributes();
+            auto& vertexBindings = graphicPipeline.VertexBindings;
 
             std::vector<vk::VertexInputBindingDescription> vertexBindingDescriptions;
             std::vector<vk::VertexInputAttributeDescription> vertexAttributeDescriptions;
-            uint32_t vertexBindingId = 0, attributeLocationId = 0;
+            uint32_t vertexBindingId = 0, attributeLocationId = 0, vertexBindingOffset = 0;
+            uint32_t attributeLocationOffset = 0;
 
-            for (const auto& vertexBinding : vertexBindings)
+            for (const auto& attribute : vertexAttributes)
             {
-                uint32_t vertexBindingOffset = 0;
-                for (const auto& attribute : vertexBinding.Attributes)
+                auto [format, locations] = VertexAttributeTypeToFormat(attribute.AttributeType);
+                for (size_t i = 0; i < locations; i++)
                 {
-                    auto [format, locations] = VertexAttributeTypeToFormat(attribute.AttributeType);
-                    for (size_t i = 0; i < locations; i++)
-                    {
-                        vertexAttributeDescriptions.push_back(
-                            vk::VertexInputAttributeDescription{
-                                attributeLocationId,
-                                vertexBindingId,
-                                format,
-                                vertexBindingOffset,
-                            });
-                        attributeLocationId++;
-                        vertexBindingOffset += attribute.ByteSize / locations;
-                    }
+                    vertexAttributeDescriptions.push_back(
+                        vk::VertexInputAttributeDescription{
+                            attributeLocationId,
+                            vertexBindingId,
+                            format,
+                            vertexBindingOffset,
+                        });
+                    attributeLocationId++;
+                    vertexBindingOffset += attribute.ByteSize / locations;
                 }
 
+                if (attributeLocationId == attributeLocationOffset + vertexBindings[vertexBindingId].BindingRange)
+                {
+                    vertexBindingDescriptions.push_back(
+                        vk::VertexInputBindingDescription{
+                            vertexBindingId,
+                            vertexBindingOffset,
+                            InputRateTable[(size_t)vertexBindings[vertexBindingId].InputRate]
+                        });
+                    vertexBindingId++;
+                    attributeLocationOffset = attributeLocationId;
+                    vertexBindingOffset = 0; // vertex binding offset is local to binding
+                }
+            }
+            // move everything else to last vertex buffer
+            if (attributeLocationId != attributeLocationOffset)
+            {
                 vertexBindingDescriptions.push_back(
                     vk::VertexInputBindingDescription{
                         vertexBindingId,
                         vertexBindingOffset,
-                        InputRateTable[(size_t)vertexBinding.InputRate]
-                });
-                vertexBindingId++;
+                        InputRateTable[(size_t)vertexBindings[vertexBindingId].InputRate]
+                    });
             }
 
             vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo;
@@ -445,14 +458,21 @@ namespace VulkanAbstractionLayer
                 context.GetSurfaceFormat(),
                 attachmentUsage,
                 MemoryUsage::GPU_ONLY,
-                context.GetAllocator()
+                context
             ));
         }
         return attachments;
     }
 
-    RenderGraphBuilder& RenderGraphBuilder::AddRenderPass(RenderPassBuilder renderPass)
+    RenderGraphBuilder& RenderGraphBuilder::AddRenderPass(RenderPassBuilder&& renderPass)
     {
+        this->renderPasses.push_back(std::move(renderPass));
+        return *this;
+    }
+
+    RenderGraphBuilder& RenderGraphBuilder::AddRenderPass(RenderPassBuilder& renderPass)
+    {
+        // bad but simplifies user code. As RenderPassBuilder is move-only, chain function which return reference cannot match other Add function
         this->renderPasses.push_back(std::move(renderPass));
         return *this;
     }

@@ -28,13 +28,7 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
 #include "VulkanMemoryAllocator.h"
-
-struct VmaAllocator_T;
-struct VmaAllocation_T;
-using VmaAllocator = VmaAllocator_T*;
-using VmaAllocation = VmaAllocation_T*;
 
 namespace VulkanAbstractionLayer
 {
@@ -50,9 +44,9 @@ namespace VulkanAbstractionLayer
         void Destroy();
         void InitExternal(const vk::Image& image, vk::Format format);
     public:
-        Image(VmaAllocator allocator) : allocator(allocator) { }
-        Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, VmaAllocator allocator);
-        Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, VmaAllocator allocator);
+        Image(const VulkanContext& context);
+        Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, const VulkanContext& context);
+        Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, const VulkanContext& context);
         Image(const Image&) = delete;
         Image& operator=(const Image&) = delete;
         Image(Image&& other) noexcept;
@@ -67,7 +61,5 @@ namespace VulkanAbstractionLayer
         uint32_t GetWidth() const { return this->extent.width; }
         uint32_t GetHeight() const { return this->extent.height; }
         VmaAllocator GetAllocator() const { return this->allocator; }
-
-        static Image CreateReference(const Image& image);
     };
 }

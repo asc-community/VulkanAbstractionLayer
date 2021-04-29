@@ -27,8 +27,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "ShaderLoader.h"
+#include "VectorMath.h"
+
 #include "ShaderLang.h"
 #include "GlslangToSpv.h"
+
 #include <fstream>
 
 namespace VulkanAbstractionLayer
@@ -176,9 +179,64 @@ namespace VulkanAbstractionLayer
         };
     }
 
+    VertexAttribute GetVertexAttributeByReflectedType(const glslang::TType& type)
+    {
+        auto baseType = type.getBasicType();
+
+        bool isFloating = baseType == glslang::EbtFloat;
+        bool isInteger = baseType == glslang::EbtInt;
+        bool isVector = type.isVector();
+        bool isMatrix = type.isMatrix();
+
+        if (isFloating && !isVector && !isMatrix)
+            return VertexAttribute::OfType<float>();
+        if (isInteger && !isVector && !isMatrix)
+            return VertexAttribute::OfType<int32_t>();
+
+        if (isFloating && isVector)
+        {
+            int vectorSize = type.getVectorSize();
+            if (vectorSize == 2)
+                return VertexAttribute::OfType<Vector2>();
+            if (vectorSize == 3)
+                return VertexAttribute::OfType<Vector3>();
+            if (vectorSize == 4)
+                return VertexAttribute::OfType<Vector4>();
+        }
+
+        if (isInteger && isVector)
+        {
+            int vectorSize = type.getVectorSize();
+            if (vectorSize == 2)
+                return VertexAttribute::OfType<VectorInt2>();
+            if (vectorSize == 3)
+                return VertexAttribute::OfType<VectorInt3>();
+            if (vectorSize == 4)
+                return VertexAttribute::OfType<VectorInt4>();
+        }
+
+        if (isFloating && isMatrix)
+        {
+            int matrixSize = type.getMatrixCols();
+            if (matrixSize == type.getMatrixRows() && matrixSize == 2)
+                return VertexAttribute::OfType<Matrix2x2>();
+            if (matrixSize == type.getMatrixRows() && matrixSize == 3)
+                return VertexAttribute::OfType<Matrix3x3>();
+            if (matrixSize == type.getMatrixRows() && matrixSize == 4)
+                return VertexAttribute::OfType<Matrix4x4>();
+        }
+
+        return VertexAttribute{ };
+    }
+
     std::vector<uint32_t> ShaderLoader::LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion)
     {
-        std::vector<uint32_t> result;
+        return ShaderLoader::LoadFromSourceWithReflection(filepath, type, language, vulkanVersion).Data;
+    }
+
+    ShaderLoader::LoadedShader ShaderLoader::LoadFromSourceWithReflection(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion)
+    {
+        LoadedShader result;
 
         std::ifstream file(filepath);
         std::string source{ std::istreambuf_iterator(file), std::istreambuf_iterator<char>() };
@@ -201,12 +259,17 @@ namespace VulkanAbstractionLayer
 
         program.buildReflection();
 
-
-
-        program.dumpReflection();
+        std::vector<VertexAttribute> vertexAttributes;
+        for (int i = 0; i < program.getNumPipeInputs(); i++)
+        {
+            auto& attributeReflection = program.getPipeInput(i);
+            auto& type = *attributeReflection.getType();
+            vertexAttributes.push_back(GetVertexAttributeByReflectedType(type));
+        }
 
         auto intermediate = program.getIntermediate(ShaderTypeTable[(size_t)type]);
-        glslang::GlslangToSpv(*intermediate, result);
+        glslang::GlslangToSpv(*intermediate, result.Data);
+        result.VertexAttributes = std::move(vertexAttributes);
         return result;
     }
 }

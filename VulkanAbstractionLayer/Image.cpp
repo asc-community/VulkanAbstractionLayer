@@ -77,15 +77,20 @@ namespace VulkanAbstractionLayer
         this->view = VmaGetDevice(this->allocator).createImageView(imageViewCreateInfo);
     }
 
-    Image::Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, VmaAllocator allocator)
-        : Image(allocator)
+    Image::Image(const VulkanContext& context)
+        : allocator(ContextGetAllocator(context))
+    {
+    }
+
+    Image::Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, const VulkanContext& context)
+        : Image(context)
     {
         this->extent = extent;
         this->InitExternal(image, format);
     }
 
-    Image::Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, VmaAllocator allocator)
-        : Image(allocator)
+    Image::Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, const VulkanContext& context)
+        : Image(context)
     {
         this->Init(width, height, format, usage, memoryUsage);
     }
@@ -153,10 +158,5 @@ namespace VulkanAbstractionLayer
 
         this->extent = vk::Extent2D{ (uint32_t)width, (uint32_t)height };
         this->InitExternal(this->handle, format);
-    }
-
-    Image Image::CreateReference(const Image& image)
-    {
-        return Image(image.GetNativeHandle(), vk::Extent2D{ (uint32_t)image.GetWidth(), (uint32_t)image.GetHeight() }, image.GetFormat(), image.GetAllocator());
     }
 }

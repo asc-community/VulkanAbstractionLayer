@@ -30,21 +30,16 @@ void WindowErrorCallback(const char* message)
 
 struct RenderGraphResources
 {
-    vk::ShaderModule VertexShader;
-    vk::ShaderModule FragmentShader;
+    std::vector<uint32_t> VertexShaderBytecode;
+    std::vector<uint32_t> FragmentShaderBytecode;
+    std::vector<VertexAttribute> VertexAttributes;
     Buffer VertexBuffer;
     vk::DescriptorSetLayout DescriptorSetLayout;
 };
 
-vk::ShaderModule CreateShaderModuleFromSource(const VulkanContext& context, const std::filesystem::path& filename, ShaderType type)
+auto CreateShaderModuleFromSource(const VulkanContext& context, const std::filesystem::path& filename, ShaderType type)
 {
-    auto bytecode = ShaderLoader::LoadFromSource(filename.string(), type, ShaderLanguage::GLSL, context.GetAPIVersion());
-    vk::ShaderModuleCreateInfo createInfo;
-    createInfo
-        .setPCode(bytecode.data())
-        .setCodeSize(bytecode.size() * sizeof(uint32_t));
-
-    return context.GetDevice().createShaderModule(createInfo);
+    return ShaderLoader::LoadFromSourceWithReflection(filename.string(), type, ShaderLanguage::GLSL, context.GetAPIVersion());
 }
 
 vk::ShaderModule CreateShaderModuleFromBinary(const VulkanContext& context, const std::string& filename, ShaderType type)
@@ -66,17 +61,16 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
         .AddRenderPass(RenderPassBuilder{ "TrianglePass"_id }
             .SetPipeline(GraphicPipeline{
                 GraphicShader{
-                    resources.VertexShader,
-                    resources.FragmentShader,
+                    resources.VertexShaderBytecode,
+                    resources.FragmentShaderBytecode,
+                    resources.VertexAttributes,
                     resources.DescriptorSetLayout,
-                    {
-                        VertexBinding{
-                            VertexBinding::Rate::PER_VERTEX,
-                            {
-                                VertexAttribute::OfType<Vector4>(),
-                                VertexAttribute::OfType<Vector2>(),
-                            },
-                        }
+                    context,
+                },
+                {
+                    VertexBinding{
+                        VertexBinding::Rate::PER_VERTEX,
+                        VertexBinding::BindingRangeAll
                     }
                 }
             })
@@ -118,7 +112,7 @@ vk::DescriptorSetLayout CreateDescriptorSetLayout(const VulkanContext& context)
 
 Buffer CreateVertexBuffer(const VulkanContext& context)
 {
-    Buffer buffer{ context.GetAllocator() };
+    Buffer buffer{ context };
 
     struct Vertex
     {
@@ -188,9 +182,13 @@ int main()
 
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
+    auto vertexShader = CreateShaderModuleFromSource(Vulkan, "main_vertex.glsl", ShaderType::VERTEX);
+    auto fragmentShader = CreateShaderModuleFromSource(Vulkan, "main_fragment.glsl", ShaderType::FRAGMENT);
+
     RenderGraphResources renderGraphResources{
-        CreateShaderModuleFromSource(Vulkan, "main_vertex.glsl", ShaderType::VERTEX),
-        CreateShaderModuleFromSource(Vulkan, "main_fragment.glsl", ShaderType::FRAGMENT),
+        vertexShader.Data,
+        fragmentShader.Data,
+        vertexShader.VertexAttributes,
         CreateVertexBuffer(Vulkan),
         CreateDescriptorSetLayout(Vulkan),
     };
@@ -228,8 +226,6 @@ int main()
     Vulkan.GetDevice().waitIdle();
 
     Vulkan.GetDevice().destroyDescriptorSetLayout(renderGraphResources.DescriptorSetLayout);
-    Vulkan.GetDevice().destroyShaderModule(renderGraphResources.VertexShader);
-    Vulkan.GetDevice().destroyShaderModule(renderGraphResources.FragmentShader);
 
     ImGuiVulkanContext::Destroy();
 
