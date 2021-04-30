@@ -63,6 +63,7 @@ namespace VulkanAbstractionLayer
         vk::Buffer handle;
         size_t byteSize = 0;
         VmaAllocation allocation = { };
+        uint8_t* mappedMemory = nullptr;
 
         void Destroy();
     public:
@@ -79,6 +80,7 @@ namespace VulkanAbstractionLayer
         vk::Buffer GetNativeHandle() const { return this->handle; }
         size_t GetByteSize() const { return this->byteSize; }
 
+        bool IsMemoryMapped() const;
         uint8_t* MapMemory();
         void UnmapMemory();
         void FlushMemory();

@@ -35,35 +35,33 @@
 
 namespace VulkanAbstractionLayer
 {
-    void ImGuiVulkanContext::Init(const VulkanContext& context, const Window& window, const vk::RenderPass& renderPass)
+    void ImGuiVulkanContext::Init(const Window& window, const vk::RenderPass& renderPass)
     {
+        auto& vulkanContext = GetCurrentVulkanContext();
+
         ImGui::CreateContext();
         ImGui_ImplGlfw_InitForVulkan(window.GetNativeHandle(), true);
         ImGui_ImplVulkan_InitInfo init_info = { };
-        init_info.Instance = context.GetInstance();
-        init_info.PhysicalDevice = context.GetPhysicalDevice();
-        init_info.Device = context.GetDevice();
-        init_info.QueueFamily = context.GetQueueFamilyIndex();
-        init_info.Queue = context.GetGraphicsQueue();
+        init_info.Instance = vulkanContext.GetInstance();
+        init_info.PhysicalDevice = vulkanContext.GetPhysicalDevice();
+        init_info.Device = vulkanContext.GetDevice();
+        init_info.QueueFamily = vulkanContext.GetQueueFamilyIndex();
+        init_info.Queue = vulkanContext.GetGraphicsQueue();
         init_info.PipelineCache = vk::PipelineCache{ };
-        init_info.DescriptorPool = context.GetDescriptorPool();
+        init_info.DescriptorPool = vulkanContext.GetDescriptorPool();
         init_info.Allocator = nullptr;
-        init_info.MinImageCount = context.GetPresentImageCount();
-        init_info.ImageCount = context.GetPresentImageCount();
+        init_info.MinImageCount = vulkanContext.GetPresentImageCount();
+        init_info.ImageCount = vulkanContext.GetPresentImageCount();
         init_info.CheckVkResultFn = nullptr;
         ImGui_ImplVulkan_Init(&init_info, renderPass);
 
-        auto commandBuffer = context.GetCurrentCommandBuffer().GetNativeHandle();
+        auto commandBuffer = vulkanContext.GetCurrentCommandBuffer();
 
-        commandBuffer.begin(vk::CommandBufferBeginInfo{ vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-        ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-        commandBuffer.end();
+        commandBuffer.Begin();
+        ImGui_ImplVulkan_CreateFontsTexture(commandBuffer.GetNativeHandle());
+        commandBuffer.End();
 
-        vk::SubmitInfo submitInfo;
-        submitInfo.setCommandBuffers(commandBuffer);
-        context.GetGraphicsQueue().submit(submitInfo);
-
-        context.GetDevice().waitIdle();
+        vulkanContext.SubmitCommandsImmediate(commandBuffer);
         ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 

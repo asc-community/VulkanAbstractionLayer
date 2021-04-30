@@ -308,17 +308,17 @@ namespace VulkanAbstractionLayer
 
         // TODO: rework
         std::array descriptorPoolSizes = {
-            vk::DescriptorPoolSize { vk::DescriptorType::eSampler,              1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eCombinedImageSampler, 1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eSampledImage,         1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eStorageImage,         1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eUniformTexelBuffer,   1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eStorageTexelBuffer,   1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eUniformBuffer,        1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eStorageBuffer,        1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eUniformBufferDynamic, 1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eStorageBufferDynamic, 1000 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eInputAttachment,      1000 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eSampler,              1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eCombinedImageSampler, 1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eSampledImage,         1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eStorageImage,         1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eUniformTexelBuffer,   1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eStorageTexelBuffer,   1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eUniformBuffer,        1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eStorageBuffer,        1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eUniformBufferDynamic, 1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eStorageBufferDynamic, 1024 },
+            vk::DescriptorPoolSize { vk::DescriptorType::eInputAttachment,      1024 },
         };
         vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
         descriptorPoolCreateInfo
@@ -330,7 +330,7 @@ namespace VulkanAbstractionLayer
         if (options.InfoCallback)
             options.InfoCallback("created command buffer pool and descriptor pool");
 
-        this->virtualFrames.Init(options.virtualFrameCount);
+        this->virtualFrames.Init(options.VirtualFrameCount, options.MaxStageBufferSize);
     }
 
     void VulkanContext::RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight)
@@ -393,9 +393,22 @@ namespace VulkanAbstractionLayer
        return this->swapchainImages[this->virtualFrames.GetPresentImageIndex()];
     }
 
-    CommandBuffer VulkanContext::GetCurrentCommandBuffer() const
+    CommandBuffer& VulkanContext::GetCurrentCommandBuffer()
     {
-        return CommandBuffer{ this->virtualFrames.GetCurrentFrame().CommandBuffer };
+        return this->virtualFrames.GetCurrentFrame().Commands;
+    }
+
+    Buffer& VulkanContext::GetCurrentStageBuffer()
+    {
+        return this->virtualFrames.GetCurrentFrame().StageBuffer;
+    }
+
+    void VulkanContext::SubmitCommandsImmediate(const CommandBuffer& commands)
+    {
+        vk::SubmitInfo submitInfo;
+        submitInfo.setCommandBuffers(commands.GetNativeHandle());
+        this->GetGraphicsQueue().submit(submitInfo);
+        this->GetDevice().waitIdle();
     }
 
     void VulkanContext::EndFrame()

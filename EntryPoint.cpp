@@ -146,8 +146,15 @@ Buffer CreateVertexBuffer(const VulkanContext& context)
 
     constexpr size_t byteSize = vertexData.size() * sizeof(Vertex);
 
-    buffer.Init(byteSize, BufferUsageType::VERTEX_BUFFER, MemoryUsage::CPU_TO_GPU);
-    buffer.LoadData((uint8_t*)vertexData.data(), byteSize, 0);
+    auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
+
+    buffer.Init(byteSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    stageBuffer.LoadData((uint8_t*)vertexData.data(), byteSize, 0);
+    commandBuffer.Begin();
+    commandBuffer.CopyBuffer(stageBuffer, vk::AccessFlagBits::eHostWrite, buffer, vk::AccessFlags{ });
+    commandBuffer.End();
+    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
     return buffer;
 }
 
@@ -198,7 +205,7 @@ int main()
         renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
     });
     
-    ImGuiVulkanContext::Init(Vulkan, window, renderGraph.GetNodeByName("ImGuiPass"_id).Pass.GetNativeHandle());
+    ImGuiVulkanContext::Init(window, renderGraph.GetNodeByName("ImGuiPass"_id).Pass.GetNativeHandle());
 
     while (!window.ShouldClose())
     {

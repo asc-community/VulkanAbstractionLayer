@@ -35,7 +35,7 @@ namespace VulkanAbstractionLayer
 {
     struct VertexAttribute
     {
-        enum Type : uint8_t
+        enum class Type: uint8_t
         {
             FLOAT = 0,
             FLOAT_VEC2,

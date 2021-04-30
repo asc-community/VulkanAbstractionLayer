@@ -111,12 +111,34 @@ namespace VulkanAbstractionLayer
         vk::VertexInputRate::eInstance,
     };
 
+    vk::AccessFlags AttachmentLayoutToAccessFlags(AttachmentLayout layout)
+    {
+        switch (layout)
+        {
+        case AttachmentLayout::UNKWNON:
+            return vk::AccessFlags{ };
+        case AttachmentLayout::SHADER_READ:
+            return vk::AccessFlagBits::eShaderRead;
+        case AttachmentLayout::COLOR_ATTACHMENT:
+            return vk::AccessFlagBits::eColorAttachmentWrite;
+        case AttachmentLayout::DEPTH_ATTACHMENT:
+            return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        case AttachmentLayout::TRANSFER_SOURCE:
+            return vk::AccessFlagBits::eTransferRead;
+        case AttachmentLayout::TRANSFER_DISTANCE:
+            return vk::AccessFlagBits::eTransferWrite;
+        default:
+            assert(false);
+            return vk::AccessFlags{ };
+        }
+    }
+
     vk::ImageUsageFlags AttachmentLayoutToImageUsage(AttachmentLayout layout)
     {
         switch (layout)
         {
         case AttachmentLayout::UNKWNON:
-            return vk::ImageUsageFlagBits{ };
+            return vk::ImageUsageFlags{ };
         case AttachmentLayout::SHADER_READ:
             return vk::ImageUsageFlagBits::eSampled;
         case AttachmentLayout::COLOR_ATTACHMENT:
@@ -129,7 +151,7 @@ namespace VulkanAbstractionLayer
             return vk::ImageUsageFlagBits::eTransferDst;
         default:
             assert(false);
-            return vk::ImageUsageFlagBits{ };
+            return vk::ImageUsageFlags{ };
         }
     }
 
@@ -137,27 +159,27 @@ namespace VulkanAbstractionLayer
     {
         switch (type)
         {
-        case VertexAttribute::FLOAT:
+        case VertexAttribute::Type::FLOAT:
             return { vk::Format::eR32Sfloat, 1 };
-        case VertexAttribute::FLOAT_VEC2:
+        case VertexAttribute::Type::FLOAT_VEC2:
             return { vk::Format::eR32G32Sfloat, 1 };
-        case VertexAttribute::FLOAT_VEC3:
+        case VertexAttribute::Type::FLOAT_VEC3:
             return { vk::Format::eR32G32B32Sfloat, 1 };
-        case VertexAttribute::FLOAT_VEC4:
+        case VertexAttribute::Type::FLOAT_VEC4:
             return { vk::Format::eR32G32B32A32Sfloat, 1 };
-        case VertexAttribute::INT:
+        case VertexAttribute::Type::INT:
             return { vk::Format::eR32Sint, 1 };
-        case VertexAttribute::INT_VEC2:
+        case VertexAttribute::Type::INT_VEC2:
             return { vk::Format::eR32G32Sint, 1 };
-        case VertexAttribute::INT_VEC3:
+        case VertexAttribute::Type::INT_VEC3:
             return { vk::Format::eR32G32B32Sint, 1 };
-        case VertexAttribute::INT_VEC4:
+        case VertexAttribute::Type::INT_VEC4:
             return { vk::Format::eR32G32B32A32Sint, 1 };
-        case VertexAttribute::MAT2:
+        case VertexAttribute::Type::MAT2:
             return { vk::Format::eR32G32Sfloat, 2 };
-        case VertexAttribute::MAT3:
+        case VertexAttribute::Type::MAT3:
             return { vk::Format::eR32G32B32Sfloat, 3 };
-        case VertexAttribute::MAT4:
+        case VertexAttribute::Type::MAT4:
             return { vk::Format::eR32G32B32A32Sfloat, 4 };
         default:
             return { vk::Format::eUndefined, 0 };
@@ -506,7 +528,10 @@ namespace VulkanAbstractionLayer
 
         auto OnPresent = [outputLayout](CommandBuffer& commandBuffer, const Image& outputImage, const Image& presentImage)
         {
-            commandBuffer.CopyImage(outputImage, LayoutTable[(size_t)outputLayout], presentImage, vk::ImageLayout::eUndefined);
+            commandBuffer.CopyImage(
+                outputImage, LayoutTable[(size_t)outputLayout], AttachmentLayoutToAccessFlags(outputLayout), 
+                presentImage, vk::ImageLayout::eUndefined, vk::AccessFlagBits::eMemoryRead
+            );
         };
 
         auto OnDestroy = [](const RenderPass& pass)

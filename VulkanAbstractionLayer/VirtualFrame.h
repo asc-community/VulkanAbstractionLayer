@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "Buffer.h"
+#include "CommandBuffer.h"
 #include <vulkan/vulkan.hpp>
 
 namespace VulkanAbstractionLayer
@@ -36,7 +38,8 @@ namespace VulkanAbstractionLayer
 
     struct VirtualFrame
     {
-        vk::CommandBuffer CommandBuffer;
+        CommandBuffer Commands{ vk::CommandBuffer{ } };
+        Buffer StageBuffer;
         vk::Fence CommandQueueFence;
     };
 
@@ -47,7 +50,7 @@ namespace VulkanAbstractionLayer
         size_t currentFrame = 0;
     public:
         VirtualFrameProvider() = default;
-        void Init(size_t frameCount);
+        void Init(size_t frameCount, size_t stageBufferSize);
         void Destroy();
 
         void StartFrame();

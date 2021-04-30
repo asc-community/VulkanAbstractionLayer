@@ -31,7 +31,7 @@
 
 namespace VulkanAbstractionLayer
 {
-    void VirtualFrameProvider::Init(size_t frameCount)
+    void VirtualFrameProvider::Init(size_t frameCount, size_t stageBufferSize)
     {
         auto& vulkanContext = GetCurrentVulkanContext();
         this->virtualFrames.resize(frameCount);
@@ -47,7 +47,9 @@ namespace VulkanAbstractionLayer
         for (size_t i = 0; i < frameCount; i++)
         {
             VirtualFrame& virtualFrame = this->virtualFrames[i];
-            virtualFrame.CommandBuffer = std::move(commandBuffers[i]);
+            virtualFrame.Commands = CommandBuffer{ commandBuffers[i] };
+            virtualFrame.StageBuffer.Init(stageBufferSize, BufferUsageType::TRANSFER_SOURCE, MemoryUsage::CPU_TO_GPU);
+            (void)virtualFrame.StageBuffer.MapMemory(); // map memory for future use as stage point for other resources
             virtualFrame.CommandQueueFence = vulkanContext.GetDevice().createFence(vk::FenceCreateInfo{ vk::FenceCreateFlagBits::eSignaled });
         }
     }
@@ -76,9 +78,7 @@ namespace VulkanAbstractionLayer
         assert(waitFenceResult == vk::Result::eSuccess);
         vulkanContext.GetDevice().resetFences(frame.CommandQueueFence);
 
-        vk::CommandBufferBeginInfo commandBufferBeginInfo;
-        commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-        frame.CommandBuffer.begin(commandBufferBeginInfo);
+        frame.Commands.Begin();
     }
 
     void VirtualFrameProvider::EndFrame()
@@ -107,7 +107,7 @@ namespace VulkanAbstractionLayer
             .setImage(presentImage.GetNativeHandle())
             .setSubresourceRange(subresourceRange);
 
-        frame.CommandBuffer.pipelineBarrier(
+        frame.Commands.GetNativeHandle().pipelineBarrier(
             vk::PipelineStageFlagBits::eTransfer,
             vk::PipelineStageFlagBits::eBottomOfPipe,
             { }, // dependency flags
@@ -116,7 +116,7 @@ namespace VulkanAbstractionLayer
             presentImageTransferDstToPresent
         );
 
-        frame.CommandBuffer.end();
+        frame.Commands.End();
 
         std::array waitDstStageMask = { (vk::PipelineStageFlags)vk::PipelineStageFlagBits::eTransfer };
 
@@ -125,7 +125,7 @@ namespace VulkanAbstractionLayer
             .setWaitSemaphores(vulkanContext.GetImageAvailableSemaphore())
             .setWaitDstStageMask(waitDstStageMask)
             .setSignalSemaphores(vulkanContext.GetRenderingFinishedSemaphore())
-            .setCommandBuffers(frame.CommandBuffer);
+            .setCommandBuffers(frame.Commands.GetNativeHandle());
 
         GetCurrentVulkanContext().GetGraphicsQueue().submit(std::array{ submitInfo }, frame.CommandQueueFence);
 

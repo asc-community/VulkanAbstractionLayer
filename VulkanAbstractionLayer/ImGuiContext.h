@@ -42,7 +42,7 @@ namespace VulkanAbstractionLayer
     class ImGuiVulkanContext
     {
     public:
-        static void Init(const VulkanContext& context, const Window& window, const vk::RenderPass& renderPass);
+        static void Init(const Window& window, const vk::RenderPass& renderPass);
         static void Destroy();
         static void StartFrame();
         static void RenderFrame(const vk::CommandBuffer& commandBuffer);

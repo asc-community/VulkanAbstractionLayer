@@ -69,7 +69,8 @@ namespace VulkanAbstractionLayer
         void (*ErrorCallback)(const char*) = nullptr;
         void (*InfoCallback)(const char*) = nullptr;
         std::vector<const char*> DeviceExtensions;
-        size_t virtualFrameCount = 3;
+        size_t VirtualFrameCount = 3;
+        size_t MaxStageBufferSize = 64 * 1024 * 1024;
     };
 
     class VulkanContext
@@ -128,7 +129,9 @@ namespace VulkanAbstractionLayer
         void RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight);
         void StartFrame();
         const Image& GetCurrentSwapchainImage() const;
-        CommandBuffer GetCurrentCommandBuffer() const;
+        CommandBuffer& GetCurrentCommandBuffer();
+        Buffer& GetCurrentStageBuffer();
+        void SubmitCommandsImmediate(const CommandBuffer& commands);
         void EndFrame();
     };
 

@@ -33,6 +33,18 @@
 
 namespace VulkanAbstractionLayer
 {
+    void CommandBuffer::Begin()
+    {
+        vk::CommandBufferBeginInfo commandBufferBeginInfo;
+        commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+        this->handle.begin(commandBufferBeginInfo);
+    }
+
+    void CommandBuffer::End()
+    {
+        this->handle.end();
+    }
+
     void CommandBuffer::BeginRenderPass(const RenderPass& renderPass)
     {
         vk::RenderPassBeginInfo renderPassBeginInfo;
@@ -105,21 +117,29 @@ namespace VulkanAbstractionLayer
         this->SetScissor(Rect2D{ 0, 0, image.GetWidth(), image.GetHeight() });
     }
 
-    void CommandBuffer::CopyImage(const Image& source, vk::ImageLayout sourceLayout, const Image& distance, vk::ImageLayout distanceLayout)
+    void CommandBuffer::CopyImage(const Image& source, vk::ImageLayout sourceLayout, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags)
     {
         vk::ImageSubresourceRange subresourceRange{
-                vk::ImageAspectFlagBits::eColor,
-                0, // base mip level
-                1, // level count
-                0, // base layer
-                1  // layer count
+            vk::ImageAspectFlagBits::eColor,
+            0, // base mip level
+            1, // level count
+            0, // base layer
+            1  // layer count
         };
 
+        vk::ImageSubresourceLayers subresourceLayer{
+            subresourceRange.aspectMask,
+            subresourceRange.baseMipLevel,
+            subresourceRange.baseArrayLayer,
+            subresourceRange.layerCount
+        };
+
+        // TODO: flexible access mask specification
         vk::ImageMemoryBarrier toTransferSrcBarrier;
         toTransferSrcBarrier
-            .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
+            .setSrcAccessMask(sourceFlags)
             .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
-            .setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
+            .setOldLayout(sourceLayout)
             .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
             .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
             .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
@@ -128,9 +148,9 @@ namespace VulkanAbstractionLayer
 
         vk::ImageMemoryBarrier toTransferDstBarrier;
         toTransferDstBarrier
-            .setSrcAccessMask(vk::AccessFlagBits::eMemoryRead)
+            .setSrcAccessMask(distanceFlags)
             .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
-            .setOldLayout(vk::ImageLayout::eUndefined)
+            .setOldLayout(distanceLayout)
             .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
             .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
             .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
@@ -152,20 +172,180 @@ namespace VulkanAbstractionLayer
         imageCopyInfo
             .setSrcOffset(0)
             .setDstOffset(0)
-            .setSrcSubresource(vk::ImageSubresourceLayers{
-                vk::ImageAspectFlagBits::eColor,
-                0, // base mip level
-                0, // base layer
-                1  // layer count
-            })
-            .setDstSubresource(vk::ImageSubresourceLayers{
-                vk::ImageAspectFlagBits::eColor,
-                0, // base mip level
-                0, // base layer
-                1  // layer count
-            })
+            .setSrcSubresource(subresourceLayer)
+            .setDstSubresource(subresourceLayer)
             .setExtent(vk::Extent3D{ (uint32_t)distance.GetWidth(), (uint32_t)distance.GetHeight(), 1 });
 
         this->handle.copyImage(source.GetNativeHandle(), vk::ImageLayout::eTransferSrcOptimal, distance.GetNativeHandle(), vk::ImageLayout::eTransferDstOptimal, imageCopyInfo);
+    }
+
+    void CommandBuffer::CopyBufferToImage(const Buffer& source, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags)
+    {
+        vk::ImageSubresourceRange subresourceRange{
+            vk::ImageAspectFlagBits::eColor,
+            0, // base mip level
+            1, // level count
+            0, // base layer
+            1  // layer count
+        };
+
+        vk::ImageSubresourceLayers subresourceLayer{
+            subresourceRange.aspectMask,
+            subresourceRange.baseMipLevel,
+            subresourceRange.baseArrayLayer,
+            subresourceRange.layerCount
+        };
+
+        vk::BufferMemoryBarrier toTransferSrcBarrier;
+        toTransferSrcBarrier
+            .setSrcAccessMask(sourceFlags)
+            .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setBuffer(source.GetNativeHandle())
+            .setSize(source.GetByteSize())
+            .setOffset(0);
+
+        vk::ImageMemoryBarrier toTransferDstBarrier;
+        toTransferDstBarrier
+            .setSrcAccessMask(distanceFlags)
+            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setOldLayout(distanceLayout)
+            .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setImage(distance.GetNativeHandle())
+            .setSubresourceRange(subresourceRange);
+
+        // TODO: flexible pipeline stage flags
+        this->handle.pipelineBarrier(
+            vk::PipelineStageFlagBits::eHost,
+            vk::PipelineStageFlagBits::eTransfer,
+            { }, // dependency flags
+            { }, // memory barriers
+            toTransferSrcBarrier,
+            toTransferDstBarrier
+        );
+
+        vk::BufferImageCopy bufferToImageCopyInfo;
+        bufferToImageCopyInfo
+            .setBufferOffset(0)
+            .setBufferImageHeight(0)
+            .setBufferRowLength(0)
+            .setImageSubresource(subresourceLayer)
+            .setImageOffset(vk::Offset3D{ 0, 0, 0 })
+            .setImageExtent(vk::Extent3D{ distance.GetWidth(), distance.GetHeight(), 1 });
+
+        this->handle.copyBufferToImage(source.GetNativeHandle(), distance.GetNativeHandle(), distanceLayout, bufferToImageCopyInfo);
+    }
+
+    void CommandBuffer::CopyImageToBuffer(const Image& source, vk::AccessFlags sourceFlags, vk::ImageLayout sourceLayout, const Buffer& distance, vk::AccessFlags distanceFlags)
+    {
+        vk::ImageSubresourceRange subresourceRange{
+            vk::ImageAspectFlagBits::eColor,
+            0, // base mip level
+            1, // level count
+            0, // base layer
+            1  // layer count
+        };
+
+        vk::ImageSubresourceLayers subresourceLayer{
+            subresourceRange.aspectMask,
+            subresourceRange.baseMipLevel,
+            subresourceRange.baseArrayLayer,
+            subresourceRange.layerCount
+        };
+
+        vk::ImageMemoryBarrier toTransferSrcBarrier;
+        toTransferSrcBarrier
+            .setSrcAccessMask(distanceFlags)
+            .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
+            .setOldLayout(sourceLayout)
+            .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setImage(source.GetNativeHandle())
+            .setSubresourceRange(subresourceRange);
+
+        vk::BufferMemoryBarrier toTransferDstBarrier;
+        toTransferDstBarrier
+            .setSrcAccessMask(sourceFlags)
+            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setBuffer(distance.GetNativeHandle())
+            .setSize(distance.GetByteSize())
+            .setOffset(0);
+
+        // TODO: flexible pipeline stage flags
+        this->handle.pipelineBarrier(
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits::eTransfer,
+            { }, // dependency flags
+            { }, // memory barriers
+            toTransferDstBarrier,
+            toTransferSrcBarrier
+        );
+
+        vk::BufferImageCopy imageToBufferCopyInfo;
+        imageToBufferCopyInfo
+            .setBufferOffset(0)
+            .setBufferImageHeight(0)
+            .setBufferRowLength(0)
+            .setImageSubresource(subresourceLayer)
+            .setImageOffset(vk::Offset3D{ 0, 0, 0 })
+            .setImageExtent(vk::Extent3D{ source.GetWidth(), source.GetHeight(), 1 });
+
+        this->handle.copyImageToBuffer(source.GetNativeHandle(), sourceLayout, distance.GetNativeHandle(), imageToBufferCopyInfo);
+    }
+
+    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags)
+    {
+        this->CopyBuffer(source, sourceFlags, distance, distanceFlags, distance.GetByteSize(), 0);
+    }
+
+    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, size_t size, size_t offset)
+    {
+        assert(source.GetByteSize() >= size);
+        assert(distance.GetByteSize() >= size + offset);
+
+        vk::BufferMemoryBarrier toTransferSrcBarrier;
+        toTransferSrcBarrier
+            .setSrcAccessMask(distanceFlags)
+            .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setBuffer(source.GetNativeHandle())
+            .setSize(size)
+            .setOffset(0);
+
+        vk::BufferMemoryBarrier toTransferDstBarrier;
+        toTransferDstBarrier
+            .setSrcAccessMask(sourceFlags)
+            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setBuffer(source.GetNativeHandle())
+            .setSize(size)
+            .setOffset(0);
+
+        // TODO: flexible pipeline stage flags
+        std::array preCopyBarriers = { toTransferSrcBarrier, toTransferDstBarrier };
+        this->handle.pipelineBarrier(
+            vk::PipelineStageFlagBits::eHost,
+            vk::PipelineStageFlagBits::eTransfer,
+            { }, // dependency flags
+            { }, // memory barriers
+            preCopyBarriers,
+            { } // image barriers
+        );
+
+        vk::BufferCopy bufferCopyInfo;
+        bufferCopyInfo
+            .setDstOffset(offset)
+            .setSize(size)
+            .setSrcOffset(0);
+
+        this->handle.copyBuffer(source.GetNativeHandle(), distance.GetNativeHandle(), bufferCopyInfo);
     }
 }

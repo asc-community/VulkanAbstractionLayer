@@ -54,14 +54,22 @@ namespace VulkanAbstractionLayer
         this->allocation = AllocateBuffer(bufferCreateInfo, memoryUsage, &this->handle);
     }
 
+    bool Buffer::IsMemoryMapped() const
+    {
+        return this->mappedMemory != nullptr;
+    }
+
     uint8_t* Buffer::MapMemory()
     {
-        return VulkanAbstractionLayer::MapMemory(this->allocation);
+        if(this->mappedMemory == nullptr)
+            this->mappedMemory = VulkanAbstractionLayer::MapMemory(this->allocation);
+        return this->mappedMemory;
     }
 
     void Buffer::UnmapMemory()
     {
         VulkanAbstractionLayer::UnmapMemory(this->allocation);
+        this->mappedMemory = nullptr;
     }
 
     void Buffer::FlushMemory()
@@ -77,16 +85,27 @@ namespace VulkanAbstractionLayer
     void Buffer::LoadData(const uint8_t* data, size_t byteSize, size_t offset)
     {
         assert(byteSize + offset <= this->byteSize);
-        uint8_t* mappedMemory = this->MapMemory();
-        std::memcpy((void*)mappedMemory, (const void*)(data + offset), byteSize);
-        this->FlushMemory();
-        this->UnmapMemory();
+
+        if (this->mappedMemory == nullptr)
+        {
+            (void)this->MapMemory();
+            std::memcpy((void*)this->mappedMemory, (const void*)(data + offset), byteSize);
+            this->FlushMemory();
+            this->UnmapMemory();
+        }
+        else // do not do map-unmap if memory was already mapped externally
+        {
+            std::memcpy((void*)this->mappedMemory, (const void*)(data + offset), byteSize);
+            this->FlushMemory();
+        }
     }
 
     void Buffer::Destroy()
     {
         if ((bool)this->handle)
         {
+            if (this->mappedMemory != nullptr)
+                this->UnmapMemory();
             DeallocateBuffer(this->handle, this->allocation);
             this->handle = vk::Buffer{ };
         }
@@ -97,10 +116,12 @@ namespace VulkanAbstractionLayer
         this->handle = other.handle;
         this->byteSize = other.byteSize;
         this->allocation = other.allocation;
+        this->mappedMemory = other.mappedMemory;
 
         other.handle = vk::Buffer{ };
         other.byteSize = 0;
         other.allocation = { };
+        other.mappedMemory = nullptr;
     }
 
     Buffer& Buffer::operator=(Buffer&& other) noexcept
@@ -109,10 +130,12 @@ namespace VulkanAbstractionLayer
 
         this->handle = other.handle;
         this->allocation = other.allocation;
+        this->mappedMemory = other.mappedMemory;
 
         other.handle = vk::Buffer{ };
         other.byteSize = 0;
         other.allocation = { };
+        other.mappedMemory = nullptr;
         
         return *this;
     }

@@ -62,6 +62,8 @@ namespace VulkanAbstractionLayer
             : handle(std::move(commandBuffer)) { }
 
         const vk::CommandBuffer& GetNativeHandle() const { return this->handle; }
+        void Begin();
+        void End();
         void BeginRenderPass(const RenderPass& renderPass);
         void EndRenderPass();
         void Draw(uint32_t vertexCount, uint32_t instanceCount) { this->Draw(vertexCount, instanceCount, 0, 0); }
@@ -72,6 +74,10 @@ namespace VulkanAbstractionLayer
         void SetViewport(const Viewport& viewport);
         void SetScissor(const Rect2D& scissor);
         void SetRenderArea(const Image& image);
-        void CopyImage(const Image& source, vk::ImageLayout sourceLayout, const Image& distance, vk::ImageLayout distanceLayout);
+        void CopyImage(const Image& source, vk::ImageLayout sourceLayout, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags);
+        void CopyBufferToImage(const Buffer& source, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags);
+        void CopyImageToBuffer(const Image& source, vk::AccessFlags sourceFlags, vk::ImageLayout sourceLayout, const Buffer& distance, vk::AccessFlags distanceFlags);
+        void CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags);
+        void CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, size_t size, size_t offset);
     };
 }
