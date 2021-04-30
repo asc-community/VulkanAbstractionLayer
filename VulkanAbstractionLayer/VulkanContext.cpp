@@ -147,7 +147,7 @@ namespace VulkanAbstractionLayer
     {
         this->device.waitIdle();
 
-        this->virtualFrames.Destroy(*this);
+        this->virtualFrames.Destroy();
        
         if ((bool)this->descriptorPool) this->device.destroyDescriptorPool(this->descriptorPool);
         if ((bool)this->commandPool) this->device.destroyCommandPool(this->commandPool);
@@ -330,7 +330,7 @@ namespace VulkanAbstractionLayer
         if (options.InfoCallback)
             options.InfoCallback("created command buffer pool and descriptor pool");
 
-        this->virtualFrames.Init(options.virtualFrameCount, *this);
+        this->virtualFrames.Init(options.virtualFrameCount);
     }
 
     void VulkanContext::RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight)
@@ -379,17 +379,40 @@ namespace VulkanAbstractionLayer
 
         for (uint32_t i = 0; i <this->presentImageCount; i++)
         {
-            this->swapchainImages.emplace_back(swapchainImages[i], this->surfaceExtent, this->surfaceFormat.format, *this);
+            this->swapchainImages.emplace_back(swapchainImages[i], this->surfaceExtent.width, this->surfaceExtent.height, this->surfaceFormat.format);
         }
     }
 
     void VulkanContext::StartFrame()
     {
-        this->virtualFrames.StartFrame(*this);
+        this->virtualFrames.StartFrame();
+    }
+
+    const Image& VulkanContext::GetCurrentSwapchainImage() const
+    {
+       return this->swapchainImages[this->virtualFrames.GetPresentImageIndex()];
+    }
+
+    CommandBuffer VulkanContext::GetCurrentCommandBuffer() const
+    {
+        return CommandBuffer{ this->virtualFrames.GetCurrentFrame().CommandBuffer };
     }
 
     void VulkanContext::EndFrame()
     {
-        this->virtualFrames.EndFrame(*this);
+        this->virtualFrames.EndFrame();
+    }
+
+    static VulkanContext* CurrentVulkanContext = nullptr;
+
+    void SetCurrentVulkanContext(VulkanContext& context)
+    {
+        CurrentVulkanContext = std::addressof(context);
+    }
+
+    VulkanContext& GetCurrentVulkanContext()
+    {
+        assert(CurrentVulkanContext != nullptr);
+        return *CurrentVulkanContext;
     }
 }

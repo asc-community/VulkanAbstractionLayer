@@ -27,8 +27,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "Image.h"
-#include "vk_mem_alloc.h"
-#include "VulkanMemoryAllocator.h"
+#include "VulkanContext.h"
 #include <cassert>
 
 namespace VulkanAbstractionLayer
@@ -39,16 +38,16 @@ namespace VulkanAbstractionLayer
         {
             if ((bool)this->allocation) // allocated
             {
-                (void)vmaDestroyImage(this->allocator, this->handle, this->allocation);
+                DeallocateImage(this->handle, this->allocation);
             }
-            VmaGetDevice(this->allocator).destroyImageView(this->view);
+            GetCurrentVulkanContext().GetDevice().destroyImageView(this->view);
             this->handle = vk::Image{ };
             this->view = vk::ImageView{ };
             this->extent = vk::Extent2D{ 0u, 0u };
         }
     }
 
-    void Image::InitExternal(const vk::Image& image, vk::Format format)
+    void Image::InitView(const vk::Image& image, vk::Format format)
     {
         this->handle = image;
         this->format = format;
@@ -74,25 +73,19 @@ namespace VulkanAbstractionLayer
                 })
             .setSubresourceRange(subresourceRange);
 
-        this->view = VmaGetDevice(this->allocator).createImageView(imageViewCreateInfo);
+        this->view = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
     }
 
-    Image::Image(const VulkanContext& context)
-        : allocator(ContextGetAllocator(context))
-    {
-    }
-
-    Image::Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, const VulkanContext& context)
-        : Image(context)
-    {
-        this->extent = extent;
-        this->InitExternal(image, format);
-    }
-
-    Image::Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, const VulkanContext& context)
-        : Image(context)
+    Image::Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage)
     {
         this->Init(width, height, format, usage, memoryUsage);
+    }
+
+    Image::Image(vk::Image image, uint32_t width, uint32_t height, vk::Format format)
+    {
+        this->extent = vk::Extent2D{ width, height };
+        this->allocation = { }; // image is external resource
+        this->InitView(image, format);
     }
 
     Image::Image(Image&& other) noexcept
@@ -101,7 +94,6 @@ namespace VulkanAbstractionLayer
         this->view = other.view;
         this->extent = other.extent;
         this->format = other.format;
-        this->allocator = other.allocator;
         this->allocation = other.allocation;
 
         other.handle = vk::Image{ };
@@ -119,7 +111,6 @@ namespace VulkanAbstractionLayer
         this->view = other.view;
         this->extent = other.extent;
         this->format = other.format;
-        this->allocator = other.allocator;
         this->allocation = other.allocation;
 
         other.handle = vk::Image{ };
@@ -150,13 +141,9 @@ namespace VulkanAbstractionLayer
             .setUsage(usage)
             .setSharingMode(vk::SharingMode::eExclusive)
             .setInitialLayout(vk::ImageLayout::eUndefined);
-
-        VmaAllocationCreateInfo allocationInfo = { };
-        allocationInfo.usage = (VmaMemoryUsage)MemoryUsageToNative(memoryUsage);
-
-        vmaCreateImage(this->allocator, (VkImageCreateInfo*)&imageCreateInfo, &allocationInfo, (VkImage*)&this->handle, &this->allocation, nullptr);
-
+        
+        this->allocation = AllocateImage(imageCreateInfo, memoryUsage, &this->handle);
         this->extent = vk::Extent2D{ (uint32_t)width, (uint32_t)height };
-        this->InitExternal(this->handle, format);
+        this->InitView(this->handle, format);
     }
 }

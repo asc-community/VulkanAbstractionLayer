@@ -30,6 +30,7 @@
 
 #include "RenderPass.h"
 #include "Image.h"
+#include "CommandBuffer.h"
 #include "StringId.h"
 
 #include <vector>
@@ -37,10 +38,6 @@
 
 namespace VulkanAbstractionLayer
 {
-    class CommandBuffer;
-    class Image;
-    class VulkanContext;
-    class RenderPass;
     class RenderGraph;
 
     struct RenderState

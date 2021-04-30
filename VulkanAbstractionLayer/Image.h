@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <vulkan/vulkan.hpp>
 #include "VulkanMemoryAllocator.h"
 
 namespace VulkanAbstractionLayer
@@ -38,15 +39,14 @@ namespace VulkanAbstractionLayer
         vk::ImageView view;
         vk::Extent2D extent = { 0u, 0u };
         vk::Format format = vk::Format::eUndefined;
-        VmaAllocator allocator;
         VmaAllocation allocation = { };
 
         void Destroy();
-        void InitExternal(const vk::Image& image, vk::Format format);
+        void InitView(const vk::Image& image, vk::Format format);
     public:
-        Image(const VulkanContext& context);
-        Image(const vk::Image& image, vk::Extent2D extent, vk::Format format, const VulkanContext& context);
-        Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage, const VulkanContext& context);
+        Image() = default;
+        Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
+        Image(vk::Image image, uint32_t width, uint32_t height, vk::Format format);
         Image(const Image&) = delete;
         Image& operator=(const Image&) = delete;
         Image(Image&& other) noexcept;
@@ -60,6 +60,5 @@ namespace VulkanAbstractionLayer
         vk::Format GetFormat() const { return this->format; }
         uint32_t GetWidth() const { return this->extent.width; }
         uint32_t GetHeight() const { return this->extent.height; }
-        VmaAllocator GetAllocator() const { return this->allocator; }
     };
 }

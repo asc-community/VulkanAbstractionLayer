@@ -4,9 +4,7 @@
 #include "VulkanAbstractionLayer/Window.h"
 #include "VulkanAbstractionLayer/VulkanContext.h"
 #include "VulkanAbstractionLayer/ImGuiContext.h"
-#include "VulkanAbstractionLayer/RenderGraph.h"
 #include "VulkanAbstractionLayer/RenderGraphBuilder.h"
-#include "VulkanAbstractionLayer/CommandBuffer.h"
 #include "VulkanAbstractionLayer/ShaderLoader.h"
 #include "VulkanAbstractionLayer/Buffer.h"
 #include "imgui.h"
@@ -37,12 +35,12 @@ struct RenderGraphResources
     vk::DescriptorSetLayout DescriptorSetLayout;
 };
 
-auto CreateShaderModuleFromSource(const VulkanContext& context, const std::filesystem::path& filename, ShaderType type)
+auto CreateShaderModuleFromSource(const std::filesystem::path& filename, ShaderType type)
 {
-    return ShaderLoader::LoadFromSourceWithReflection(filename.string(), type, ShaderLanguage::GLSL, context.GetAPIVersion());
+    return ShaderLoader::LoadFromSourceWithReflection(filename.string(), type, ShaderLanguage::GLSL, GetCurrentVulkanContext().GetAPIVersion());
 }
 
-vk::ShaderModule CreateShaderModuleFromBinary(const VulkanContext& context, const std::string& filename, ShaderType type)
+vk::ShaderModule CreateShaderModuleFromBinary(const std::string& filename, ShaderType type)
 {
     (void)type;
     auto bytecode = ShaderLoader::LoadFromBinary(filename);
@@ -51,7 +49,7 @@ vk::ShaderModule CreateShaderModuleFromBinary(const VulkanContext& context, cons
         .setPCode(bytecode.data())
         .setCodeSize(bytecode.size() * sizeof(uint32_t));
 
-    return context.GetDevice().createShaderModule(createInfo);
+    return GetCurrentVulkanContext().GetDevice().createShaderModule(createInfo);
 }
 
 RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const VulkanContext& context)
@@ -65,7 +63,6 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     resources.FragmentShaderBytecode,
                     resources.VertexAttributes,
                     resources.DescriptorSetLayout,
-                    context,
                 },
                 {
                     VertexBinding{
@@ -96,7 +93,7 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
         )
         .SetOutputName("Output"_id);
 
-    return renderGraphBuilder.Build(context);
+    return renderGraphBuilder.Build();
 }
 
 vk::DescriptorSetLayout CreateDescriptorSetLayout(const VulkanContext& context)
@@ -112,7 +109,7 @@ vk::DescriptorSetLayout CreateDescriptorSetLayout(const VulkanContext& context)
 
 Buffer CreateVertexBuffer(const VulkanContext& context)
 {
-    Buffer buffer{ context };
+    Buffer buffer;
 
     struct Vertex
     {
@@ -174,6 +171,7 @@ int main()
     vulkanOptions.InfoCallback = VulkanInfoCallback;
 
     VulkanContext Vulkan(vulkanOptions);
+    SetCurrentVulkanContext(Vulkan);
 
     ContextInitializeOptions deviceOptions;
     deviceOptions.PreferredDeviceType = DeviceType::DISCRETE_GPU;
@@ -182,8 +180,8 @@ int main()
 
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
-    auto vertexShader = CreateShaderModuleFromSource(Vulkan, "main_vertex.glsl", ShaderType::VERTEX);
-    auto fragmentShader = CreateShaderModuleFromSource(Vulkan, "main_fragment.glsl", ShaderType::FRAGMENT);
+    auto vertexShader = CreateShaderModuleFromSource("main_vertex.glsl", ShaderType::VERTEX);
+    auto fragmentShader = CreateShaderModuleFromSource("main_fragment.glsl", ShaderType::FRAGMENT);
 
     RenderGraphResources renderGraphResources{
         vertexShader.Data,
@@ -213,10 +211,8 @@ int main()
             
             ImGui::ShowDemoWindow();
 
-            CommandBuffer commandBuffer{ Vulkan.GetCurrentFrame().CommandBuffer };
-
-            renderGraph.Execute(commandBuffer);
-            renderGraph.Present(commandBuffer, Vulkan.GetCurrentSwapchainImage());
+            renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
+            renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());
 
             ImGuiVulkanContext::EndFrame();
             Vulkan.EndFrame();

@@ -164,7 +164,7 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    RenderPass RenderGraphBuilder::BuildRenderPass(const VulkanContext& context, const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments)
+    RenderPass RenderGraphBuilder::BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments)
     {
         std::vector<vk::AttachmentDescription> attachmentDescriptions;
         std::vector<vk::AttachmentReference> attachmentReferences;
@@ -242,7 +242,7 @@ namespace VulkanAbstractionLayer
             .setSubpasses(subpassDescription)
             .setDependencies(dependencies);
         
-        auto renderPass = context.GetDevice().createRenderPass(renderPassCreateInfo);
+        auto renderPass = GetCurrentVulkanContext().GetDevice().createRenderPass(renderPassCreateInfo);
         
         vk::FramebufferCreateInfo framebufferCreateInfo;
         framebufferCreateInfo
@@ -252,7 +252,7 @@ namespace VulkanAbstractionLayer
             .setHeight(renderAreaHeight)
             .setLayers(1);
         
-        auto framebuffer = context.GetDevice().createFramebuffer(framebufferCreateInfo);
+        auto framebuffer = GetCurrentVulkanContext().GetDevice().createFramebuffer(framebufferCreateInfo);
         
         auto renderArea = vk::Rect2D{ vk::Offset2D{ 0u, 0u }, vk::Extent2D{ renderAreaWidth, renderAreaHeight } };
         
@@ -381,7 +381,7 @@ namespace VulkanAbstractionLayer
             vk::PipelineLayoutCreateInfo layoutCreateInfo;
             layoutCreateInfo.setSetLayouts(graphicPipeline.Shader.GetDescriptorSetLayout());
 
-            pipelineLayout = context.GetDevice().createPipelineLayout(layoutCreateInfo);
+            pipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
 
             vk::GraphicsPipelineCreateInfo pipelineCreateInfo;
             pipelineCreateInfo
@@ -401,7 +401,7 @@ namespace VulkanAbstractionLayer
                 .setBasePipelineHandle(vk::Pipeline{ })
                 .setBasePipelineIndex(0);
 
-            pipeline = context.GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
+            pipeline = GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
         }
 
         return RenderPass{ renderPass, pipeline, pipelineLayout, renderArea, framebuffer, clearValues };
@@ -428,7 +428,7 @@ namespace VulkanAbstractionLayer
         return layoutTransitions[outputName];
     }
 
-    RenderGraphBuilder::AttachmentHashMap RenderGraphBuilder::AllocateAttachments(const VulkanContext& context)
+    RenderGraphBuilder::AttachmentHashMap RenderGraphBuilder::AllocateAttachments()
     {
         AttachmentHashMap attachments;
 
@@ -449,16 +449,17 @@ namespace VulkanAbstractionLayer
         // remove empty attachment
         attachmentUsages.erase(StringId{ });
 
+        auto& vulkanContext = GetCurrentVulkanContext();
+
         for (const auto& [attachmentName, attachmentUsage] : attachmentUsages)
         {
             // TODO: attachments with different sizes and formats from present image
             attachments.emplace(attachmentName, Image(
-                context.GetSurfaceExtent().width,
-                context.GetSurfaceExtent().height,
-                context.GetSurfaceFormat(),
+                vulkanContext.GetSurfaceExtent().width,
+                vulkanContext.GetSurfaceExtent().height,
+                vulkanContext.GetSurfaceFormat(),
                 attachmentUsage,
-                MemoryUsage::GPU_ONLY,
-                context
+                MemoryUsage::GPU_ONLY
             ));
         }
         return attachments;
@@ -483,10 +484,10 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
-    RenderGraph RenderGraphBuilder::Build(const VulkanContext& context)
+    RenderGraph RenderGraphBuilder::Build()
     {
         AttachmentLayout outputLayout = this->ResolveImageTransitions(this->outputName);
-        AttachmentHashMap attachments = this->AllocateAttachments(context);
+        AttachmentHashMap attachments = this->AllocateAttachments();
 
         std::vector<RenderGraphNode> nodes;
         for (auto& renderPass : this->renderPasses)
@@ -497,7 +498,7 @@ namespace VulkanAbstractionLayer
 
             nodes.push_back(RenderGraphNode{
                 renderPass.name,
-                this->BuildRenderPass(context, renderPass, attachments),
+                this->BuildRenderPass(renderPass, attachments),
                 std::move(renderPass.onRenderCallback),
                 std::move(colorAttachments)
             });
@@ -508,8 +509,9 @@ namespace VulkanAbstractionLayer
             commandBuffer.CopyImage(outputImage, LayoutTable[(size_t)outputLayout], presentImage, vk::ImageLayout::eUndefined);
         };
 
-        auto OnDestroy = [device = context.GetDevice()](const RenderPass& pass)
+        auto OnDestroy = [](const RenderPass& pass)
         {
+            auto& device = GetCurrentVulkanContext().GetDevice();
             if((bool)pass.GetPipeline())       device.destroyPipeline(pass.GetPipeline());
             if((bool)pass.GetPipelineLayout()) device.destroyPipelineLayout(pass.GetPipelineLayout());
             if((bool)pass.GetFramebuffer())    device.destroyFramebuffer(pass.GetFramebuffer());

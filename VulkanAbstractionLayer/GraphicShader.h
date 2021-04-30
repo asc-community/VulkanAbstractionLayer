@@ -38,7 +38,6 @@ namespace VulkanAbstractionLayer
 
     class GraphicShader
     {
-        vk::Device device;
         vk::ShaderModule vertexShader;
         vk::ShaderModule fragmentShader;
 
@@ -47,15 +46,17 @@ namespace VulkanAbstractionLayer
 
         void Destroy();
     public:
-        GraphicShader(const VulkanContext& context);
+        GraphicShader() = default;
         GraphicShader(
             std::vector<uint32_t> vertexBytecode, std::vector<uint32_t> fragmentBytecode, 
-            std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout, const VulkanContext& context);
+            std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout);
 
         void Init(std::vector<uint32_t> vertexBytecode, std::vector<uint32_t> fragmentBytecode,
             std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout);
 
+        GraphicShader(const GraphicShader& other) = delete;
         GraphicShader(GraphicShader&& other) noexcept;
+        GraphicShader& operator=(const GraphicShader& other) = delete;
         GraphicShader& operator=(GraphicShader&& other) noexcept;
         ~GraphicShader();
 

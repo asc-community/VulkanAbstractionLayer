@@ -45,19 +45,17 @@ namespace VulkanAbstractionLayer
         std::vector<VirtualFrame> virtualFrames;
         uint32_t presentImageIndex = 0;
         size_t currentFrame = 0;
-
-        void RecreateFramebuffer(const VulkanContext& context);
     public:
         VirtualFrameProvider() = default;
-        void Init(size_t frameCount, const VulkanContext& context);
-        void Destroy(const VulkanContext& device);
+        void Init(size_t frameCount);
+        void Destroy();
 
-        void StartFrame(const VulkanContext& context);
+        void StartFrame();
         VirtualFrame& GetCurrentFrame();
         VirtualFrame& GetNextFrame();
         const VirtualFrame& GetCurrentFrame() const;
         const VirtualFrame& GetNextFrame() const;
         uint32_t GetPresentImageIndex() const;
-        void EndFrame(const VulkanContext& context);
+        void EndFrame();
     };
 }

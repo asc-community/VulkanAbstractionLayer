@@ -28,7 +28,7 @@
 
 #include "GraphicShader.h"
 #include "VectorMath.h"
-#include "VulkanMemoryAllocator.h"
+#include "VulkanContext.h"
 
 namespace VulkanAbstractionLayer
 {
@@ -100,33 +100,30 @@ namespace VulkanAbstractionLayer
 
     void GraphicShader::Destroy()
     {
-        if((bool)this->vertexShader) this->device.destroyShaderModule(this->vertexShader);
-        if ((bool)this->fragmentShader) this->device.destroyShaderModule(this->fragmentShader);
+        auto& device = GetCurrentVulkanContext().GetDevice();
+        if((bool)this->vertexShader) device.destroyShaderModule(this->vertexShader);
+        if ((bool)this->fragmentShader) device.destroyShaderModule(this->fragmentShader);
 
         this->vertexShader = vk::ShaderModule{ };
         this->fragmentShader = vk::ShaderModule{ };
     }
 
-    GraphicShader::GraphicShader(const VulkanContext& context)
-        : device(ContextGetDevice(context))
-    {
-    }
-
-    GraphicShader::GraphicShader(std::vector<uint32_t> vertexBytecode, std::vector<uint32_t> fragmentBytecode, std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout, const VulkanContext& context)
-        : GraphicShader(context)
+    GraphicShader::GraphicShader(std::vector<uint32_t> vertexBytecode, std::vector<uint32_t> fragmentBytecode, std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout)
     {
         this->Init(std::move(vertexBytecode), std::move(fragmentBytecode), std::move(vertexAttributes), std::move(descriptorSetLayout));
     }
 
     void GraphicShader::Init(std::vector<uint32_t> vertexBytecode, std::vector<uint32_t> fragmentBytecode, std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout)
     {
+        auto& device = GetCurrentVulkanContext().GetDevice();
+
         vk::ShaderModuleCreateInfo vertexShaderInfo;
         vertexShaderInfo.setCode(vertexBytecode);
-        this->vertexShader = this->device.createShaderModule(vertexShaderInfo);
+        this->vertexShader = device.createShaderModule(vertexShaderInfo);
 
         vk::ShaderModuleCreateInfo fragmentShaderInfo;
         fragmentShaderInfo.setCode(fragmentBytecode);
-        this->fragmentShader = this->device.createShaderModule(fragmentShaderInfo);
+        this->fragmentShader = device.createShaderModule(fragmentShaderInfo);
 
         this->vertexAttributes = std::move(vertexAttributes);
         this->descriptorSetLayout = std::move(descriptorSetLayout);
@@ -134,7 +131,6 @@ namespace VulkanAbstractionLayer
 
     GraphicShader::GraphicShader(GraphicShader&& other) noexcept
     {
-        this->device = other.device;
         this->vertexShader = other.vertexShader;
         this->fragmentShader = other.fragmentShader;
         this->vertexAttributes = std::move(other.vertexAttributes);
@@ -148,7 +144,6 @@ namespace VulkanAbstractionLayer
     {
         this->Destroy();
 
-        this->device = other.device;
         this->vertexShader = other.vertexShader;
         this->fragmentShader = other.fragmentShader;
         this->vertexAttributes = std::move(other.vertexAttributes);

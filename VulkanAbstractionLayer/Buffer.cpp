@@ -27,13 +27,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "Buffer.h"
-#include "vk_mem_alloc.h"
+#include "VulkanContext.h"
 #include <cassert>
 
 namespace VulkanAbstractionLayer
 {
-    Buffer::Buffer(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage, const VulkanContext& context)
-        : Buffer(context)
+    Buffer::Buffer(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage)
     {
         this->Init(byteSize, usage, memoryUsage);
     }
@@ -52,22 +51,17 @@ namespace VulkanAbstractionLayer
             .setSharingMode(vk::SharingMode::eExclusive)
             .setQueueFamilyIndices(BufferQueueFamiliyIndicies);
 
-        VmaAllocationCreateInfo allocationInfo = { };
-        allocationInfo.usage = (VmaMemoryUsage)MemoryUsageToNative(memoryUsage);
-
-        (void)vmaCreateBuffer(this->allocator, (VkBufferCreateInfo*)&bufferCreateInfo, &allocationInfo, (VkBuffer*)&this->handle, &this->allocation, nullptr);
+        this->allocation = AllocateBuffer(bufferCreateInfo, memoryUsage, &this->handle);
     }
 
     uint8_t* Buffer::MapMemory()
     {
-        void* result = nullptr;
-        (void)vmaMapMemory(this->allocator, this->allocation, &result);
-        return (uint8_t*)result;
+        return VulkanAbstractionLayer::MapMemory(this->allocation);
     }
 
     void Buffer::UnmapMemory()
     {
-        vmaUnmapMemory(this->allocator, this->allocation);
+        VulkanAbstractionLayer::UnmapMemory(this->allocation);
     }
 
     void Buffer::FlushMemory()
@@ -77,7 +71,7 @@ namespace VulkanAbstractionLayer
 
     void Buffer::FlushMemory(size_t byteSize, size_t offset)
     {
-        (void)vmaFlushAllocation(this->allocator, this->allocation, offset, byteSize);
+        VulkanAbstractionLayer::FlushMemory(this->allocation, byteSize, offset);
     }
 
     void Buffer::LoadData(const uint8_t* data, size_t byteSize, size_t offset)
@@ -93,21 +87,15 @@ namespace VulkanAbstractionLayer
     {
         if ((bool)this->handle)
         {
-            (void)vmaDestroyBuffer(this->allocator, this->handle, this->allocation);
+            DeallocateBuffer(this->handle, this->allocation);
             this->handle = vk::Buffer{ };
         }
-    }
-
-    Buffer::Buffer(const VulkanContext& context)
-        : allocator(ContextGetAllocator(context))
-    {
     }
 
     Buffer::Buffer(Buffer&& other) noexcept
     {
         this->handle = other.handle;
         this->byteSize = other.byteSize;
-        this->allocator = other.allocator;
         this->allocation = other.allocation;
 
         other.handle = vk::Buffer{ };
@@ -120,7 +108,6 @@ namespace VulkanAbstractionLayer
         this->Destroy();
 
         this->handle = other.handle;
-        this->allocator = other.allocator;
         this->allocation = other.allocation;
 
         other.handle = vk::Buffer{ };

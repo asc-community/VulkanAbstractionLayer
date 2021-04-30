@@ -26,11 +26,13 @@ int main()
     vulkanOptions.Layers = { "VK_LAYER_KHRONOS_validation" };
 
     VulkanContext Vulkan(vulkanOptions);
+    SetCurrentVulkanContext(Vulkan);
 
     ContextInitializeOptions deviceOptions;
     deviceOptions.PreferredDeviceType = DeviceType::DISCRETE_GPU;
 
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
+
     window.OnResize([&Vulkan](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 

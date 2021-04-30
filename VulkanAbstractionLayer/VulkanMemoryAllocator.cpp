@@ -26,15 +26,15 @@
 
 #define VMA_IMPLEMENTATION
 
-#include "VulkanContext.h"
 #include "VulkanMemoryAllocator.h"
+#include "VulkanContext.h"
 #include "vk_mem_alloc.h"
 
 namespace VulkanAbstractionLayer
 {
-    uint32_t MemoryUsageToNative(MemoryUsage usage)
+    VmaMemoryUsage MemoryUsageToNative(MemoryUsage usage)
     {
-        constexpr uint32_t mappingTable[] = {
+        constexpr VmaMemoryUsage mappingTable[] = {
             VMA_MEMORY_USAGE_GPU_ONLY,
             VMA_MEMORY_USAGE_CPU_ONLY,
             VMA_MEMORY_USAGE_CPU_TO_GPU,
@@ -45,18 +45,53 @@ namespace VulkanAbstractionLayer
         return mappingTable[(size_t)usage];
     }
 
-    vk::Device VmaGetDevice(VmaAllocator allocator)
+    VmaAllocator GetVulkanAllocator()
     {
-        return allocator->m_hDevice;
+        return GetCurrentVulkanContext().GetAllocator();
     }
 
-    vk::Device ContextGetDevice(const VulkanContext& context)
+    void DeallocateImage(const vk::Image& image, VmaAllocation allocation)
     {
-        return context.GetDevice();
+        vmaDestroyImage(GetVulkanAllocator(), image, allocation);
     }
 
-    VmaAllocator ContextGetAllocator(const VulkanContext& context)
+    void DeallocateBuffer(const vk::Buffer& buffer, VmaAllocation allocation)
     {
-        return context.GetAllocator();
+        vmaDestroyBuffer(GetVulkanAllocator(), buffer, allocation);
+    }
+
+    VmaAllocation AllocateImage(const vk::ImageCreateInfo& imageCreateInfo, MemoryUsage usage, vk::Image* image)
+    {
+        VmaAllocation allocation = { };
+        VmaAllocationCreateInfo allocationInfo = { };
+        allocationInfo.usage = MemoryUsageToNative(usage);
+        (void)vmaCreateImage(GetCurrentVulkanContext().GetAllocator(), (VkImageCreateInfo*)&imageCreateInfo, &allocationInfo, (VkImage*)image, &allocation, nullptr);
+        return allocation;
+    }
+
+    VmaAllocation AllocateBuffer(const vk::BufferCreateInfo& bufferCreateInfo, MemoryUsage usage, vk::Buffer* buffer)
+    {
+        VmaAllocation allocation = { };
+        VmaAllocationCreateInfo allocationInfo = { };
+        allocationInfo.usage = MemoryUsageToNative(usage);
+        (void)vmaCreateBuffer(GetCurrentVulkanContext().GetAllocator(), (VkBufferCreateInfo*)&bufferCreateInfo, &allocationInfo, (VkBuffer*)buffer, &allocation, nullptr);
+        return allocation;
+    }
+
+    uint8_t* MapMemory(VmaAllocation allocation)
+    {
+        void* memory = nullptr;
+        vmaMapMemory(GetCurrentVulkanContext().GetAllocator(), allocation, &memory);
+        return (uint8_t*)memory;
+    }
+
+    void UnmapMemory(VmaAllocation allocation)
+    {
+        vmaUnmapMemory(GetCurrentVulkanContext().GetAllocator(), allocation);
+    }
+
+    void FlushMemory(VmaAllocation allocation, size_t byteSize, size_t offset)
+    {
+        vmaFlushAllocation(GetCurrentVulkanContext().GetAllocator(), allocation, offset, byteSize);
     }
 }

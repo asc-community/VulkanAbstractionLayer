@@ -33,6 +33,7 @@
 
 #include "VirtualFrame.h"
 #include "Image.h"
+#include "CommandBuffer.h"
 
 struct VmaAllocator_T;
 using VmaAllocator = VmaAllocator_T*;
@@ -94,6 +95,7 @@ namespace VulkanAbstractionLayer
         uint32_t queueFamilyIndex = { };
         uint32_t apiVersion = { };
         bool renderingEnabled = true;
+
     public:
         VulkanContext(const VulkanContextCreateOptions& options);
         ~VulkanContext();
@@ -120,14 +122,16 @@ namespace VulkanAbstractionLayer
         uint32_t GetAPIVersion() const { return this->apiVersion; }
         const VmaAllocator& GetAllocator() const { return this->allocator; }
         const Image& GetSwapchainImage(size_t index) const { return this->swapchainImages[index]; }
-        const Image& GetCurrentSwapchainImage() const { return this->swapchainImages[this->virtualFrames.GetPresentImageIndex()]; }
-        bool IsRenderingEnabled() const { return this->renderingEnabled; }
 
+        bool IsRenderingEnabled() const { return this->renderingEnabled; }
         void InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options);
         void RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight);
         void StartFrame();
-        VirtualFrame& GetCurrentFrame() { return this->virtualFrames.GetCurrentFrame(); }
-        const VirtualFrame& GetCurrentFrame() const { return this->virtualFrames.GetCurrentFrame(); }
+        const Image& GetCurrentSwapchainImage() const;
+        CommandBuffer GetCurrentCommandBuffer() const;
         void EndFrame();
     };
+
+    VulkanContext& GetCurrentVulkanContext();
+    void SetCurrentVulkanContext(VulkanContext& context);
 }

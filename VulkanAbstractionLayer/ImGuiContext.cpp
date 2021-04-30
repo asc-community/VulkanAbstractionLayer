@@ -53,11 +53,10 @@ namespace VulkanAbstractionLayer
         init_info.CheckVkResultFn = nullptr;
         ImGui_ImplVulkan_Init(&init_info, renderPass);
 
-        auto commandBuffer = context.GetCurrentFrame().CommandBuffer;
+        auto commandBuffer = context.GetCurrentCommandBuffer().GetNativeHandle();
+
         commandBuffer.begin(vk::CommandBufferBeginInfo{ vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-
         ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-
         commandBuffer.end();
 
         vk::SubmitInfo submitInfo;

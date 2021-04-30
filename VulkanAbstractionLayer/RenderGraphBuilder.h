@@ -38,8 +38,6 @@
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
-
     enum class AttachmentLayout
     {
         UNKWNON = 0,
@@ -131,13 +129,13 @@ namespace VulkanAbstractionLayer
         std::vector<RenderPassBuilder> renderPasses;
         StringId outputName = { };
 
-        RenderPass BuildRenderPass(const VulkanContext& context, const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments);
+        RenderPass BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments);
         AttachmentLayout ResolveImageTransitions(StringId outputName);
-        AttachmentHashMap AllocateAttachments(const VulkanContext& context);
+        AttachmentHashMap AllocateAttachments();
     public:
         RenderGraphBuilder& AddRenderPass(RenderPassBuilder&& renderPass);
         RenderGraphBuilder& AddRenderPass(RenderPassBuilder& renderPass);
         RenderGraphBuilder& SetOutputName(StringId name);
-        RenderGraph Build(const VulkanContext& context);
+        RenderGraph Build();
     };
 }

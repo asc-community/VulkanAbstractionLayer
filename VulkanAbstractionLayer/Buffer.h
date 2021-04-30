@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <vulkan/vulkan.hpp>
 #include "VulkanMemoryAllocator.h"
 
 namespace VulkanAbstractionLayer
@@ -61,24 +62,22 @@ namespace VulkanAbstractionLayer
     {
         vk::Buffer handle;
         size_t byteSize = 0;
-        VmaAllocator allocator;
         VmaAllocation allocation = { };
 
         void Destroy();
     public:
-        Buffer(const VulkanContext& context);
+        Buffer() = default;
         Buffer(const Buffer&) = delete;
         Buffer& operator=(const Buffer&) = delete;
         Buffer(Buffer&& other) noexcept;
         Buffer& operator=(Buffer&& other) noexcept;
         ~Buffer();
 
-        Buffer(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage, const VulkanContext& context);
+        Buffer(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage);
         void Init(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage);
 
         vk::Buffer GetNativeHandle() const { return this->handle; }
         size_t GetByteSize() const { return this->byteSize; }
-        VmaAllocator GetAllocator() const { return this->allocator; }
 
         uint8_t* MapMemory();
         void UnmapMemory();
