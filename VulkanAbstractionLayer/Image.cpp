@@ -32,6 +32,140 @@
 
 namespace VulkanAbstractionLayer
 {
+    vk::Format FormatTable[] = {
+        vk::Format::eUndefined,
+        vk::Format::eR4G4UnormPack8,
+        vk::Format::eR4G4B4A4UnormPack16,
+        vk::Format::eB4G4R4A4UnormPack16,
+        vk::Format::eR5G6B5UnormPack16,
+        vk::Format::eB5G6R5UnormPack16,
+        vk::Format::eR5G5B5A1UnormPack16,
+        vk::Format::eB5G5R5A1UnormPack16,
+        vk::Format::eA1R5G5B5UnormPack16,
+        vk::Format::eR8Unorm,
+        vk::Format::eR8Snorm,
+        vk::Format::eR8Uscaled,
+        vk::Format::eR8Sscaled,
+        vk::Format::eR8Uint,
+        vk::Format::eR8Sint,
+        vk::Format::eR8Srgb,
+        vk::Format::eR8G8Unorm,
+        vk::Format::eR8G8Snorm,
+        vk::Format::eR8G8Uscaled,
+        vk::Format::eR8G8Sscaled,
+        vk::Format::eR8G8Uint,
+        vk::Format::eR8G8Sint,
+        vk::Format::eR8G8Srgb,
+        vk::Format::eR8G8B8Unorm,
+        vk::Format::eR8G8B8Snorm,
+        vk::Format::eR8G8B8Uscaled,
+        vk::Format::eR8G8B8Sscaled,
+        vk::Format::eR8G8B8Uint,
+        vk::Format::eR8G8B8Sint,
+        vk::Format::eR8G8B8Srgb,
+        vk::Format::eB8G8R8Unorm,
+        vk::Format::eB8G8R8Snorm,
+        vk::Format::eB8G8R8Uscaled,
+        vk::Format::eB8G8R8Sscaled,
+        vk::Format::eB8G8R8Uint,
+        vk::Format::eB8G8R8Sint,
+        vk::Format::eB8G8R8Srgb,
+        vk::Format::eR8G8B8A8Unorm,
+        vk::Format::eR8G8B8A8Snorm,
+        vk::Format::eR8G8B8A8Uscaled,
+        vk::Format::eR8G8B8A8Sscaled,
+        vk::Format::eR8G8B8A8Uint,
+        vk::Format::eR8G8B8A8Sint,
+        vk::Format::eR8G8B8A8Srgb,
+        vk::Format::eB8G8R8A8Unorm,
+        vk::Format::eB8G8R8A8Snorm,
+        vk::Format::eB8G8R8A8Uscaled,
+        vk::Format::eB8G8R8A8Sscaled,
+        vk::Format::eB8G8R8A8Uint,
+        vk::Format::eB8G8R8A8Sint,
+        vk::Format::eB8G8R8A8Srgb,
+        vk::Format::eA8B8G8R8UnormPack32,
+        vk::Format::eA8B8G8R8SnormPack32,
+        vk::Format::eA8B8G8R8UscaledPack32,
+        vk::Format::eA8B8G8R8SscaledPack32,
+        vk::Format::eA8B8G8R8UintPack32,
+        vk::Format::eA8B8G8R8SintPack32,
+        vk::Format::eA8B8G8R8SrgbPack32,
+        vk::Format::eA2R10G10B10UnormPack32,
+        vk::Format::eA2R10G10B10SnormPack32,
+        vk::Format::eA2R10G10B10UscaledPack32,
+        vk::Format::eA2R10G10B10SscaledPack32,
+        vk::Format::eA2R10G10B10UintPack32,
+        vk::Format::eA2R10G10B10SintPack32,
+        vk::Format::eA2B10G10R10UnormPack32,
+        vk::Format::eA2B10G10R10SnormPack32,
+        vk::Format::eA2B10G10R10UscaledPack32,
+        vk::Format::eA2B10G10R10SscaledPack32,
+        vk::Format::eA2B10G10R10UintPack32,
+        vk::Format::eA2B10G10R10SintPack32,
+        vk::Format::eR16Unorm,
+        vk::Format::eR16Snorm,
+        vk::Format::eR16Uscaled,
+        vk::Format::eR16Sscaled,
+        vk::Format::eR16Uint,
+        vk::Format::eR16Sint,
+        vk::Format::eR16Sfloat,
+        vk::Format::eR16G16Unorm,
+        vk::Format::eR16G16Snorm,
+        vk::Format::eR16G16Uscaled,
+        vk::Format::eR16G16Sscaled,
+        vk::Format::eR16G16Uint,
+        vk::Format::eR16G16Sint,
+        vk::Format::eR16G16Sfloat,
+        vk::Format::eR16G16B16Unorm,
+        vk::Format::eR16G16B16Snorm,
+        vk::Format::eR16G16B16Uscaled,
+        vk::Format::eR16G16B16Sscaled,
+        vk::Format::eR16G16B16Uint,
+        vk::Format::eR16G16B16Sint,
+        vk::Format::eR16G16B16Sfloat,
+        vk::Format::eR16G16B16A16Unorm,
+        vk::Format::eR16G16B16A16Snorm,
+        vk::Format::eR16G16B16A16Uscaled,
+        vk::Format::eR16G16B16A16Sscaled,
+        vk::Format::eR16G16B16A16Uint,
+        vk::Format::eR16G16B16A16Sint,
+        vk::Format::eR16G16B16A16Sfloat,
+        vk::Format::eR32Uint,
+        vk::Format::eR32Sint,
+        vk::Format::eR32Sfloat,
+        vk::Format::eR32G32Uint,
+        vk::Format::eR32G32Sint,
+        vk::Format::eR32G32Sfloat,
+        vk::Format::eR32G32B32Uint,
+        vk::Format::eR32G32B32Sint,
+        vk::Format::eR32G32B32Sfloat,
+        vk::Format::eR32G32B32A32Uint,
+        vk::Format::eR32G32B32A32Sint,
+        vk::Format::eR32G32B32A32Sfloat,
+        vk::Format::eR64Uint,
+        vk::Format::eR64Sint,
+        vk::Format::eR64Sfloat,
+        vk::Format::eR64G64Uint,
+        vk::Format::eR64G64Sint,
+        vk::Format::eR64G64Sfloat,
+        vk::Format::eR64G64B64Uint,
+        vk::Format::eR64G64B64Sint,
+        vk::Format::eR64G64B64Sfloat,
+        vk::Format::eR64G64B64A64Uint,
+        vk::Format::eR64G64B64A64Sint,
+        vk::Format::eR64G64B64A64Sfloat,
+        vk::Format::eB10G11R11UfloatPack32,
+        vk::Format::eE5B9G9R9UfloatPack32,
+        vk::Format::eD16Unorm,
+        vk::Format::eX8D24UnormPack32,
+        vk::Format::eD32Sfloat,
+        vk::Format::eS8Uint,
+        vk::Format::eD16UnormS8Uint,
+        vk::Format::eD24UnormS8Uint,
+        vk::Format::eD32SfloatS8Uint,
+    };
+
     void Image::Destroy()
     {
         if ((bool)this->handle)
@@ -47,7 +181,7 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    void Image::InitView(const vk::Image& image, vk::Format format)
+    void Image::InitView(const vk::Image& image, Format format)
     {
         this->handle = image;
         this->format = format;
@@ -64,24 +198,24 @@ namespace VulkanAbstractionLayer
         imageViewCreateInfo
             .setImage(this->handle)
             .setViewType(vk::ImageViewType::e2D)
-            .setFormat(format)
+            .setFormat(ToNativeFormat(format))
             .setComponents(vk::ComponentMapping{
                 vk::ComponentSwizzle::eIdentity,
                 vk::ComponentSwizzle::eIdentity,
                 vk::ComponentSwizzle::eIdentity,
                 vk::ComponentSwizzle::eIdentity
-                })
+            })
             .setSubresourceRange(subresourceRange);
 
         this->view = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
     }
 
-    Image::Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage)
+    Image::Image(uint32_t width, uint32_t height, Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage)
     {
         this->Init(width, height, format, usage, memoryUsage);
     }
 
-    Image::Image(vk::Image image, uint32_t width, uint32_t height, vk::Format format)
+    Image::Image(vk::Image image, uint32_t width, uint32_t height, Format format)
     {
         this->extent = vk::Extent2D{ width, height };
         this->allocation = { }; // image is external resource
@@ -99,7 +233,7 @@ namespace VulkanAbstractionLayer
         other.handle = vk::Image{ };
         other.view = vk::ImageView{ };
         other.extent = vk::Extent2D{ 0u, 0u };
-        other.format = vk::Format::eUndefined;
+        other.format = Format::UNDEFINED;
         other.allocation = { };
     }
 
@@ -116,7 +250,7 @@ namespace VulkanAbstractionLayer
         other.handle = vk::Image{ };
         other.view = vk::ImageView{ };
         other.extent = vk::Extent2D{ 0u, 0u };
-        other.format = vk::Format::eUndefined;
+        other.format = Format::UNDEFINED;
         other.allocation = { };
 
         return *this;
@@ -127,12 +261,12 @@ namespace VulkanAbstractionLayer
         this->Destroy();
     }
 
-    void Image::Init(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage)
+    void Image::Init(uint32_t width, uint32_t height, Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage)
     {
         vk::ImageCreateInfo imageCreateInfo;
         imageCreateInfo
             .setImageType(vk::ImageType::e2D)
-            .setFormat(format)
+            .setFormat(ToNativeFormat(format))
             .setExtent(vk::Extent3D{ width, height, 1 })
             .setSamples(vk::SampleCountFlagBits::e1)
             .setMipLevels(1)
@@ -145,5 +279,20 @@ namespace VulkanAbstractionLayer
         this->allocation = AllocateImage(imageCreateInfo, memoryUsage, &this->handle);
         this->extent = vk::Extent2D{ (uint32_t)width, (uint32_t)height };
         this->InitView(this->handle, format);
+    }
+
+    const vk::Format& ToNativeFormat(Format format)
+    {
+        return FormatTable[(size_t)format];
+    }
+
+    Format FromNativeFormat(const vk::Format& format)
+    {
+        for (size_t i = 0; i < std::size(FormatTable); i++)
+        {
+            if (FormatTable[i] == format)
+                return (Format)i;
+        }
+        return Format::UNDEFINED;
     }
 }

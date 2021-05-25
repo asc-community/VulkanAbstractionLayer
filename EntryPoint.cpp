@@ -75,7 +75,7 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
             .AddOnRenderCallback(
                 [&resources](RenderState state)
                 {
-                    auto& output = state.GetColorAttachment(0);
+                    auto& output = state.GetOutputColorAttachment(0);
                     state.Commands.SetRenderArea(output);
                     state.Commands.BindVertexBuffer(resources.VertexBuffer);
                     state.Commands.Draw(6, 1);
@@ -91,23 +91,23 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                 }
             )
         )
+        .AddAttachment("Output"_id, Format::R8G8B8A8_UNORM)
         .SetOutputName("Output"_id);
 
     return renderGraphBuilder.Build();
 }
 
-vk::DescriptorSetLayout CreateDescriptorSetLayout(const VulkanContext& context)
+vk::DescriptorSetLayout CreateDescriptorSetLayout()
 {
-    std::array<vk::DescriptorSetLayoutBinding, 0> layoutBindings = {
-    };
+    std::array<vk::DescriptorSetLayoutBinding, 0> layoutBindings;
 
     vk::DescriptorSetLayoutCreateInfo createInfo;
     createInfo.setBindings(layoutBindings);
 
-    return context.GetDevice().createDescriptorSetLayout(createInfo);
+    return GetCurrentVulkanContext().GetDevice().createDescriptorSetLayout(createInfo);
 }
 
-Buffer CreateVertexBuffer(const VulkanContext& context)
+Buffer CreateVertexBuffer()
 {
     Buffer buffer;
 
@@ -146,15 +146,16 @@ Buffer CreateVertexBuffer(const VulkanContext& context)
 
     constexpr size_t byteSize = vertexData.size() * sizeof(Vertex);
 
-    auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
-    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
+    auto& vulkanContext = GetCurrentVulkanContext();
+    auto& stageBuffer = vulkanContext.GetCurrentStageBuffer();
+    auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
 
     buffer.Init(byteSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
     stageBuffer.LoadData((uint8_t*)vertexData.data(), byteSize, 0);
     commandBuffer.Begin();
     commandBuffer.CopyBuffer(stageBuffer, vk::AccessFlagBits::eHostWrite, buffer, vk::AccessFlags{ });
     commandBuffer.End();
-    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
+    vulkanContext.SubmitCommandsImmediate(commandBuffer);
     return buffer;
 }
 
@@ -194,8 +195,8 @@ int main()
         vertexShader.Data,
         fragmentShader.Data,
         vertexShader.VertexAttributes,
-        CreateVertexBuffer(Vulkan),
-        CreateDescriptorSetLayout(Vulkan),
+        CreateVertexBuffer(),
+        CreateDescriptorSetLayout(),
     };
     RenderGraph renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
 

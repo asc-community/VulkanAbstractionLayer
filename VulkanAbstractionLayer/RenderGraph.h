@@ -46,7 +46,7 @@ namespace VulkanAbstractionLayer
         CommandBuffer& Commands;
         const std::vector<StringId>& ColorAttachments;
 
-        const Image& GetColorAttachment(size_t index) const;
+        const Image& GetOutputColorAttachment(size_t index) const;
     };
 
     struct RenderGraphNode

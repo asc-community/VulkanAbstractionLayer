@@ -379,7 +379,13 @@ namespace VulkanAbstractionLayer
 
         for (uint32_t i = 0; i <this->presentImageCount; i++)
         {
-            this->swapchainImages.emplace_back(swapchainImages[i], this->surfaceExtent.width, this->surfaceExtent.height, this->surfaceFormat.format);
+            Format format = FromNativeFormat(this->surfaceFormat.format);
+            this->swapchainImages.push_back(Image(
+                swapchainImages[i], 
+                this->surfaceExtent.width, 
+                this->surfaceExtent.height, 
+                FromNativeFormat(this->surfaceFormat.format)
+            ));
         }
     }
 

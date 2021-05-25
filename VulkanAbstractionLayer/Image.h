@@ -30,6 +30,7 @@
 
 #include <vulkan/vulkan.hpp>
 #include "VulkanMemoryAllocator.h"
+#include "ShaderReflection.h"
 
 namespace VulkanAbstractionLayer
 {
@@ -38,26 +39,26 @@ namespace VulkanAbstractionLayer
         vk::Image handle;
         vk::ImageView view;
         vk::Extent2D extent = { 0u, 0u };
-        vk::Format format = vk::Format::eUndefined;
+        Format format = Format::UNDEFINED;
         VmaAllocation allocation = { };
 
         void Destroy();
-        void InitView(const vk::Image& image, vk::Format format);
+        void InitView(const vk::Image& image, Format format);
     public:
-        Image() = default;
-        Image(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
-        Image(vk::Image image, uint32_t width, uint32_t height, vk::Format format);
-        Image(const Image&) = delete;
-        Image& operator=(const Image&) = delete;
+        Image();
+        Image(uint32_t width, uint32_t height, Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
+        Image(vk::Image image, uint32_t width, uint32_t height, Format format);
+        Image(const Image&);
+        Image& operator=(const Image&);
         Image(Image&& other) noexcept;
         Image& operator=(Image&& other) noexcept;
         ~Image();
 
-        void Init(uint32_t width, uint32_t height, vk::Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
+        void Init(uint32_t width, uint32_t height, Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
 
         vk::Image GetNativeHandle() const { return this->handle; }
         vk::ImageView GetNativeView() const { return this->view; }
-        vk::Format GetFormat() const { return this->format; }
+        Format GetFormat() const { return this->format; }
         uint32_t GetWidth() const { return this->extent.width; }
         uint32_t GetHeight() const { return this->extent.height; }
     };

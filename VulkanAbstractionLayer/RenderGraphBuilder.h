@@ -55,14 +55,6 @@ namespace VulkanAbstractionLayer
         LOAD,
     };
 
-    struct ReadOnlyAttachment
-    {
-        StringId Name = { };
-        AttachmentLayout InitialLayout = AttachmentLayout::UNKWNON;
-    };
-
-    struct ReadOnlyColorAttachment : ReadOnlyAttachment { };
-
     struct ClearColor
     {
         float R = 0.0f, G = 0.0f, B = 0.0f, A = 1.0f;
@@ -74,20 +66,29 @@ namespace VulkanAbstractionLayer
         uint32_t Spencil = 0;
     };
 
-    struct WriteOnlyColorAttachment
+    struct Attachment
     {
         StringId Name = { };
-        ClearColor ClearValue = { };
         AttachmentLayout InitialLayout = AttachmentLayout::UNKWNON;
+    };
+
+    struct WriteOnlyAttachment : Attachment
+    {
         AttachmentInitialState InitialState = AttachmentInitialState::DISCARD;
     };
 
-    struct WriteOnlyDepthAttachment
+    struct ReadOnlyAttachment : Attachment { };
+
+    struct ReadOnlyColorAttachment : ReadOnlyAttachment { };
+
+    struct WriteOnlyColorAttachment : WriteOnlyAttachment
     {
-        StringId Name = { };
-        ClearDepthSpencil ClearValue = { };
-        AttachmentLayout InitialLayout = AttachmentLayout::UNKWNON;
-        AttachmentInitialState InitialState = AttachmentInitialState::DISCARD;
+        ClearColor ClearValue;
+    };
+
+    struct WriteOnlyDepthAttachment : WriteOnlyAttachment
+    {
+        ClearDepthSpencil ClearValue;
     };
 
     struct GraphicPipeline
@@ -124,8 +125,17 @@ namespace VulkanAbstractionLayer
 
     class RenderGraphBuilder
     {
-        using AttachmentHashMap = std::unordered_map<StringId, Image>;
+        struct AttachmentCreateOptions
+        {
+            Format LayoutFormat;
+            uint32_t Width;
+            uint32_t Height;
+        };
 
+        using AttachmentHashMap = std::unordered_map<StringId, Image>;
+        using AttachmentCreateOptionsHashMap = std::unordered_map<StringId, AttachmentCreateOptions>;
+
+        AttachmentCreateOptionsHashMap attachmentsCreateOptions;
         std::vector<RenderPassBuilder> renderPasses;
         StringId outputName = { };
 
@@ -136,6 +146,8 @@ namespace VulkanAbstractionLayer
         RenderGraphBuilder& AddRenderPass(RenderPassBuilder&& renderPass);
         RenderGraphBuilder& AddRenderPass(RenderPassBuilder& renderPass);
         RenderGraphBuilder& SetOutputName(StringId name);
+        RenderGraphBuilder& AddAttachment(StringId name, Format format);
+        RenderGraphBuilder& AddAttachment(StringId name, Format format, uint32_t width, uint32_t height);
         RenderGraph Build();
     };
 }

@@ -51,37 +51,37 @@ namespace VulkanAbstractionLayer
 
     RenderPassBuilder& RenderPassBuilder::AddWriteOnlyColorAttachment(StringId name)
     {
-        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, { } });
+        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name });
         return *this;
     }
 
     RenderPassBuilder& RenderPassBuilder::AddWriteOnlyColorAttachment(StringId name, ClearColor clear)
     {
-        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, clear, AttachmentLayout::UNKWNON, AttachmentInitialState::CLEAR });
+        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, AttachmentLayout::UNKWNON, AttachmentInitialState::CLEAR, clear });
         return *this;
     }
 
     RenderPassBuilder& RenderPassBuilder::AddWriteOnlyColorAttachment(StringId name, AttachmentInitialState state)
     {
-        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, ClearColor{ }, AttachmentLayout::UNKWNON, state });
+        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, AttachmentLayout::UNKWNON, state });
         return *this;
     }
 
     RenderPassBuilder& RenderPassBuilder::SetWriteOnlyDepthAttachment(StringId name)
     {
-        this->depthAttachment = WriteOnlyDepthAttachment{ name, };
+        this->depthAttachment = WriteOnlyDepthAttachment{ name };
         return *this;
     }
 
     RenderPassBuilder& RenderPassBuilder::SetWriteOnlyDepthAttachment(StringId name, ClearDepthSpencil clear)
     {
-        this->depthAttachment = WriteOnlyDepthAttachment{ name, clear, AttachmentLayout::UNKWNON, AttachmentInitialState::CLEAR };
+        this->depthAttachment = WriteOnlyDepthAttachment{ name, AttachmentLayout::UNKWNON, AttachmentInitialState::CLEAR, clear };
         return *this;
     }
 
     RenderPassBuilder& RenderPassBuilder::SetWriteOnlyDepthAttachment(StringId name, AttachmentInitialState state)
     {
-        this->depthAttachment = WriteOnlyDepthAttachment{ name, ClearDepthSpencil{ }, AttachmentLayout::UNKWNON, state };
+        this->depthAttachment = WriteOnlyDepthAttachment{ name, AttachmentLayout::UNKWNON, state };
         return *this;
     }
 
@@ -155,37 +155,6 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    std::pair<vk::Format, int32_t> VertexAttributeTypeToFormat(VertexAttribute::Type type)
-    {
-        switch (type)
-        {
-        case VertexAttribute::Type::FLOAT:
-            return { vk::Format::eR32Sfloat, 1 };
-        case VertexAttribute::Type::FLOAT_VEC2:
-            return { vk::Format::eR32G32Sfloat, 1 };
-        case VertexAttribute::Type::FLOAT_VEC3:
-            return { vk::Format::eR32G32B32Sfloat, 1 };
-        case VertexAttribute::Type::FLOAT_VEC4:
-            return { vk::Format::eR32G32B32A32Sfloat, 1 };
-        case VertexAttribute::Type::INT:
-            return { vk::Format::eR32Sint, 1 };
-        case VertexAttribute::Type::INT_VEC2:
-            return { vk::Format::eR32G32Sint, 1 };
-        case VertexAttribute::Type::INT_VEC3:
-            return { vk::Format::eR32G32B32Sint, 1 };
-        case VertexAttribute::Type::INT_VEC4:
-            return { vk::Format::eR32G32B32A32Sint, 1 };
-        case VertexAttribute::Type::MAT2:
-            return { vk::Format::eR32G32Sfloat, 2 };
-        case VertexAttribute::Type::MAT3:
-            return { vk::Format::eR32G32B32Sfloat, 3 };
-        case VertexAttribute::Type::MAT4:
-            return { vk::Format::eR32G32B32A32Sfloat, 4 };
-        default:
-            return { vk::Format::eUndefined, 0 };
-        }
-    }
-
     RenderPass RenderGraphBuilder::BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments)
     {
         std::vector<vk::AttachmentDescription> attachmentDescriptions;
@@ -208,7 +177,7 @@ namespace VulkanAbstractionLayer
         
             vk::AttachmentDescription attachmentDescription;
             attachmentDescription
-                .setFormat(imageReference.GetFormat())
+                .setFormat(ToNativeFormat(imageReference.GetFormat()))
                 .setSamples(vk::SampleCountFlagBits::e1)
                 .setLoadOp(LoadOpTable[(size_t)outputColorAttachment.InitialState])
                 .setStoreOp(vk::AttachmentStoreOp::eStore)
@@ -309,18 +278,17 @@ namespace VulkanAbstractionLayer
 
             for (const auto& attribute : vertexAttributes)
             {
-                auto [format, locations] = VertexAttributeTypeToFormat(attribute.AttributeType);
-                for (size_t i = 0; i < locations; i++)
+                for (size_t i = 0; i < attribute.ComponentCount; i++)
                 {
                     vertexAttributeDescriptions.push_back(
                         vk::VertexInputAttributeDescription{
                             attributeLocationId,
                             vertexBindingId,
-                            format,
+                            ToNativeFormat(attribute.LayoutFormat),
                             vertexBindingOffset,
                         });
                     attributeLocationId++;
-                    vertexBindingOffset += attribute.ByteSize / locations;
+                    vertexBindingOffset += attribute.ByteSize / attribute.ComponentCount;
                 }
 
                 if (attributeLocationId == attributeLocationOffset + vertexBindings[vertexBindingId].BindingRange)
@@ -475,11 +443,12 @@ namespace VulkanAbstractionLayer
 
         for (const auto& [attachmentName, attachmentUsage] : attachmentUsages)
         {
-            // TODO: attachments with different sizes and formats from present image
+            auto& attachmentCreateOptions = this->attachmentsCreateOptions.at(attachmentName);
+
             attachments.emplace(attachmentName, Image(
-                vulkanContext.GetSurfaceExtent().width,
-                vulkanContext.GetSurfaceExtent().height,
-                vulkanContext.GetSurfaceFormat(),
+                attachmentCreateOptions.Width,
+                attachmentCreateOptions.Height,
+                attachmentCreateOptions.LayoutFormat,
                 attachmentUsage,
                 MemoryUsage::GPU_ONLY
             ));
@@ -506,6 +475,19 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
+    RenderGraphBuilder& RenderGraphBuilder::AddAttachment(StringId name, Format format)
+    {
+        auto& vulkanContext = GetCurrentVulkanContext();
+        auto [width, height] = vulkanContext.GetSurfaceExtent();
+        return this->AddAttachment(name, format, width, height);
+    }
+
+    RenderGraphBuilder& RenderGraphBuilder::AddAttachment(StringId name, Format format, uint32_t width, uint32_t height)
+    {
+        this->attachmentsCreateOptions.emplace(name, AttachmentCreateOptions{ format, width, height });
+        return *this;
+    }
+
     RenderGraph RenderGraphBuilder::Build()
     {
         AttachmentLayout outputLayout = this->ResolveImageTransitions(this->outputName);
@@ -528,9 +510,10 @@ namespace VulkanAbstractionLayer
 
         auto OnPresent = [outputLayout](CommandBuffer& commandBuffer, const Image& outputImage, const Image& presentImage)
         {
-            commandBuffer.CopyImage(
+            commandBuffer.BlitImage(
                 outputImage, LayoutTable[(size_t)outputLayout], AttachmentLayoutToAccessFlags(outputLayout), 
-                presentImage, vk::ImageLayout::eUndefined, vk::AccessFlagBits::eMemoryRead
+                presentImage, vk::ImageLayout::eUndefined, vk::AccessFlagBits::eMemoryRead,
+                vk::Filter::eLinear
             );
         };
 
