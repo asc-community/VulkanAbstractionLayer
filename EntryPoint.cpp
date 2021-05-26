@@ -36,7 +36,11 @@ struct RenderGraphResources
     Buffer UniformBuffer;
     vk::DescriptorSet DescriptorSet;
     vk::DescriptorSetLayout DescriptorSetLayout;
-    Matrix4x4 ViewProjMatrix;
+    struct UniformBufferData
+    {
+        Matrix4x4 ViewProjMatrix;
+        Matrix4x4 ModelMatrix; // TODO: to Matrix3x3
+    } UniformData;
 };
 
 auto CreateShaderModuleFromSource(const std::filesystem::path& filename, ShaderType type)
@@ -80,7 +84,7 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
             .AddBeforeRenderCallback([&resources](RenderState state)
                 {
                     auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
-                    stageBuffer.LoadData((uint8_t*)&resources.ViewProjMatrix, sizeof(resources.ViewProjMatrix), 0);
+                    stageBuffer.LoadData((uint8_t*)&resources.UniformData, sizeof(resources.UniformData), 0);
 
                     state.Commands.CopyBuffer(
                         stageBuffer, vk::AccessFlagBits::eHostWrite,
@@ -137,7 +141,7 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
             )
         )
         .AddAttachment("Output"_id, Format::R8G8B8A8_UNORM)
-        .AddAttachment("OutputDepth"_id, Format::D32_SFLOAT)
+        .AddAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT)
         .SetOutputName("Output"_id);
 
     return renderGraphBuilder.Build();
@@ -194,7 +198,7 @@ void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const Buffer& un
 
 Buffer CreateUniformBuffer()
 {
-    return Buffer(sizeof(Matrix4x4), BufferUsageType::UNIFORM_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    return Buffer(2.0 * sizeof(Matrix4x4), BufferUsageType::UNIFORM_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
 }
 
 Buffer CreateVertexBuffer()
@@ -289,15 +293,20 @@ int main()
             Vulkan.StartFrame();
             ImGuiVulkanContext::StartFrame();
             
-            static Vector3 position{ 0.0f, 0.0f, 0.0f };
-            static Vector2 rotation{ 0.0f, 0.0f };
+            static Vector3 modelRotation{ -1.45f, 5.0f, 0.0f };
+            static Vector3 position{ 10.0f, 12.0f, -27.0f };
+            static Vector2 rotation{ 5.74f, 0.0f };
             static float fov = 65.0f;
 
             ImGui::Begin("Camera");
-
             ImGui::DragFloat3("position", &position[0]);
             ImGui::DragFloat2("rotation", &rotation[0], 0.01f);
             ImGui::DragFloat("fov", &fov);
+            ImGui::End();
+
+            ImGui::Begin("Model");
+            ImGui::DragFloat3("rotation", &modelRotation[0], 0.01f);
+            ImGui::End();
 
             rotation.y = glm::clamp(rotation.y,
                 -glm::half_pi<float>() + 0.001f, glm::half_pi<float>() - 0.001f);
@@ -316,11 +325,11 @@ int main()
                 cos(rotation.x - glm::half_pi<float>())
             };
 
-            renderGraphResources.ViewProjMatrix = 
+            renderGraphResources.UniformData.ViewProjMatrix =
                 glm::perspective(glm::radians(fov), 16.0f / 9.0f, 0.001f, 1000.0f) *
                 glm::lookAt(position, position + direction, Vector3(0.0f, 1.0f, 0.0f));
 
-            ImGui::End();
+            renderGraphResources.UniformData.ModelMatrix = glm::yawPitchRoll(modelRotation.y, modelRotation.x, modelRotation.z);
 
             renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());

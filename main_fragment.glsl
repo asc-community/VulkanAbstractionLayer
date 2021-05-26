@@ -7,5 +7,7 @@ layout(location = 0) out vec4 oColor;
 
 void main() 
 {
-    oColor = vec4(vTexCoord.xy, 0.2, 1.0);
+    const vec3 light = normalize(vec3(1.0, 1.0, 0.0));
+    float diffuseFactor = max(dot(light, vNormal), 0.0);
+    oColor = vec4(vec3(diffuseFactor), 1.0);
 }

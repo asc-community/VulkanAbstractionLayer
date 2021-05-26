@@ -15,6 +15,7 @@ layout(location = 1) out vec3 vNormal;
 layout(set = 0, binding = 1) uniform uCameraBuffer
 {
     mat4 uViewProjection;
+    mat4 uModel;
 };
 
 void main() 
@@ -26,7 +27,7 @@ void main()
         vec4(-0, - 0, - 86.6025, 1)
     );
 
-    gl_Position = uViewProjection * vec4(iPosition, 1.0);
+    gl_Position = uViewProjection * uModel * vec4(iPosition, 1.0);
     vTexCoord = iTexCoord; 
-    vNormal = iNormal;
+    vNormal = mat3(uModel) * iNormal;
 }

@@ -168,9 +168,9 @@ namespace VulkanAbstractionLayer
         X8D24_UNORM_PACK_32,
         D32_SFLOAT,
         S8_UINT,
-        D16_UNORMS8_UINT,
-        D24_UNORMS8_UINT,
-        D32_SFLOATS8_UINT,
+        D16_UNORM_S8_UINT,
+        D24_UNORM_S8_UINT,
+        D32_SFLOAT_S8_UINT,
     };
 
     const vk::Format& ToNativeFormat(Format format);

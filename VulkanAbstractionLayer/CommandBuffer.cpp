@@ -89,9 +89,9 @@ namespace VulkanAbstractionLayer
     {
         this->handle.setViewport(0, vk::Viewport{ 
             viewport.OffsetWidth, 
-            viewport.OffsetHeight, 
+            viewport.OffsetHeight + viewport.Height, 
             viewport.Width, 
-            viewport.Height, 
+            -viewport.Height, // inverse viewport height to invert coordinate system
             viewport.MinDepth, 
             viewport.MaxDepth 
         });

@@ -253,18 +253,18 @@ namespace VulkanAbstractionLayer
             vk::SubpassDependency {
                 VK_SUBPASS_EXTERNAL,
                 0,
-                vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+                vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
                 vk::AccessFlagBits::eMemoryRead,
-                vk::AccessFlagBits::eColorAttachmentWrite,
+                vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
                 vk::DependencyFlagBits::eByRegion
             },
             vk::SubpassDependency {
                 0,
                 VK_SUBPASS_EXTERNAL,
-                vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
                 vk::PipelineStageFlagBits::eBottomOfPipe,
-                vk::AccessFlagBits::eColorAttachmentWrite,
+                vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
                 vk::AccessFlagBits::eMemoryRead,
                 vk::DependencyFlagBits::eByRegion
             },
@@ -413,6 +413,7 @@ namespace VulkanAbstractionLayer
                 .setStencilTestEnable(false)
                 .setDepthTestEnable(true)
                 .setDepthWriteEnable(true)
+                .setDepthBoundsTestEnable(false)
                 .setDepthCompareOp(vk::CompareOp::eLess)
                 .setMinDepthBounds(0.0f)
                 .setMaxDepthBounds(1.0f);

@@ -42,11 +42,11 @@ namespace VulkanAbstractionLayer
             return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
         case Format::D32_SFLOAT:
             return vk::ImageAspectFlagBits::eDepth;
-        case Format::D16_UNORMS8_UINT:
+        case Format::D16_UNORM_S8_UINT:
             return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
-        case Format::D24_UNORMS8_UINT:
+        case Format::D24_UNORM_S8_UINT:
             return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
-        case Format::D32_SFLOATS8_UINT:
+        case Format::D32_SFLOAT_S8_UINT:
             return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
         default:
             return vk::ImageAspectFlagBits::eColor;
