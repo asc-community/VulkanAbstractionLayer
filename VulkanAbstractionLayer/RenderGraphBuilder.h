@@ -62,7 +62,7 @@ namespace VulkanAbstractionLayer
 
     struct ClearDepthSpencil
     {
-        float Depth = 0.0f;
+        float Depth = 1.0f;
         uint32_t Spencil = 0;
     };
 
@@ -100,7 +100,9 @@ namespace VulkanAbstractionLayer
     class RenderPassBuilder
     {
         StringId name = { };
+        RenderGraphNode::RenderCallback beforeRenderCallback;
         RenderGraphNode::RenderCallback onRenderCallback;
+        RenderGraphNode::RenderCallback afterRenderCallback;
         std::vector<ReadOnlyColorAttachment> inputColorAttachments;
         std::vector<WriteOnlyColorAttachment> outputColorAttachments;
         WriteOnlyDepthAttachment depthAttachment;
@@ -110,7 +112,9 @@ namespace VulkanAbstractionLayer
         RenderPassBuilder(RenderPassBuilder&&) = default;
         RenderPassBuilder& operator=(RenderPassBuilder&&) = default;
 
+        RenderPassBuilder& AddBeforeRenderCallback(RenderGraphNode::RenderCallback callback);
         RenderPassBuilder& AddOnRenderCallback(RenderGraphNode::RenderCallback callback);
+        RenderPassBuilder& AddAfterRenderCallback(RenderGraphNode::RenderCallback callback);
         RenderPassBuilder& AddReadOnlyColorAttachment(StringId name);
         RenderPassBuilder& AddWriteOnlyColorAttachment(StringId name);
         RenderPassBuilder& AddWriteOnlyColorAttachment(StringId name, ClearColor clear);

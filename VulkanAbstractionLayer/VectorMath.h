@@ -27,6 +27,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <glm/glm.hpp>
+#include <glm/ext.hpp>
 
 namespace VulkanAbstractionLayer
 {

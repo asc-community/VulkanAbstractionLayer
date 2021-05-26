@@ -39,11 +39,20 @@ namespace VulkanAbstractionLayer
 
     void RenderGraph::ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer)
     {
+        RenderState state{ *this, commandBuffer, node.ColorAttachments, node.Pass.GetPipelineLayout() };
+
+        if((bool)node.BeforeRender)
+            node.BeforeRender(state);
+
         commandBuffer.BeginRenderPass(node.Pass);
 
-        node.OnRender(RenderState{ *this, commandBuffer, node.ColorAttachments });
+        if ((bool)node.OnRender)
+            node.OnRender(state);
 
         commandBuffer.EndRenderPass();
+
+        if ((bool)node.AfterRender)
+            node.AfterRender(state);
     }
 
     void RenderGraph::Execute(CommandBuffer& commandBuffer)

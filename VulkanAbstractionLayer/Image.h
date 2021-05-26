@@ -45,11 +45,9 @@ namespace VulkanAbstractionLayer
         void Destroy();
         void InitView(const vk::Image& image, Format format);
     public:
-        Image();
+        Image() = default;
         Image(uint32_t width, uint32_t height, Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
         Image(vk::Image image, uint32_t width, uint32_t height, Format format);
-        Image(const Image&);
-        Image& operator=(const Image&);
         Image(Image&& other) noexcept;
         Image& operator=(Image&& other) noexcept;
         ~Image();

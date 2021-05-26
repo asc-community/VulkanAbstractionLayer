@@ -43,6 +43,18 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
+    RenderPassBuilder& RenderPassBuilder::AddBeforeRenderCallback(RenderGraphNode::RenderCallback callback)
+    {
+        this->beforeRenderCallback = std::move(callback);
+        return *this;
+    }
+
+    RenderPassBuilder& RenderPassBuilder::AddAfterRenderCallback(RenderGraphNode::RenderCallback callback)
+    {
+        this->afterRenderCallback = std::move(callback);
+        return *this;
+    }
+
     RenderPassBuilder& RenderPassBuilder::AddReadOnlyColorAttachment(StringId name)
     {
         this->inputColorAttachments.push_back(ReadOnlyColorAttachment{ name });
@@ -171,8 +183,8 @@ namespace VulkanAbstractionLayer
 
             if (renderAreaWidth == 0 && renderAreaHeight == 0)
             {
-                renderAreaWidth = (uint32_t)imageReference.GetWidth();
-                renderAreaHeight = (uint32_t)imageReference.GetHeight();
+                renderAreaWidth = std::max(renderAreaWidth, (uint32_t)imageReference.GetWidth());
+                renderAreaHeight = std::max(renderAreaHeight, (uint32_t)imageReference.GetHeight());
             }
         
             vk::AttachmentDescription attachmentDescription;
@@ -200,10 +212,41 @@ namespace VulkanAbstractionLayer
             clearValues.push_back(vk::ClearValue{ vk::ClearColorValue{ std::array{ clear.R, clear.G, clear.B, clear.A } } });
         }
         
+        const WriteOnlyDepthAttachment& depthAttachment = renderPassBuilder.depthAttachment;
+        vk::AttachmentReference depthAttachmentReference;
+
+        if (depthAttachment.Name != StringId{ })
+        {
+            const Image& depthImageReference = attachments.at(depthAttachment.Name);
+
+            vk::AttachmentDescription depthAttachmentDescription;
+            depthAttachmentDescription
+                .setFormat(ToNativeFormat(depthImageReference.GetFormat()))
+                .setSamples(vk::SampleCountFlagBits::e1)
+                .setLoadOp(LoadOpTable[(size_t)depthAttachment.InitialState])
+                .setStoreOp(vk::AttachmentStoreOp::eStore)
+                .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+                .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+                .setInitialLayout(LayoutTable[(size_t)depthAttachment.InitialLayout])
+                .setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+            attachmentDescriptions.push_back(std::move(depthAttachmentDescription));
+
+            depthAttachmentReference
+                .setAttachment((uint32_t)(attachmentDescriptions.size() - 1))
+                .setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+            attachmentViews.push_back(depthImageReference.GetNativeView());
+
+            ClearDepthSpencil depthClear = depthAttachment.ClearValue;
+            clearValues.push_back(vk::ClearValue{ vk::ClearDepthStencilValue{ depthClear.Depth, depthClear.Spencil } });
+        }
+
         vk::SubpassDescription subpassDescription;
         subpassDescription
             .setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
-            .setColorAttachments(attachmentReferences);
+            .setColorAttachments(attachmentReferences)
+            .setPDepthStencilAttachment(depthAttachmentReference != vk::AttachmentReference{ } ? &depthAttachmentReference : nullptr);
         
         // TODO
         std::array dependencies = {
@@ -365,6 +408,15 @@ namespace VulkanAbstractionLayer
                 vk::DynamicState::eScissor,
             };
 
+            vk::PipelineDepthStencilStateCreateInfo depthSpencilStateCreateInfo;
+            depthSpencilStateCreateInfo
+                .setStencilTestEnable(false)
+                .setDepthTestEnable(true)
+                .setDepthWriteEnable(true)
+                .setDepthCompareOp(vk::CompareOp::eLess)
+                .setMinDepthBounds(0.0f)
+                .setMaxDepthBounds(1.0f);
+
             vk::PipelineDynamicStateCreateInfo dynamicStateCreateInfo;
             dynamicStateCreateInfo.setDynamicStates(dynamicStates);
 
@@ -382,7 +434,7 @@ namespace VulkanAbstractionLayer
                 .setPViewportState(&viewportStateCreateInfo)
                 .setPRasterizationState(&rasterizationStateCreateInfo)
                 .setPMultisampleState(&multisampleStateCreateInfo)
-                .setPDepthStencilState(nullptr)
+                .setPDepthStencilState(&depthSpencilStateCreateInfo)
                 .setPColorBlendState(&colorBlendStateCreateInfo)
                 .setPDynamicState(&dynamicStateCreateInfo)
                 .setLayout(pipelineLayout)
@@ -503,7 +555,9 @@ namespace VulkanAbstractionLayer
             nodes.push_back(RenderGraphNode{
                 renderPass.name,
                 this->BuildRenderPass(renderPass, attachments),
+                std::move(renderPass.beforeRenderCallback),
                 std::move(renderPass.onRenderCallback),
+                std::move(renderPass.afterRenderCallback),
                 std::move(colorAttachments)
             });
         }
@@ -513,7 +567,7 @@ namespace VulkanAbstractionLayer
             commandBuffer.BlitImage(
                 outputImage, LayoutTable[(size_t)outputLayout], AttachmentLayoutToAccessFlags(outputLayout), 
                 presentImage, vk::ImageLayout::eUndefined, vk::AccessFlagBits::eMemoryRead,
-                vk::Filter::eLinear
+                vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::Filter::eLinear
             );
         };
 

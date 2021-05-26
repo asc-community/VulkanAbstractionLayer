@@ -117,7 +117,7 @@ namespace VulkanAbstractionLayer
         this->SetScissor(Rect2D{ 0, 0, image.GetWidth(), image.GetHeight() });
     }
 
-    void CommandBuffer::CopyImage(const Image& source, vk::ImageLayout sourceLayout, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags)
+    void CommandBuffer::CopyImage(const Image& source, vk::ImageLayout sourceLayout, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags)
     {
         vk::ImageSubresourceRange subresourceRange{
             vk::ImageAspectFlagBits::eColor,
@@ -134,7 +134,6 @@ namespace VulkanAbstractionLayer
             subresourceRange.layerCount
         };
 
-        // TODO: flexible access mask specification
         vk::ImageMemoryBarrier toTransferSrcBarrier;
         toTransferSrcBarrier
             .setSrcAccessMask(sourceFlags)
@@ -157,10 +156,9 @@ namespace VulkanAbstractionLayer
             .setImage(distance.GetNativeHandle())
             .setSubresourceRange(subresourceRange);
 
-        // TODO: flexible pipeline stage flags
         std::array preCopyBarriers = { toTransferSrcBarrier, toTransferDstBarrier };
         this->handle.pipelineBarrier(
-            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            pipelineFlags,
             vk::PipelineStageFlagBits::eTransfer,
             { }, // dependency flags
             { }, // memory barriers
@@ -179,7 +177,7 @@ namespace VulkanAbstractionLayer
         this->handle.copyImage(source.GetNativeHandle(), vk::ImageLayout::eTransferSrcOptimal, distance.GetNativeHandle(), vk::ImageLayout::eTransferDstOptimal, imageCopyInfo);
     }
 
-    void CommandBuffer::CopyBufferToImage(const Buffer& source, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags)
+    void CommandBuffer::CopyBufferToImage(const Buffer& source, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags)
     {
         vk::ImageSubresourceRange subresourceRange{
             vk::ImageAspectFlagBits::eColor,
@@ -217,9 +215,8 @@ namespace VulkanAbstractionLayer
             .setImage(distance.GetNativeHandle())
             .setSubresourceRange(subresourceRange);
 
-        // TODO: flexible pipeline stage flags
         this->handle.pipelineBarrier(
-            vk::PipelineStageFlagBits::eHost,
+            pipelineFlags,
             vk::PipelineStageFlagBits::eTransfer,
             { }, // dependency flags
             { }, // memory barriers
@@ -239,7 +236,7 @@ namespace VulkanAbstractionLayer
         this->handle.copyBufferToImage(source.GetNativeHandle(), distance.GetNativeHandle(), distanceLayout, bufferToImageCopyInfo);
     }
 
-    void CommandBuffer::CopyImageToBuffer(const Image& source, vk::AccessFlags sourceFlags, vk::ImageLayout sourceLayout, const Buffer& distance, vk::AccessFlags distanceFlags)
+    void CommandBuffer::CopyImageToBuffer(const Image& source, vk::AccessFlags sourceFlags, vk::ImageLayout sourceLayout, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags)
     {
         vk::ImageSubresourceRange subresourceRange{
             vk::ImageAspectFlagBits::eColor,
@@ -277,9 +274,8 @@ namespace VulkanAbstractionLayer
             .setSize(distance.GetByteSize())
             .setOffset(0);
 
-        // TODO: flexible pipeline stage flags
         this->handle.pipelineBarrier(
-            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            pipelineFlags,
             vk::PipelineStageFlagBits::eTransfer,
             { }, // dependency flags
             { }, // memory barriers
@@ -299,12 +295,12 @@ namespace VulkanAbstractionLayer
         this->handle.copyImageToBuffer(source.GetNativeHandle(), sourceLayout, distance.GetNativeHandle(), imageToBufferCopyInfo);
     }
 
-    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags)
+    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags)
     {
-        this->CopyBuffer(source, sourceFlags, distance, distanceFlags, distance.GetByteSize(), 0);
+        this->CopyBuffer(source, sourceFlags, distance, distanceFlags, pipelineFlags, distance.GetByteSize(), 0);
     }
 
-    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, size_t size, size_t offset)
+    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags, size_t size, size_t offset)
     {
         assert(source.GetByteSize() >= size);
         assert(distance.GetByteSize() >= size + offset);
@@ -329,10 +325,9 @@ namespace VulkanAbstractionLayer
             .setSize(size)
             .setOffset(0);
 
-        // TODO: flexible pipeline stage flags
         std::array preCopyBarriers = { toTransferSrcBarrier, toTransferDstBarrier };
         this->handle.pipelineBarrier(
-            vk::PipelineStageFlagBits::eHost,
+            pipelineFlags,
             vk::PipelineStageFlagBits::eTransfer,
             { }, // dependency flags
             { }, // memory barriers
@@ -349,7 +344,7 @@ namespace VulkanAbstractionLayer
         this->handle.copyBuffer(source.GetNativeHandle(), distance.GetNativeHandle(), bufferCopyInfo);
     }
 
-    void CommandBuffer::BlitImage(const Image& source, vk::ImageLayout sourceLayout, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags, vk::Filter filter)
+    void CommandBuffer::BlitImage(const Image& source, vk::ImageLayout sourceLayout, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags, vk::Filter filter)
     {
         vk::ImageSubresourceRange subresourceRange{
              vk::ImageAspectFlagBits::eColor,
@@ -366,7 +361,6 @@ namespace VulkanAbstractionLayer
             subresourceRange.layerCount
         };
 
-        // TODO: flexible access mask specification
         vk::ImageMemoryBarrier toTransferSrcBarrier;
         toTransferSrcBarrier
             .setSrcAccessMask(sourceFlags)
@@ -389,10 +383,9 @@ namespace VulkanAbstractionLayer
             .setImage(distance.GetNativeHandle())
             .setSubresourceRange(subresourceRange);
 
-        // TODO: flexible pipeline stage flags
         std::array preCopyBarriers = { toTransferSrcBarrier, toTransferDstBarrier };
         this->handle.pipelineBarrier(
-            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            pipelineFlags,
             vk::PipelineStageFlagBits::eTransfer,
             { }, // dependency flags
             { }, // memory barriers

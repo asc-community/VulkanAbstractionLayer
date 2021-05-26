@@ -45,6 +45,7 @@ namespace VulkanAbstractionLayer
         RenderGraph& Graph;
         CommandBuffer& Commands;
         const std::vector<StringId>& ColorAttachments;
+        vk::PipelineLayout PipelineLayout;
 
         const Image& GetOutputColorAttachment(size_t index) const;
     };
@@ -55,7 +56,9 @@ namespace VulkanAbstractionLayer
 
         StringId Name;
         RenderPass Pass;
+        RenderCallback BeforeRender;
         RenderCallback OnRender;
+        RenderCallback AfterRender;
         std::vector<StringId> ColorAttachments;
     };
 
