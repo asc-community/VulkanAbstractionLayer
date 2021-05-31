@@ -38,8 +38,8 @@ struct RenderGraphResources
     vk::DescriptorSetLayout DescriptorSetLayout;
     struct UniformBufferData
     {
-        Matrix4x4 ViewProjMatrix;
-        Matrix4x4 ModelMatrix; // TODO: to Matrix3x3
+        Matrix4x4 CameraMatrix;
+        Matrix3x4 ModelMatrix;
     } UniformData;
 };
 
@@ -77,7 +77,7 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                         VertexBinding::Rate::PER_VERTEX,
                         VertexBinding::BindingRangeAll
                     }
-                }\
+                }
             })
             .AddWriteOnlyColorAttachment("Output"_id, ClearColor{ 0.8f, 0.6f, 0.0f, 1.0f })
             .SetWriteOnlyDepthAttachment("OutputDepth"_id, ClearDepthSpencil{ })
@@ -127,7 +127,7 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     );
 
                     state.Commands.BindVertexBuffer(resources.VertexBuffer);
-                    state.Commands.Draw(resources.VertexBuffer.GetByteSize() / sizeof(ModelLoader::Vertex), 1);
+                    state.Commands.Draw((uint32_t)resources.VertexBuffer.GetByteSize() / sizeof(ModelLoader::Vertex), 1);
                 }
             )
         )
@@ -196,9 +196,9 @@ void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const Buffer& un
     GetCurrentVulkanContext().GetDevice().updateDescriptorSets(descriptorBufferWrite, { });
 }
 
-Buffer CreateUniformBuffer()
+Buffer CreateUniformBuffer(size_t byteSize)
 {
-    return Buffer(2.0 * sizeof(Matrix4x4), BufferUsageType::UNIFORM_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    return Buffer(byteSize, BufferUsageType::UNIFORM_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
 }
 
 Buffer CreateVertexBuffer()
@@ -227,6 +227,59 @@ Buffer CreateVertexBuffer()
     vulkanContext.SubmitCommandsImmediate(commandBuffer);
     return buffer;
 }
+
+struct Camera
+{
+    Vector3 Position{ 10.0f, 12.0f, -27.0f };
+    Vector2 Rotation{ 5.74f, 0.0f };
+    float Fov = 65.0f;
+    float MovementSpeed = 0.5f;
+    float RotationMovementSpeed = 0.01f;
+    float AspectRatio = 16.0f / 9.0f;
+    float ZNear = 0.001f;
+    float ZFar = 1000.0f;
+
+    void Rotate(const Vector2& delta)
+    {
+        this->Rotation += this->RotationMovementSpeed * delta;
+
+        constexpr float MaxAngleY = HalfPi - 0.001f;
+        constexpr float MaxAngleX = TwoPi;
+        this->Rotation.y = std::clamp(this->Rotation.y, -MaxAngleY, MaxAngleY);
+        this->Rotation.x = std::fmod(this->Rotation.x, MaxAngleX);
+    }
+    
+    void Move(const Vector3& direction)
+    {
+        Matrix3x3 view{
+            std::sin(Rotation.x), 0.0f, std::cos(Rotation.x), // forward
+            0.0f, 1.0f, 0.0f, // up
+            std::sin(Rotation.x - HalfPi), 0.0f, std::cos(Rotation.x - HalfPi) // right
+        };
+
+        this->Position += this->MovementSpeed * (view * direction);
+    }
+    
+    Matrix4x4 GetViewMatrix() const
+    {
+        Vector3 direction{
+            std::cos(this->Rotation.y) * std::sin(this->Rotation.x),
+            std::sin(this->Rotation.y),
+            std::cos(this->Rotation.y) * std::cos(this->Rotation.x)
+        };
+        return MakeLookAtMatrix(this->Position, direction, Vector3{0.0f, 1.0f, 0.0f});
+    }
+
+    Matrix4x4 GetProjectionMatrix() const
+    {
+        return MakePerspectiveMatrix(ToRadians(this->Fov), this->AspectRatio, this->ZNear, this->ZFar);
+    }
+
+    Matrix4x4 GetMatrix()
+    {
+        return this->GetProjectionMatrix() * this->GetViewMatrix();
+    }
+};
 
 int main()
 {
@@ -267,7 +320,7 @@ int main()
         fragmentShader.Data,
         vertexShader.VertexAttributes,
         CreateVertexBuffer(),
-        CreateUniformBuffer(),
+        CreateUniformBuffer(sizeof(RenderGraphResources::UniformData)),
         descriptorSet,
         descriptorSetLayout,
     };
@@ -276,10 +329,13 @@ int main()
 
     RenderGraph renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
 
-    window.OnResize([&Vulkan, &renderGraphResources, &renderGraph](Window& window, Vector2 size) mutable
+    Camera camera;
+
+    window.OnResize([&Vulkan, &renderGraphResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
         renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
+        camera.AspectRatio = size.x / size.y;
     });
     
     ImGuiVulkanContext::Init(window, renderGraph.GetNodeByName("ImGuiPass"_id).Pass.GetNativeHandle());
@@ -294,42 +350,41 @@ int main()
             ImGuiVulkanContext::StartFrame();
             
             static Vector3 modelRotation{ -1.45f, 5.0f, 0.0f };
-            static Vector3 position{ 10.0f, 12.0f, -27.0f };
-            static Vector2 rotation{ 5.74f, 0.0f };
-            static float fov = 65.0f;
+
+            auto mouseMovement = ImGui::GetMouseDragDelta(MouseButton::RIGHT, 0.0f);
+            ImGui::ResetMouseDragDelta(MouseButton::RIGHT);
+            camera.Rotate({ -mouseMovement.x, -mouseMovement.y });
+
+            Vector3 movementDirection{ 0.0f };
+            if (ImGui::IsKeyDown(KeyCode::W))
+                movementDirection += Vector3{  1.0f,  0.0f,  0.0f };
+            if (ImGui::IsKeyDown(KeyCode::A))
+                movementDirection += Vector3{  0.0f,  0.0f, -1.0f };
+            if (ImGui::IsKeyDown(KeyCode::S))
+                movementDirection += Vector3{ -1.0f,  0.0f,  0.0f };
+            if (ImGui::IsKeyDown(KeyCode::D))
+                movementDirection += Vector3{  0.0f,  0.0f,  1.0f };
+            if (ImGui::IsKeyDown(KeyCode::SPACE))
+                movementDirection += Vector3{  0.0f,  1.0f,  0.0f };
+            if (ImGui::IsKeyDown(KeyCode::LEFT_SHIFT))
+                movementDirection += Vector3{  0.0f, -1.0f,  0.0f };
+            if (movementDirection != Vector3{ 0.0f }) movementDirection = Normalize(movementDirection);
+            camera.Move(movementDirection);
 
             ImGui::Begin("Camera");
-            ImGui::DragFloat3("position", &position[0]);
-            ImGui::DragFloat2("rotation", &rotation[0], 0.01f);
-            ImGui::DragFloat("fov", &fov);
+            ImGui::DragFloat("movement speed", &camera.MovementSpeed, 0.1f);
+            ImGui::DragFloat("rotation movement speed", &camera.RotationMovementSpeed, 0.01f);
+            ImGui::DragFloat3("position", &camera.Position[0]);
+            ImGui::DragFloat2("rotation", &camera.Rotation[0], 0.01f);
+            ImGui::DragFloat("fov", &camera.Fov);
             ImGui::End();
 
             ImGui::Begin("Model");
             ImGui::DragFloat3("rotation", &modelRotation[0], 0.01f);
             ImGui::End();
 
-            rotation.y = glm::clamp(rotation.y,
-                -glm::half_pi<float>() + 0.001f, glm::half_pi<float>() - 0.001f);
-
-            rotation.x = rotation.x - glm::two_pi<float>() * std::floor(rotation.x / glm::two_pi<float>());
-
-            Vector3 direction{
-                std::cos(rotation.y) * std::sin(rotation.x),
-                std::sin(rotation.y),
-                std::cos(rotation.y) * std::cos(rotation.x)
-            };
-
-            Vector3 right{
-                sin(rotation.x - glm::half_pi<float>()),
-                0.0f,
-                cos(rotation.x - glm::half_pi<float>())
-            };
-
-            renderGraphResources.UniformData.ViewProjMatrix =
-                glm::perspective(glm::radians(fov), 16.0f / 9.0f, 0.001f, 1000.0f) *
-                glm::lookAt(position, position + direction, Vector3(0.0f, 1.0f, 0.0f));
-
-            renderGraphResources.UniformData.ModelMatrix = glm::yawPitchRoll(modelRotation.y, modelRotation.x, modelRotation.z);
+            renderGraphResources.UniformData.CameraMatrix = camera.GetMatrix();
+            renderGraphResources.UniformData.ModelMatrix = MakeRotationMatrix(modelRotation);
 
             renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());

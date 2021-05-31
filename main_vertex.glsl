@@ -15,19 +15,13 @@ layout(location = 1) out vec3 vNormal;
 layout(set = 0, binding = 1) uniform uCameraBuffer
 {
     mat4 uViewProjection;
-    mat4 uModel;
+    mat3 uModel;
 };
 
 void main() 
 {
-    mat4 M = mat4(
-        vec4(-0.707107, -0.408248, 0.57735, 0),
-        vec4(0.707107, - 0.408248, 0.57735, 0),
-        vec4(0, 0.816497, 0.57735, 0),
-        vec4(-0, - 0, - 86.6025, 1)
-    );
-
-    gl_Position = uViewProjection * uModel * vec4(iPosition, 1.0);
+    vec3 worldSpacePosition = uModel * iPosition;
+    gl_Position = uViewProjection * vec4(worldSpacePosition, 1.0);
     vTexCoord = iTexCoord; 
     vNormal = mat3(uModel) * iNormal;
 }

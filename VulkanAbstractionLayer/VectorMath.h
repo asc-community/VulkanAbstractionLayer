@@ -31,6 +31,7 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include <glm/gtx/euler_angles.hpp>
+#include <glm/simd/matrix.h>
 
 namespace VulkanAbstractionLayer
 {
@@ -41,8 +42,50 @@ namespace VulkanAbstractionLayer
     using Matrix2x2 = glm::mat2;
     using Matrix3x3 = glm::mat3;
     using Matrix4x4 = glm::mat4;
+    using Matrix3x4 = glm::mat3x4;
 
     using VectorInt2 = glm::vec<2, int32_t>;
     using VectorInt3 = glm::vec<3, int32_t>;
     using VectorInt4 = glm::vec<4, int32_t>;
+
+    constexpr float HalfPi = glm::half_pi<float>();
+    constexpr float Pi = glm::pi<float>();
+    constexpr float TwoPi = glm::two_pi<float>();
+
+    template<typename T>
+    T Normalize(const T& v)
+    {
+        return glm::normalize(v);
+    }
+
+    template<typename T>
+    float Length(const T& v)
+    {
+        return glm::length(v);
+    }
+
+    inline float ToRadians(float degrees)
+    {
+        return glm::radians(degrees);
+    }
+
+    inline float ToDegrees(float radians)
+    {
+        return glm::degrees(radians);
+    }
+
+    inline Matrix4x4 MakeRotationMatrix(const Vector3& rotations)
+    {
+        return glm::yawPitchRoll(rotations.y, rotations.x, rotations.z);
+    }
+
+    inline Matrix4x4 MakePerspectiveMatrix(float fov, float aspect, float znear, float zfar)
+    {
+        return glm::perspective(fov, aspect, znear, zfar);
+    }
+
+    inline Matrix4x4 MakeLookAtMatrix(const Vector3& position, const Vector3& direction, const Vector3& up)
+    {
+        return glm::lookAt(position, position + direction, up);
+    }
 }
