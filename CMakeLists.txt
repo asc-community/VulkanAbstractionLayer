@@ -24,6 +24,7 @@ set(SOURCES
 "VulkanAbstractionLayer/GraphicShader.cpp" 
 "VulkanAbstractionLayer/ShaderReflection.cpp"
 "VulkanAbstractionLayer/ModelLoader.cpp"
+"VulkanAbstractionLayer/ImageLoader.cpp"
 "submodules/imgui/imgui.cpp"
 "submodules/imgui/imgui_demo.cpp"
 "submodules/imgui/imgui_draw.cpp"
@@ -44,6 +45,7 @@ set(VMA_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/VulkanMemoryAllocator
 set(TINYOBJLOADER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/tinyobjloader)
 set(SPAN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/span/include)
 set(SPIRV_REFLECT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/spirv-reflect)
+set(STB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/stb)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
@@ -57,6 +59,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${TINYOBJLOADER_INCLUDE_DIR}
     ${SPAN_INCLUDE_DIR}
     ${SPIRV_REFLECT_INCLUDE_DIR}
+    ${STB_INCLUDE_DIR}
 )
 target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw MachineIndependent SPIRV)
 

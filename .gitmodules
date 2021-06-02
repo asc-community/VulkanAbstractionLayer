@@ -23,3 +23,6 @@
 [submodule "submodules/spirv-reflect"]
 	path = submodules/spirv-reflect
 	url = https://github.com/KhronosGroup/SPIRV-Reflect
+[submodule "submodules/stb"]
+	path = submodules/stb
+	url = https://github.com/nothings/stb

@@ -7,6 +7,7 @@
 #include "VulkanAbstractionLayer/RenderGraphBuilder.h"
 #include "VulkanAbstractionLayer/ShaderLoader.h"
 #include "VulkanAbstractionLayer/ModelLoader.h"
+#include "VulkanAbstractionLayer/ImageLoader.h"
 #include "VulkanAbstractionLayer/Buffer.h"
 #include "imgui.h"
 
@@ -26,6 +27,12 @@ void WindowErrorCallback(const char* message)
 {
     std::cerr << "[ERROR Window]: " << message << std::endl;
 }
+
+struct InstanceData
+{
+    Vector3 Position;
+    uint32_t AlbedoTextureIndex;
+};
 
 struct CameraUniformData
 {
@@ -51,25 +58,27 @@ struct Uniform
     T UniformData;
 };
 
+struct Mesh
+{
+    Buffer VertexBuffer;
+    Buffer InstanceBuffer;
+    Image Texture;
+};
+
 struct RenderGraphResources
 {
     std::vector<uint32_t> VertexShaderBytecode;
     std::vector<uint32_t> FragmentShaderBytecode;
     std::vector<VertexAttribute> VertexAttributes;
-    Buffer VertexBuffer;
-    Buffer InstanceBuffer;
     vk::DescriptorSet DescriptorSet;
     vk::DescriptorSetLayout DescriptorSetLayout;
+    vk::Sampler TextureSampler;
     Uniform<CameraUniformData> CameraUniform;
     Uniform<ModelUniformData> ModelUniform;
     Uniform<LightUniformData> LightUniform;
-    std::vector<Vector3> InstancePositions;
+    Mesh DragonMesh;
+    Mesh PlaneMesh;
 };
-
-auto CreateShaderModuleFromSource(const std::filesystem::path& filename, ShaderType type)
-{
-    return ShaderLoader::LoadFromSourceWithReflection(filename.string(), type, ShaderLanguage::GLSL, GetCurrentVulkanContext().GetAPIVersion());
-}
 
 vk::ShaderModule CreateShaderModuleFromBinary(const std::string& filename, ShaderType type)
 {
@@ -102,11 +111,11 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     },
                     VertexBinding{
                         VertexBinding::Rate::PER_INSTANCE,
-                        1
+                        VertexBinding::BindingRangeAll
                     },
                 }
             })
-            .AddWriteOnlyColorAttachment("Output"_id, ClearColor{ 0.8f, 0.6f, 0.0f, 1.0f })
+            .AddWriteOnlyColorAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f })
             .SetWriteOnlyDepthAttachment("OutputDepth"_id, ClearDepthSpencil{ })
             .AddBeforeRenderCallback([&resources](RenderState state)
                 {
@@ -171,10 +180,15 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                         { }
                     );
 
-                    size_t vertexCount = resources.VertexBuffer.GetByteSize() / sizeof(ModelLoader::Vertex);
+                    size_t dragonVertexCount = resources.DragonMesh.VertexBuffer.GetByteSize() / sizeof(ModelLoader::Vertex);
+                    size_t dragonInstanceCount = resources.DragonMesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
+                    state.Commands.BindVertexBuffers(resources.DragonMesh.VertexBuffer, resources.DragonMesh.InstanceBuffer);
+                    state.Commands.Draw((uint32_t)dragonVertexCount, (uint32_t)dragonInstanceCount);
 
-                    state.Commands.BindVertexBuffers(resources.VertexBuffer, resources.InstanceBuffer);
-                    state.Commands.Draw((uint32_t)vertexCount, 5);
+                    size_t planeVertexCount = resources.PlaneMesh.VertexBuffer.GetByteSize() / sizeof(ModelLoader::Vertex);
+                    size_t planeInstanceCount = resources.PlaneMesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
+                    state.Commands.BindVertexBuffers(resources.PlaneMesh.VertexBuffer, resources.PlaneMesh.InstanceBuffer);
+                    state.Commands.Draw((uint32_t)planeVertexCount, (uint32_t)planeInstanceCount);
                 }
             )
         )
@@ -217,6 +231,18 @@ auto CreateDescriptorSet()
             1,
             vk::ShaderStageFlagBits::eFragment
         },
+        vk::DescriptorSetLayoutBinding {
+            3,
+            vk::DescriptorType::eSampler,
+            1,
+            vk::ShaderStageFlagBits::eFragment
+        },
+        vk::DescriptorSetLayoutBinding {
+            4,
+            vk::DescriptorType::eSampledImage,
+            2,
+            vk::ShaderStageFlagBits::eFragment
+        }
     };
 
     vk::DescriptorSetLayoutCreateInfo createInfo;
@@ -233,6 +259,20 @@ auto CreateDescriptorSet()
     auto descriptorSet = vulkan.GetDevice().allocateDescriptorSets(allocationInfo).front();
     
     return std::pair{ descriptorSet, descriptorSetLayout };
+}
+
+vk::Sampler CreateSampler()
+{
+    vk::SamplerCreateInfo samplerCreateInfo;
+    samplerCreateInfo
+        .setMinFilter(vk::Filter::eLinear)
+        .setMagFilter(vk::Filter::eLinear)
+        .setAddressModeU(vk::SamplerAddressMode::eRepeat)
+        .setAddressModeV(vk::SamplerAddressMode::eRepeat)
+        .setMipmapMode(vk::SamplerMipmapMode::eLinear);
+
+    vk::Sampler sampler = GetCurrentVulkanContext().GetDevice().createSampler(samplerCreateInfo);
+    return sampler;
 }
 
 void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGraphResources& resources)
@@ -259,19 +299,62 @@ void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGrap
         return descriptorBufferWrite;
     };
 
+    auto MakeDescriptorSamplerWrite = [&descriptorSet](const vk::DescriptorImageInfo& info, uint32_t binding)
+    {
+        vk::WriteDescriptorSet descriptorSamplerWrite;
+        descriptorSamplerWrite
+            .setDstSet(descriptorSet)
+            .setDstBinding(binding)
+            .setDstArrayElement(0)
+            .setDescriptorType(vk::DescriptorType::eSampler)
+            .setImageInfo(info);
+        return descriptorSamplerWrite;
+    };
+
+    auto MakeDescriptorSampledImageWrite = [&descriptorSet](ArrayView<vk::DescriptorImageInfo> info, uint32_t binding)
+    {
+        vk::WriteDescriptorSet descriptorSampledImagesWrite;
+        descriptorSampledImagesWrite
+            .setDstSet(descriptorSet)
+            .setDstBinding(binding)
+            .setDstArrayElement(0)
+            .setDescriptorType(vk::DescriptorType::eSampledImage)
+            .setDescriptorCount((uint32_t)info.size())
+            .setPImageInfo(info.data());
+        return descriptorSampledImagesWrite;
+    };
+
+    vk::DescriptorImageInfo samplerInfo;
+    samplerInfo.setSampler(resources.TextureSampler);
+
+    std::array sampledImageInfos = {
+        vk::DescriptorImageInfo{
+            { },
+            resources.DragonMesh.Texture.GetNativeView(),
+            vk::ImageLayout::eShaderReadOnlyOptimal
+        },
+        vk::DescriptorImageInfo{
+            { },
+            resources.PlaneMesh.Texture.GetNativeView(),
+            vk::ImageLayout::eShaderReadOnlyOptimal
+        }
+    };
+
     std::array descriptorBufferInfos = {
         MakeDescriptorBufferInfo(resources.CameraUniform.UniformBuffer),
         MakeDescriptorBufferInfo(resources.ModelUniform.UniformBuffer),
         MakeDescriptorBufferInfo(resources.LightUniform.UniformBuffer),
     };
 
-    std::array descriptorBufferWrites = {
+    std::array descriptorWrites = {
         MakeDescriptorBufferWrite(descriptorBufferInfos[0], 0),
         MakeDescriptorBufferWrite(descriptorBufferInfos[1], 1),
         MakeDescriptorBufferWrite(descriptorBufferInfos[2], 2),
+        MakeDescriptorSamplerWrite(samplerInfo, 3),
+        MakeDescriptorSampledImageWrite(sampledImageInfos, 4),
     };
 
-    GetCurrentVulkanContext().GetDevice().updateDescriptorSets(descriptorBufferWrites, { });
+    GetCurrentVulkanContext().GetDevice().updateDescriptorSets(descriptorWrites, { });
 }
 
 template<typename T>
@@ -280,60 +363,117 @@ Uniform<T> CreateUniform()
     return { Buffer(sizeof(T), BufferUsageType::UNIFORM_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY), T{ } };
 }
 
-Buffer CreateVertexBuffer()
+Mesh CreateMesh(const std::vector<ModelLoader::Vertex>& vertices, const std::vector<InstanceData>& instances, ImageData texture)
 {
-    Buffer buffer;
-
-    auto model = ModelLoader::LoadFromObj("models/dragon.obj");
-    auto& vertexData = model.Shapes[0].Vertices;
-    size_t byteSize = vertexData.size() * sizeof(ModelLoader::Vertex);
-
-    std::cout << "loaded model with " << vertexData.size() << " vertices" << std::endl;
+    Mesh result;
 
     auto& vulkanContext = GetCurrentVulkanContext();
     auto& stageBuffer = vulkanContext.GetCurrentStageBuffer();
     auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
 
-    buffer.Init(byteSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
-    stageBuffer.LoadData((uint8_t*)vertexData.data(), byteSize, 0);
-    commandBuffer.Begin();
-    commandBuffer.CopyBuffer(
-        stageBuffer, vk::AccessFlagBits::eHostWrite, 
-        buffer, vk::AccessFlags{ },
-        vk::PipelineStageFlagBits::eHost
-    );
-    commandBuffer.End();
-    vulkanContext.SubmitCommandsImmediate(commandBuffer);
-    return buffer;
-}
+    size_t instanceBufferSize = instances.size() * sizeof(InstanceData);
+    size_t vertexBufferSize = vertices.size() * sizeof(ModelLoader::Vertex);
+    size_t textureSize = size_t(texture.Width * texture.Height * texture.Channels * texture.ChannelSize);
 
-Buffer CreateInstanceBuffer()
-{
-    std::array instances = {
-        Vector3(0.0f, 0.0f, -40.0f),
-        Vector3(0.0f, 0.0f, -20.0f),
-        Vector3(0.0f, 0.0f,   0.0f),
-        Vector3(0.0f, 0.0f,  20.0f),
-        Vector3(0.0f, 0.0f,  40.0f),
+    result.InstanceBuffer.Init(instanceBufferSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    result.VertexBuffer.Init(vertexBufferSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    result.Texture.Init(texture.Width, texture.Height, Format::R8G8B8A8_UNORM, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst, MemoryUsage::GPU_ONLY);
+
+    stageBuffer.LoadData((uint8_t*)instances.data(), instanceBufferSize, 0);
+    stageBuffer.LoadData((uint8_t*)vertices.data(), vertexBufferSize, instanceBufferSize);
+    stageBuffer.LoadData(texture.ByteData, textureSize, instanceBufferSize + vertexBufferSize);
+
+
+    commandBuffer.Begin();
+
+    commandBuffer.CopyBuffer(
+        stageBuffer, vk::AccessFlagBits::eHostWrite, 0,
+        result.InstanceBuffer, vk::AccessFlags{ }, 0,
+        vk::PipelineStageFlagBits::eHost,
+        instanceBufferSize
+    );
+    commandBuffer.CopyBuffer(
+        stageBuffer, vk::AccessFlagBits::eTransferRead, instanceBufferSize,
+        result.VertexBuffer, vk::AccessFlags{ }, 0,
+        vk::PipelineStageFlagBits::eTransfer,
+        vertexBufferSize
+    );
+    commandBuffer.CopyBufferToImage(
+        stageBuffer, vk::AccessFlagBits::eTransferRead, instanceBufferSize + vertexBufferSize,
+        result.Texture, vk::ImageLayout::eUndefined, vk::AccessFlags{ },
+        vk::PipelineStageFlagBits::eTransfer,
+        textureSize
+    );
+
+    vk::ImageSubresourceRange subresourceRange{
+        vk::ImageAspectFlagBits::eColor,
+        0, // base mip level
+        1, // level count
+        0, // base layer
+        1  // layer count
     };
 
-    Buffer buffer;
+    vk::ImageMemoryBarrier imageLayoutToShaderRead;
+    imageLayoutToShaderRead
+        .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+        .setDstAccessMask(vk::AccessFlagBits::eShaderRead)
+        .setOldLayout(vk::ImageLayout::eTransferDstOptimal)
+        .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+        .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+        .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+        .setImage(result.Texture.GetNativeHandle())
+        .setSubresourceRange(subresourceRange);
 
-    auto& vulkanContext = GetCurrentVulkanContext();
-    auto& stageBuffer = vulkanContext.GetCurrentStageBuffer();
-    auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
-
-    buffer.Init(instances.size() * sizeof(Vector3), BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
-    stageBuffer.LoadData((uint8_t*)instances.data(), instances.size() * sizeof(Vector3), 0);
-    commandBuffer.Begin();
-    commandBuffer.CopyBuffer(
-        stageBuffer, vk::AccessFlagBits::eHostWrite,
-        buffer, vk::AccessFlags{ },
-        vk::PipelineStageFlagBits::eHost
+    commandBuffer.GetNativeHandle().pipelineBarrier(
+        vk::PipelineStageFlagBits::eTransfer,
+        vk::PipelineStageFlagBits::eFragmentShader,
+        { },
+        { },
+        { },
+        imageLayoutToShaderRead
     );
+
     commandBuffer.End();
     vulkanContext.SubmitCommandsImmediate(commandBuffer);
-    return buffer;
+    return result;
+}
+
+Mesh CreatePlaneMesh()
+{
+    std::vector vertices = {
+        ModelLoader::Vertex{ { -500.0f, -500.0f, -0.01f }, { -15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelLoader::Vertex{ {  500.0f,  500.0f, -0.01f }, {  15.0f,  15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelLoader::Vertex{ { -500.0f,  500.0f, -0.01f }, { -15.0f,  15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelLoader::Vertex{ {  500.0f,  500.0f, -0.01f }, {  15.0f,  15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelLoader::Vertex{ { -500.0f, -500.0f, -0.01f }, { -15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelLoader::Vertex{ {  500.0f, -500.0f, -0.01f }, {  15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
+    };
+    std::vector instances = {
+        InstanceData{ { 0.0f, 0.0f, 0.0f }, 1 },
+    };
+
+    auto texture = ImageLoader::LoadFromFile("models/sand.png");
+
+    return CreateMesh(vertices, instances, texture);
+}
+
+Mesh CreateDragonMesh()
+{
+    std::vector instances = {
+        InstanceData{ { 0.0f, 0.0f, -40.0f }, 0 },
+        InstanceData{ { 0.0f, 0.0f, -20.0f }, 0 },
+        InstanceData{ { 0.0f, 0.0f,   0.0f }, 0 },
+        InstanceData{ { 0.0f, 0.0f,  20.0f }, 0 },
+        InstanceData{ { 0.0f, 0.0f,  40.0f }, 0 },
+    };
+
+    auto model = ModelLoader::LoadFromObj("models/dragon.obj");
+    auto& vertices = model.Shapes.front().Vertices;
+
+    std::array<uint8_t, 4> whiteColor = { 255, 255, 255, 255 };
+    ImageData texture{ whiteColor.data(), 1, 1, 4, sizeof(uint8_t) };
+
+    return CreateMesh(vertices, instances, texture);
 }
 
 struct Camera
@@ -345,7 +485,7 @@ struct Camera
     float RotationMovementSpeed = 0.01f;
     float AspectRatio = 16.0f / 9.0f;
     float ZNear = 0.001f;
-    float ZFar = 1000.0f;
+    float ZFar = 10000.0f;
 
     void Rotate(const Vector2& delta)
     {
@@ -418,8 +558,8 @@ int main()
 
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
-    auto vertexShader = CreateShaderModuleFromSource("main_vertex.glsl", ShaderType::VERTEX);
-    auto fragmentShader = CreateShaderModuleFromSource("main_fragment.glsl", ShaderType::FRAGMENT);
+    auto vertexShader = ShaderLoader::LoadFromSourceWithReflection("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
+    auto fragmentShader = ShaderLoader::LoadFromSourceWithReflection("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
 
     auto [descriptorSet, descriptorSetLayout] = CreateDescriptorSet();
 
@@ -427,13 +567,14 @@ int main()
         vertexShader.Data,
         fragmentShader.Data,
         vertexShader.VertexAttributes,
-        CreateVertexBuffer(),
-        CreateInstanceBuffer(),
         descriptorSet,
         descriptorSetLayout,
+        CreateSampler(),
         CreateUniform<CameraUniformData>(),
         CreateUniform<ModelUniformData>(),
         CreateUniform<LightUniformData>(),
+        CreateDragonMesh(),
+        CreatePlaneMesh(),
     };
 
     WriteDescriptorSet(renderGraphResources.DescriptorSet, renderGraphResources);
@@ -516,6 +657,7 @@ int main()
     Vulkan.GetDevice().waitIdle();
 
     Vulkan.GetDevice().destroyDescriptorSetLayout(renderGraphResources.DescriptorSetLayout);
+    Vulkan.GetDevice().destroySampler(renderGraphResources.TextureSampler);
 
     ImGuiVulkanContext::Destroy();
 
