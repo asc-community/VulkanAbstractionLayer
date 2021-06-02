@@ -53,3 +53,6 @@ int main()
     return 0;
 }
 ```
+
+## Some Examples
+![instanced-dragons](preview/instanced-dragons.png)
