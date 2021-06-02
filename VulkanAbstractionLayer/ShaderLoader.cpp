@@ -29,23 +29,14 @@
 #include "ShaderLoader.h"
 #include "VectorMath.h"
 
-#include "ShaderLang.h"
-#include "GlslangToSpv.h"
+#include <ShaderLang.h>
+#include <GlslangToSpv.h>
+#include <spirv_reflect.h>
 
 #include <fstream>
 
 namespace VulkanAbstractionLayer
 {
-    std::vector<uint32_t> ShaderLoader::LoadFromBinary(const std::string& filepath)
-    {
-        std::vector<uint32_t> result;
-        std::ifstream file(filepath, std::ios_base::binary);
-        auto binaryData = std::vector<char>(std::istreambuf_iterator(file), std::istreambuf_iterator<char>());
-        result.resize(binaryData.size() / sizeof(uint32_t));
-        std::copy((uint32_t*)binaryData.data(), (uint32_t*)(binaryData.data() + binaryData.size()), result.begin());
-        return result;
-    }
-
     EShLanguage ShaderTypeTable[] = {
         EShLangVertex,
         EShLangTessControl,
@@ -179,54 +170,13 @@ namespace VulkanAbstractionLayer
         };
     }
 
-    VertexAttribute GetVertexAttributeByReflectedType(const glslang::TType& type)
+    VertexAttribute GetVertexAttributeByReflectedType(const SpvReflectInterfaceVariable* type)
     {
-        auto baseType = type.getBasicType();
-
-        bool isFloating = baseType == glslang::EbtFloat;
-        bool isInteger = baseType == glslang::EbtInt;
-        bool isVector = type.isVector();
-        bool isMatrix = type.isMatrix();
-
-        if (isFloating && !isVector && !isMatrix)
-            return VertexAttribute::OfType<float>();
-        if (isInteger && !isVector && !isMatrix)
-            return VertexAttribute::OfType<int32_t>();
-
-        if (isFloating && isVector)
-        {
-            int vectorSize = type.getVectorSize();
-            if (vectorSize == 2)
-                return VertexAttribute::OfType<Vector2>();
-            if (vectorSize == 3)
-                return VertexAttribute::OfType<Vector3>();
-            if (vectorSize == 4)
-                return VertexAttribute::OfType<Vector4>();
-        }
-
-        if (isInteger && isVector)
-        {
-            int vectorSize = type.getVectorSize();
-            if (vectorSize == 2)
-                return VertexAttribute::OfType<VectorInt2>();
-            if (vectorSize == 3)
-                return VertexAttribute::OfType<VectorInt3>();
-            if (vectorSize == 4)
-                return VertexAttribute::OfType<VectorInt4>();
-        }
-
-        if (isFloating && isMatrix)
-        {
-            int matrixSize = type.getMatrixCols();
-            if (matrixSize == type.getMatrixRows() && matrixSize == 2)
-                return VertexAttribute::OfType<Matrix2x2>();
-            if (matrixSize == type.getMatrixRows() && matrixSize == 3)
-                return VertexAttribute::OfType<Matrix3x3>();
-            if (matrixSize == type.getMatrixRows() && matrixSize == 4)
-                return VertexAttribute::OfType<Matrix4x4>();
-        }
-
-        return VertexAttribute{ };
+        int32_t byteSize = type->numeric.scalar.width / 8;
+        int32_t componentCount = 1;
+        if (type->numeric.vector.component_count > 0) byteSize *= type->numeric.vector.component_count;
+        if (type->numeric.matrix.column_count > 0) componentCount = type->numeric.matrix.column_count;
+        return VertexAttribute{ FromNativeFormat((vk::Format)type->format), componentCount, byteSize };
     }
 
     std::vector<uint32_t> ShaderLoader::LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion)
@@ -234,10 +184,18 @@ namespace VulkanAbstractionLayer
         return ShaderLoader::LoadFromSourceWithReflection(filepath, type, language, vulkanVersion).Data;
     }
 
+    std::vector<uint32_t> ShaderLoader::LoadFromBinary(const std::string& filepath)
+    {
+        std::vector<uint32_t> result;
+        std::ifstream file(filepath, std::ios_base::binary);
+        auto binaryData = std::vector<char>(std::istreambuf_iterator(file), std::istreambuf_iterator<char>());
+        result.resize(binaryData.size() / sizeof(uint32_t));
+        std::copy((uint32_t*)binaryData.data(), (uint32_t*)(binaryData.data() + binaryData.size()), result.begin());
+        return result;
+    }
+
     ShaderLoader::LoadedShader ShaderLoader::LoadFromSourceWithReflection(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion)
     {
-        LoadedShader result;
-
         std::ifstream file(filepath);
         std::string source{ std::istreambuf_iterator(file), std::istreambuf_iterator<char>() };
         const char* rawSource = source.c_str();
@@ -250,26 +208,52 @@ namespace VulkanAbstractionLayer
         shader.setEnvClient(glslang::EShClient::EShClientVulkan, (glslang::EShTargetClientVersion)vulkanVersion);
         shader.setEnvTarget(glslang::EShTargetLanguage::EShTargetSpv, glslang::EShTargetLanguageVersion::EShTargetSpv_1_5);
         bool isParsed = shader.parse(&ResourceLimits, 100, false, EShMessages::EShMsgDefault);
-        if (!isParsed) return result;
+        if (!isParsed) return LoadedShader{ };
 
         glslang::TProgram program;
         program.addShader(&shader);
         bool isLinked = program.link(EShMessages::EShMsgDefault);
-        if (!isLinked) return result;
-
-        program.buildReflection();
-
-        std::vector<VertexAttribute> vertexAttributes;
-        for (int i = 0; i < program.getNumPipeInputs(); i++)
-        {
-            auto& attributeReflection = program.getPipeInput(i);
-            auto& type = *attributeReflection.getType();
-            vertexAttributes.push_back(GetVertexAttributeByReflectedType(type));
-        }
+        if (!isLinked) return LoadedShader{ };
 
         auto intermediate = program.getIntermediate(ShaderTypeTable[(size_t)type]);
-        glslang::GlslangToSpv(*intermediate, result.Data);
-        result.VertexAttributes = std::move(vertexAttributes);
+        std::vector<uint32_t> bytecode;
+        glslang::GlslangToSpv(*intermediate, bytecode);
+
+        return ShaderLoader::LoadFromMemoryWithReflection(bytecode);
+    }
+
+    ShaderLoader::LoadedShader ShaderLoader::LoadFromBinaryWithReflection(const std::string& filepath)
+    {
+        auto bytecode = ShaderLoader::LoadFromBinary(filepath);
+        return ShaderLoader::LoadFromMemoryWithReflection(bytecode);
+    }
+
+    ShaderLoader::LoadedShader ShaderLoader::LoadFromMemoryWithReflection(std::vector<uint32_t> bytecode)
+    {
+        LoadedShader result;
+        result.Data = std::move(bytecode);
+
+        SpvReflectResult spvResult;
+        SpvReflectShaderModule reflectedShader;
+        spvResult = spvReflectCreateShaderModule(result.Data.size() * sizeof(uint32_t), (const void*)result.Data.data(), &reflectedShader);
+        assert(spvResult == SPV_REFLECT_RESULT_SUCCESS);
+
+        uint32_t inputAttributeCount = 0;
+        spvResult = spvReflectEnumerateInputVariables(&reflectedShader, &inputAttributeCount, NULL);
+        assert(spvResult == SPV_REFLECT_RESULT_SUCCESS);
+        std::vector< SpvReflectInterfaceVariable*> inputAttributes(inputAttributeCount);
+        spvResult = spvReflectEnumerateInputVariables(&reflectedShader, &inputAttributeCount, inputAttributes.data());
+        assert(spvResult == SPV_REFLECT_RESULT_SUCCESS);
+
+        // sort in location order
+        std::sort(inputAttributes.begin(), inputAttributes.end(), [](const auto& v1, const auto& v2) { return v1->location < v2->location; });
+        for (const auto& inputAttribute : inputAttributes)
+        {
+            result.VertexAttributes.push_back(GetVertexAttributeByReflectedType(inputAttribute));
+        }
+
+        spvReflectDestroyShaderModule(&reflectedShader);
+
         return result;
     }
 }

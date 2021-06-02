@@ -28,30 +28,7 @@
 
 #pragma once
 
-#include <vector>
-#include <string>
+#include <tcb/span.hpp>
 
-#include "ShaderType.h"
-#include "ShaderReflection.h"
-
-namespace VulkanAbstractionLayer
-{
-    class ShaderLoader
-    {
-    public:
-        struct LoadedShader
-        {
-            using Bytecode = std::vector<uint32_t>;
-            using Attributes = std::vector<VertexAttribute>;
-
-            Bytecode Data;
-            Attributes VertexAttributes;
-        };
-
-        static std::vector<uint32_t> LoadFromBinary(const std::string& filepath);
-        static std::vector<uint32_t> LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion);
-        static LoadedShader LoadFromSourceWithReflection(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion);
-        static LoadedShader LoadFromBinaryWithReflection(const std::string& filepath);
-        static LoadedShader LoadFromMemoryWithReflection(std::vector<uint32_t> bytecode);
-    };
-}
+template <typename T>
+using ArrayView = tcb::span<T, tcb::dynamic_extent>;

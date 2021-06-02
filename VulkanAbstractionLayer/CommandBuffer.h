@@ -30,6 +30,8 @@
 
 #include <vulkan/vulkan.hpp>
 
+#include "ArrayUtils.h"
+
 namespace VulkanAbstractionLayer
 {
     class RenderPass;
@@ -68,7 +70,6 @@ namespace VulkanAbstractionLayer
         void EndRenderPass();
         void Draw(uint32_t vertexCount, uint32_t instanceCount) { this->Draw(vertexCount, instanceCount, 0, 0); }
         void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
-        void BindVertexBuffer(const Buffer& vertexBuffer);
         void BindIndexBufferInt32(const Buffer& indexBuffer);
         void BindIndexBufferInt16(const Buffer& indexBuffer);
         void SetViewport(const Viewport& viewport);
@@ -80,5 +81,14 @@ namespace VulkanAbstractionLayer
         void CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags);
         void CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, size_t sourceOffset, const Buffer& distance, vk::AccessFlags distanceFlags, size_t distanceOffset, vk::PipelineStageFlags pipelineFlags, size_t byteSize);
         void BlitImage(const Image& source, vk::ImageLayout sourceLayout, vk::AccessFlags sourceFlags, const Image& distance, vk::ImageLayout distanceLayout, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags, vk::Filter filter);
+    
+        template<typename... Buffers>
+        void BindVertexBuffers(const Buffers&... vertexBuffers)
+        {
+            constexpr size_t BufferCount = sizeof...(Buffers);
+            const vk::Buffer buffers[BufferCount] = { vertexBuffers.GetNativeHandle()... };
+            vk::DeviceSize offsets[BufferCount] = { 0 };
+            this->GetNativeHandle().bindVertexBuffers(0, BufferCount, buffers, offsets);
+        }
     };
 }

@@ -23,13 +23,15 @@ set(SOURCES
 "VulkanAbstractionLayer/ShaderLoader.cpp" 
 "VulkanAbstractionLayer/GraphicShader.cpp" 
 "VulkanAbstractionLayer/ShaderReflection.cpp"
+"VulkanAbstractionLayer/ModelLoader.cpp"
 "submodules/imgui/imgui.cpp"
 "submodules/imgui/imgui_demo.cpp"
 "submodules/imgui/imgui_draw.cpp"
 "submodules/imgui/imgui_tables.cpp"
 "submodules/imgui/imgui_widgets.cpp"
 "submodules/imgui/backends/imgui_impl_vulkan.cpp"
-"submodules/imgui/backends/imgui_impl_glfw.cpp" "VulkanAbstractionLayer/ModelLoader.cpp" )
+"submodules/imgui/backends/imgui_impl_glfw.cpp"
+"submodules/spirv-reflect/spirv_reflect.c")
 
 find_package(Vulkan REQUIRED FATAL_ERROR)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw)
@@ -40,6 +42,8 @@ set(IMGUI_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/imgui)
 set(GLSLANG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang/glslang/Public ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang/SPIRV)
 set(VMA_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/VulkanMemoryAllocator/src)
 set(TINYOBJLOADER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/tinyobjloader)
+set(SPAN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/span/include)
+set(SPIRV_REFLECT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/spirv-reflect)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
@@ -51,6 +55,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${VMA_INCLUDE_DIR}
     ${GLSLANG_INCLUDE_DIR}
     ${TINYOBJLOADER_INCLUDE_DIR}
+    ${SPAN_INCLUDE_DIR}
+    ${SPIRV_REFLECT_INCLUDE_DIR}
 )
 target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw MachineIndependent SPIRV)
 

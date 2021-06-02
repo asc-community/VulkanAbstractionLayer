@@ -3,6 +3,7 @@
 layout(location = 0) in vec3 iPosition;
 layout(location = 1) in vec2 iTexCoord;
 layout(location = 2) in vec3 iNormal;
+layout(location = 3) in vec3 iInstancePosition;
 
 out gl_PerVertex
 {
@@ -24,7 +25,7 @@ layout(set = 0, binding = 1) uniform uModelBuffer
 
 void main() 
 {
-    vec3 worldSpacePosition = uModel * iPosition;
+    vec3 worldSpacePosition = (uModel * iPosition) + iInstancePosition;
     gl_Position = uViewProjection * vec4(worldSpacePosition, 1.0);
     vTexCoord = iTexCoord; 
     vNormal = uModel * iNormal;

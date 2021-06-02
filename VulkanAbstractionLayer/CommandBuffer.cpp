@@ -70,11 +70,6 @@ namespace VulkanAbstractionLayer
         this->handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
     }
 
-    void CommandBuffer::BindVertexBuffer(const Buffer& vertexBuffer)
-    {
-        this->handle.bindVertexBuffers(0, vertexBuffer.GetNativeHandle(), { 0 });
-    }
-
     void CommandBuffer::BindIndexBufferInt32(const Buffer& indexBuffer)
     {
         this->handle.bindIndexBuffer(indexBuffer.GetNativeHandle(), 0, vk::IndexType::eUint32);

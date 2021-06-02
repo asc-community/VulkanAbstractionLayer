@@ -57,11 +57,13 @@ struct RenderGraphResources
     std::vector<uint32_t> FragmentShaderBytecode;
     std::vector<VertexAttribute> VertexAttributes;
     Buffer VertexBuffer;
+    Buffer InstanceBuffer;
     vk::DescriptorSet DescriptorSet;
     vk::DescriptorSetLayout DescriptorSetLayout;
     Uniform<CameraUniformData> CameraUniform;
     Uniform<ModelUniformData> ModelUniform;
     Uniform<LightUniformData> LightUniform;
+    std::vector<Vector3> InstancePositions;
 };
 
 auto CreateShaderModuleFromSource(const std::filesystem::path& filename, ShaderType type)
@@ -96,8 +98,12 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                 {
                     VertexBinding{
                         VertexBinding::Rate::PER_VERTEX,
-                        VertexBinding::BindingRangeAll
-                    }
+                        3,
+                    },
+                    VertexBinding{
+                        VertexBinding::Rate::PER_INSTANCE,
+                        1
+                    },
                 }
             })
             .AddWriteOnlyColorAttachment("Output"_id, ClearColor{ 0.8f, 0.6f, 0.0f, 1.0f })
@@ -165,8 +171,10 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                         { }
                     );
 
-                    state.Commands.BindVertexBuffer(resources.VertexBuffer);
-                    state.Commands.Draw((uint32_t)resources.VertexBuffer.GetByteSize() / sizeof(ModelLoader::Vertex), 1);
+                    size_t vertexCount = resources.VertexBuffer.GetByteSize() / sizeof(ModelLoader::Vertex);
+
+                    state.Commands.BindVertexBuffers(resources.VertexBuffer, resources.InstanceBuffer);
+                    state.Commands.Draw((uint32_t)vertexCount, 5);
                 }
             )
         )
@@ -299,9 +307,38 @@ Buffer CreateVertexBuffer()
     return buffer;
 }
 
+Buffer CreateInstanceBuffer()
+{
+    std::array instances = {
+        Vector3(0.0f, 0.0f, -40.0f),
+        Vector3(0.0f, 0.0f, -20.0f),
+        Vector3(0.0f, 0.0f,   0.0f),
+        Vector3(0.0f, 0.0f,  20.0f),
+        Vector3(0.0f, 0.0f,  40.0f),
+    };
+
+    Buffer buffer;
+
+    auto& vulkanContext = GetCurrentVulkanContext();
+    auto& stageBuffer = vulkanContext.GetCurrentStageBuffer();
+    auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
+
+    buffer.Init(instances.size() * sizeof(Vector3), BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    stageBuffer.LoadData((uint8_t*)instances.data(), instances.size() * sizeof(Vector3), 0);
+    commandBuffer.Begin();
+    commandBuffer.CopyBuffer(
+        stageBuffer, vk::AccessFlagBits::eHostWrite,
+        buffer, vk::AccessFlags{ },
+        vk::PipelineStageFlagBits::eHost
+    );
+    commandBuffer.End();
+    vulkanContext.SubmitCommandsImmediate(commandBuffer);
+    return buffer;
+}
+
 struct Camera
 {
-    Vector3 Position{ 10.0f, 12.0f, -27.0f };
+    Vector3 Position{ 40.0f, 25.0f, -90.0f };
     Vector2 Rotation{ 5.74f, 0.0f };
     float Fov = 65.0f;
     float MovementSpeed = 0.5f;
@@ -391,6 +428,7 @@ int main()
         fragmentShader.Data,
         vertexShader.VertexAttributes,
         CreateVertexBuffer(),
+        CreateInstanceBuffer(),
         descriptorSet,
         descriptorSetLayout,
         CreateUniform<CameraUniformData>(),
