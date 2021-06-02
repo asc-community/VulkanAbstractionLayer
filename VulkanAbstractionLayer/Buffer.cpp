@@ -89,14 +89,14 @@ namespace VulkanAbstractionLayer
         if (this->mappedMemory == nullptr)
         {
             (void)this->MapMemory();
-            std::memcpy((void*)this->mappedMemory, (const void*)(data + offset), byteSize);
-            this->FlushMemory();
+            std::memcpy((void*)(this->mappedMemory + offset), (const void*)data, byteSize);
+            this->FlushMemory(byteSize, offset);
             this->UnmapMemory();
         }
         else // do not do map-unmap if memory was already mapped externally
         {
-            std::memcpy((void*)this->mappedMemory, (const void*)(data + offset), byteSize);
-            this->FlushMemory();
+            std::memcpy((void*)(this->mappedMemory + offset), (const void*)data, byteSize);
+            this->FlushMemory(byteSize, offset);
         }
     }
 

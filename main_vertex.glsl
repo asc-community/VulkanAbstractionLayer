@@ -12,9 +12,13 @@ out gl_PerVertex
 layout(location = 0) out vec2 vTexCoord;
 layout(location = 1) out vec3 vNormal;
 
-layout(set = 0, binding = 1) uniform uCameraBuffer
+layout(set = 0, binding = 0) uniform uCameraBuffer
 {
     mat4 uViewProjection;
+};
+
+layout(set = 0, binding = 1) uniform uModelBuffer
+{
     mat3 uModel;
 };
 
@@ -23,5 +27,5 @@ void main()
     vec3 worldSpacePosition = uModel * iPosition;
     gl_Position = uViewProjection * vec4(worldSpacePosition, 1.0);
     vTexCoord = iTexCoord; 
-    vNormal = mat3(uModel) * iNormal;
+    vNormal = uModel * iNormal;
 }

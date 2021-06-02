@@ -297,33 +297,33 @@ namespace VulkanAbstractionLayer
 
     void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags)
     {
-        this->CopyBuffer(source, sourceFlags, distance, distanceFlags, pipelineFlags, distance.GetByteSize(), 0);
+        this->CopyBuffer(source, sourceFlags, 0, distance, distanceFlags, 0, pipelineFlags, distance.GetByteSize());
     }
 
-    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags, size_t size, size_t offset)
+    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, size_t sourceOffset, const Buffer& distance, vk::AccessFlags distanceFlags, size_t distanceOffset, vk::PipelineStageFlags pipelineFlags, size_t byteSize)
     {
-        assert(source.GetByteSize() >= size);
-        assert(distance.GetByteSize() >= size + offset);
+        assert(source.GetByteSize() >= sourceOffset + byteSize);
+        assert(distance.GetByteSize() >= distanceOffset + byteSize);
 
         vk::BufferMemoryBarrier toTransferSrcBarrier;
         toTransferSrcBarrier
-            .setSrcAccessMask(distanceFlags)
+            .setSrcAccessMask(sourceFlags)
             .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
             .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
             .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
             .setBuffer(source.GetNativeHandle())
-            .setSize(size)
-            .setOffset(0);
+            .setSize(byteSize)
+            .setOffset(sourceOffset);
 
         vk::BufferMemoryBarrier toTransferDstBarrier;
         toTransferDstBarrier
-            .setSrcAccessMask(sourceFlags)
+            .setSrcAccessMask(distanceFlags)
             .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
             .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
             .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setBuffer(source.GetNativeHandle())
-            .setSize(size)
-            .setOffset(0);
+            .setBuffer(distance.GetNativeHandle())
+            .setSize(byteSize)
+            .setOffset(distanceOffset);
 
         std::array preCopyBarriers = { toTransferSrcBarrier, toTransferDstBarrier };
         this->handle.pipelineBarrier(
@@ -337,9 +337,9 @@ namespace VulkanAbstractionLayer
 
         vk::BufferCopy bufferCopyInfo;
         bufferCopyInfo
-            .setDstOffset(offset)
-            .setSize(size)
-            .setSrcOffset(0);
+            .setDstOffset(distanceOffset)
+            .setSize(byteSize)
+            .setSrcOffset(sourceOffset);
 
         this->handle.copyBuffer(source.GetNativeHandle(), distance.GetNativeHandle(), bufferCopyInfo);
     }
