@@ -80,18 +80,6 @@ struct RenderGraphResources
     Mesh PlaneMesh;
 };
 
-vk::ShaderModule CreateShaderModuleFromBinary(const std::string& filename, ShaderType type)
-{
-    (void)type;
-    auto bytecode = ShaderLoader::LoadFromBinary(filename);
-    vk::ShaderModuleCreateInfo createInfo;
-    createInfo
-        .setPCode(bytecode.data())
-        .setCodeSize(bytecode.size() * sizeof(uint32_t));
-
-    return GetCurrentVulkanContext().GetDevice().createShaderModule(createInfo);
-}
-
 RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const VulkanContext& context)
 {
     RenderGraphBuilder renderGraphBuilder;

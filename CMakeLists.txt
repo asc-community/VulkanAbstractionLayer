@@ -5,9 +5,9 @@ project(VulkanAbstractionLayer)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(PROJECT_NAME, VulkanAbstractionLayer)
+option(VULKAN_ABSTRACTION_LAYER_BUILD_EXAMPLES "build examples" ON)
+
 set(SOURCES 
-"EntryPoint.cpp"
 "VulkanAbstractionLayer/Window.cpp"
 "VulkanAbstractionLayer/VulkanContext.cpp" 
 "VulkanAbstractionLayer/VulkanSurface.cpp" 
@@ -47,9 +47,10 @@ set(SPAN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/span/include)
 set(SPIRV_REFLECT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/spirv-reflect)
 set(STB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/stb)
 
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_library(${CMAKE_PROJECT_NAME} STATIC ${SOURCES})
 
-target_include_directories(${PROJECT_NAME} PUBLIC
+set(VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${Vulkan_INCLUDE_DIR} 
     ${GLFW_INCLUDE_DIR} 
     ${GLM_INCLUDE_DIR} 
@@ -61,6 +62,13 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${SPIRV_REFLECT_INCLUDE_DIR}
     ${STB_INCLUDE_DIR}
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw MachineIndependent SPIRV)
 
-target_compile_definitions(${PROJECT_NAME} PUBLIC -D APPLICATION_WORKING_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}")
+set(VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR ${VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR} PARENT_SCOPE)
+
+target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC ${VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR})
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw MachineIndependent SPIRV)
+
+# examples
+if(VULKAN_ABSTRACTION_LAYER_BUILD_EXAMPLES)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
+endif()

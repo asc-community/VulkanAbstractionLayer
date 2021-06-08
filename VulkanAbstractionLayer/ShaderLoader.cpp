@@ -174,8 +174,15 @@ namespace VulkanAbstractionLayer
     {
         int32_t byteSize = type->numeric.scalar.width / 8;
         int32_t componentCount = 1;
-        if (type->numeric.vector.component_count > 0) byteSize *= type->numeric.vector.component_count;
-        if (type->numeric.matrix.column_count > 0) componentCount = type->numeric.matrix.column_count;
+
+        if (type->numeric.vector.component_count > 0) 
+            byteSize *= type->numeric.vector.component_count;
+        else if (type->numeric.matrix.row_count > 0)
+            byteSize *= type->numeric.matrix.row_count;
+
+        if (type->numeric.matrix.column_count > 0) 
+            componentCount = type->numeric.matrix.column_count;
+
         return VertexAttribute{ FromNativeFormat((vk::Format)type->format), componentCount, byteSize };
     }
 
