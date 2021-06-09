@@ -30,11 +30,19 @@
 
 #include "ShaderType.h"
 #include "ShaderReflection.h"
+#include "ShaderLoader.h"
+
 #include <vulkan/vulkan.hpp>
 
 namespace VulkanAbstractionLayer
 {
     class VulkanContext;
+
+    struct UniformsPerShaderStage
+    {
+        std::vector<Uniform> Uniforms;
+        vk::ShaderStageFlags Stage;
+    };
 
     class GraphicShader
     {
@@ -42,17 +50,14 @@ namespace VulkanAbstractionLayer
         vk::ShaderModule fragmentShader;
 
         std::vector<VertexAttribute> vertexAttributes;
-        vk::DescriptorSetLayout descriptorSetLayout;
+        std::vector<UniformsPerShaderStage> uniforms;
 
         void Destroy();
     public:
         GraphicShader() = default;
-        GraphicShader(
-            std::vector<uint32_t> vertexBytecode, std::vector<uint32_t> fragmentBytecode, 
-            std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout);
+        GraphicShader(const ShaderData& vertex, const ShaderData& fragment);
 
-        void Init(std::vector<uint32_t> vertexBytecode, std::vector<uint32_t> fragmentBytecode,
-            std::vector<VertexAttribute> vertexAttributes, vk::DescriptorSetLayout descriptorSetLayout);
+        void Init(const ShaderData& vertex, const ShaderData& fragment);
 
         GraphicShader(const GraphicShader& other) = delete;
         GraphicShader(GraphicShader&& other) noexcept;
@@ -61,7 +66,7 @@ namespace VulkanAbstractionLayer
         ~GraphicShader();
 
         const auto& GetVertexAttributes() const { return this->vertexAttributes; }
-        const auto& GetDescriptorSetLayout() const { return this->descriptorSetLayout; }
+        const auto& GetUniforms() const { return this->uniforms; }
 
         const vk::ShaderModule& GetNativeShader(ShaderType type) const
         {

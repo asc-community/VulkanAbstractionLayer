@@ -167,6 +167,22 @@ namespace VulkanAbstractionLayer
         vk::Format::eD32SfloatS8Uint,
     };
 
+    vk::DescriptorType DescriptorTypeTable[] = {
+        vk::DescriptorType::eSampler,
+        vk::DescriptorType::eCombinedImageSampler,
+        vk::DescriptorType::eSampledImage,
+        vk::DescriptorType::eStorageImage,
+        vk::DescriptorType::eUniformTexelBuffer,
+        vk::DescriptorType::eStorageTexelBuffer,
+        vk::DescriptorType::eUniformBuffer,
+        vk::DescriptorType::eStorageBuffer,
+        vk::DescriptorType::eUniformBufferDynamic,
+        vk::DescriptorType::eStorageBufferDynamic,
+        vk::DescriptorType::eInputAttachment,
+        vk::DescriptorType::eInlineUniformBlockEXT,
+        vk::DescriptorType::eAccelerationStructureKHR,
+    };
+
     template<>
     VertexAttribute VertexAttribute::OfType<float>()
     {
@@ -234,18 +250,35 @@ namespace VulkanAbstractionLayer
     }
 
 
-    const vk::Format& ToNativeFormat(Format format)
+    const vk::Format& ToNative(Format format)
     {
         return FormatTable[(size_t)format];
     }
 
-    Format FromNativeFormat(const vk::Format& format)
+    Format FromNative(const vk::Format& format)
     {
         for (size_t i = 0; i < std::size(FormatTable); i++)
         {
             if (FormatTable[i] == format)
                 return (Format)i;
         }
-        return Format::UNDEFINED;
+        assert(false);
+        return (Format)0;
+    }
+
+    const vk::DescriptorType& ToNative(UniformType type)
+    {
+        return DescriptorTypeTable[(size_t)type];
+    }
+
+    UniformType FromNative(const vk::DescriptorType& type)
+    {
+        for (size_t i = 0; i < std::size(DescriptorTypeTable); i++)
+        {
+            if (DescriptorTypeTable[i] == type)
+                return (UniformType)i;
+        }
+        assert(false);
+        return (UniformType)0;
     }
 }

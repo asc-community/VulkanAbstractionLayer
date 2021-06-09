@@ -52,10 +52,10 @@ struct LightUniformData
 };
 
 template<typename T>
-struct Uniform
+struct UniformData
 {
-    Buffer UniformBuffer;
-    T UniformData;
+    Buffer Buffer;
+    T Data;
 };
 
 struct Mesh
@@ -67,15 +67,12 @@ struct Mesh
 
 struct RenderGraphResources
 {
-    std::vector<uint32_t> VertexShaderBytecode;
-    std::vector<uint32_t> FragmentShaderBytecode;
-    std::vector<VertexAttribute> VertexAttributes;
-    vk::DescriptorSet DescriptorSet;
-    vk::DescriptorSetLayout DescriptorSetLayout;
+    ShaderData OpaquePassVertexShader;
+    ShaderData OpaquePassFragmentShader;
     vk::Sampler TextureSampler;
-    Uniform<CameraUniformData> CameraUniform;
-    Uniform<ModelUniformData> ModelUniform;
-    Uniform<LightUniformData> LightUniform;
+    UniformData<CameraUniformData> CameraUniform;
+    UniformData<ModelUniformData> ModelUniform;
+    UniformData<LightUniformData> LightUniform;
     Mesh DragonMesh;
     Mesh PlaneMesh;
 };
@@ -84,13 +81,11 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddRenderPass(RenderPassBuilder{ "TrianglePass"_id }
+        .AddRenderPass(RenderPassBuilder{ "OpaquePass"_id }
             .SetPipeline(GraphicPipeline{
                 GraphicShader{
-                    resources.VertexShaderBytecode,
-                    resources.FragmentShaderBytecode,
-                    resources.VertexAttributes,
-                    resources.DescriptorSetLayout,
+                    resources.OpaquePassVertexShader,
+                    resources.OpaquePassFragmentShader,
                 },
                 {
                     VertexBinding{
@@ -125,12 +120,12 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     {
                         auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
 
-                        size_t dataSize = sizeof(uniform.UniformData);
+                        size_t dataSize = sizeof(uniform.Data);
 
-                        stageBuffer.LoadData((uint8_t*)&uniform.UniformData, dataSize, stageBufferOffset);
+                        stageBuffer.LoadData((uint8_t*)&uniform.Data, dataSize, stageBufferOffset);
                         state.Commands.CopyBuffer(
                             stageBuffer, vk::AccessFlagBits::eHostWrite, stageBufferOffset,
-                            uniform.UniformBuffer, vk::AccessFlagBits::eUniformRead, 0,
+                            uniform.Buffer, vk::AccessFlagBits::eUniformRead, 0,
                             vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eVertexShader,
                             dataSize
                         );
@@ -147,9 +142,9 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                         { }, // dependency flags
                         { }, // memory barriers
                         {
-                            MakeBarrier(resources.CameraUniform.UniformBuffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
-                            MakeBarrier(resources.ModelUniform.UniformBuffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
-                            MakeBarrier(resources.LightUniform.UniformBuffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
+                            MakeBarrier(resources.CameraUniform.Buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
+                            MakeBarrier(resources.ModelUniform.Buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
+                            MakeBarrier(resources.LightUniform.Buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
                         },
                         { } // image barriers
                     );
@@ -160,20 +155,12 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     auto& output = state.GetOutputColorAttachment(0);
                     state.Commands.SetRenderArea(output);
 
-                    state.Commands.GetNativeHandle().bindDescriptorSets(
-                        vk::PipelineBindPoint::eGraphics, 
-                        state.PipelineLayout,
-                        0, 
-                        resources.DescriptorSet,
-                        { }
-                    );
-
-                    size_t dragonVertexCount = resources.DragonMesh.VertexBuffer.GetByteSize() / sizeof(ModelLoader::Vertex);
+                    size_t dragonVertexCount = resources.DragonMesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
                     size_t dragonInstanceCount = resources.DragonMesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
                     state.Commands.BindVertexBuffers(resources.DragonMesh.VertexBuffer, resources.DragonMesh.InstanceBuffer);
                     state.Commands.Draw((uint32_t)dragonVertexCount, (uint32_t)dragonInstanceCount);
 
-                    size_t planeVertexCount = resources.PlaneMesh.VertexBuffer.GetByteSize() / sizeof(ModelLoader::Vertex);
+                    size_t planeVertexCount = resources.PlaneMesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
                     size_t planeInstanceCount = resources.PlaneMesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
                     state.Commands.BindVertexBuffers(resources.PlaneMesh.VertexBuffer, resources.PlaneMesh.InstanceBuffer);
                     state.Commands.Draw((uint32_t)planeVertexCount, (uint32_t)planeInstanceCount);
@@ -194,59 +181,6 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
         .SetOutputName("Output"_id);
 
     return renderGraphBuilder.Build();
-}
-
-auto CreateDescriptorSet()
-{
-    auto& vulkan = GetCurrentVulkanContext();
-
-    std::array layoutBindings = {
-        vk::DescriptorSetLayoutBinding {
-            0,
-            vk::DescriptorType::eUniformBuffer,
-            1,
-            vk::ShaderStageFlagBits::eVertex
-        },
-        vk::DescriptorSetLayoutBinding {
-            1,
-            vk::DescriptorType::eUniformBuffer,
-            1,
-            vk::ShaderStageFlagBits::eVertex
-        },
-        vk::DescriptorSetLayoutBinding {
-            2,
-            vk::DescriptorType::eUniformBuffer,
-            1,
-            vk::ShaderStageFlagBits::eFragment
-        },
-        vk::DescriptorSetLayoutBinding {
-            3,
-            vk::DescriptorType::eSampler,
-            1,
-            vk::ShaderStageFlagBits::eFragment
-        },
-        vk::DescriptorSetLayoutBinding {
-            4,
-            vk::DescriptorType::eSampledImage,
-            2,
-            vk::ShaderStageFlagBits::eFragment
-        }
-    };
-
-    vk::DescriptorSetLayoutCreateInfo createInfo;
-    createInfo.setBindings(layoutBindings);
-
-    auto descriptorSetLayout = vulkan.GetDevice().createDescriptorSetLayout(createInfo);
-
-    vk::DescriptorSetAllocateInfo allocationInfo;
-    allocationInfo
-        .setDescriptorPool(vulkan.GetDescriptorPool())
-        .setSetLayouts(descriptorSetLayout);
-
-
-    auto descriptorSet = vulkan.GetDevice().allocateDescriptorSets(allocationInfo).front();
-    
-    return std::pair{ descriptorSet, descriptorSetLayout };
 }
 
 vk::Sampler CreateSampler()
@@ -329,9 +263,9 @@ void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGrap
     };
 
     std::array descriptorBufferInfos = {
-        MakeDescriptorBufferInfo(resources.CameraUniform.UniformBuffer),
-        MakeDescriptorBufferInfo(resources.ModelUniform.UniformBuffer),
-        MakeDescriptorBufferInfo(resources.LightUniform.UniformBuffer),
+        MakeDescriptorBufferInfo(resources.CameraUniform.Buffer),
+        MakeDescriptorBufferInfo(resources.ModelUniform.Buffer),
+        MakeDescriptorBufferInfo(resources.LightUniform.Buffer),
     };
 
     std::array descriptorWrites = {
@@ -346,12 +280,12 @@ void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGrap
 }
 
 template<typename T>
-Uniform<T> CreateUniform()
+UniformData<T> CreateUniform()
 {
     return { Buffer(sizeof(T), BufferUsageType::UNIFORM_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY), T{ } };
 }
 
-Mesh CreateMesh(const std::vector<ModelLoader::Vertex>& vertices, const std::vector<InstanceData>& instances, ImageData texture)
+Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vector<InstanceData>& instances, ImageData texture)
 {
     Mesh result;
 
@@ -360,7 +294,7 @@ Mesh CreateMesh(const std::vector<ModelLoader::Vertex>& vertices, const std::vec
     auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
 
     size_t instanceBufferSize = instances.size() * sizeof(InstanceData);
-    size_t vertexBufferSize = vertices.size() * sizeof(ModelLoader::Vertex);
+    size_t vertexBufferSize = vertices.size() * sizeof(ModelData::Vertex);
     size_t textureSize = size_t(texture.Width * texture.Height * texture.Channels * texture.ChannelSize);
 
     result.InstanceBuffer.Init(instanceBufferSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
@@ -429,12 +363,12 @@ Mesh CreateMesh(const std::vector<ModelLoader::Vertex>& vertices, const std::vec
 Mesh CreatePlaneMesh()
 {
     std::vector vertices = {
-        ModelLoader::Vertex{ { -500.0f, -500.0f, -0.01f }, { -15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
-        ModelLoader::Vertex{ {  500.0f,  500.0f, -0.01f }, {  15.0f,  15.0f }, { 0.0f, 0.0f, 1.0f } },
-        ModelLoader::Vertex{ { -500.0f,  500.0f, -0.01f }, { -15.0f,  15.0f }, { 0.0f, 0.0f, 1.0f } },
-        ModelLoader::Vertex{ {  500.0f,  500.0f, -0.01f }, {  15.0f,  15.0f }, { 0.0f, 0.0f, 1.0f } },
-        ModelLoader::Vertex{ { -500.0f, -500.0f, -0.01f }, { -15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
-        ModelLoader::Vertex{ {  500.0f, -500.0f, -0.01f }, {  15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelData::Vertex{ { -500.0f, -500.0f, -0.01f }, { -15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelData::Vertex{ {  500.0f,  500.0f, -0.01f }, {  15.0f,  15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelData::Vertex{ { -500.0f,  500.0f, -0.01f }, { -15.0f,  15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelData::Vertex{ {  500.0f,  500.0f, -0.01f }, {  15.0f,  15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelData::Vertex{ { -500.0f, -500.0f, -0.01f }, { -15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
+        ModelData::Vertex{ {  500.0f, -500.0f, -0.01f }, {  15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
     };
     std::vector instances = {
         InstanceData{ { 0.0f, 0.0f, 0.0f }, 1 },
@@ -546,17 +480,12 @@ int main()
 
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
-    auto vertexShader = ShaderLoader::LoadFromSourceWithReflection("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
-    auto fragmentShader = ShaderLoader::LoadFromSourceWithReflection("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
-
-    auto [descriptorSet, descriptorSetLayout] = CreateDescriptorSet();
+    auto vertexShader = ShaderLoader::LoadFromSource("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
+    auto fragmentShader = ShaderLoader::LoadFromSource("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
 
     RenderGraphResources renderGraphResources{
-        vertexShader.Data,
-        fragmentShader.Data,
-        vertexShader.VertexAttributes,
-        descriptorSet,
-        descriptorSetLayout,
+        std::move(vertexShader),
+        std::move(fragmentShader),
         CreateSampler(),
         CreateUniform<CameraUniformData>(),
         CreateUniform<ModelUniformData>(),
@@ -565,9 +494,9 @@ int main()
         CreatePlaneMesh(),
     };
 
-    WriteDescriptorSet(renderGraphResources.DescriptorSet, renderGraphResources);
-
     RenderGraph renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
+
+    WriteDescriptorSet(renderGraph.GetNodeByName("OpaquePass"_id).Pass.GetDescriptorSet(), renderGraphResources);
 
     Camera camera;
     Vector3 modelRotation{ -HalfPi, Pi, 0.0f };
@@ -629,10 +558,10 @@ int main()
             ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
             ImGui::End();
 
-            renderGraphResources.CameraUniform.UniformData.Matrix = camera.GetMatrix();
-            renderGraphResources.ModelUniform.UniformData.Matrix = MakeRotationMatrix(modelRotation);
-            renderGraphResources.LightUniform.UniformData.Color = lightColor;
-            renderGraphResources.LightUniform.UniformData.Direction = Normalize(lightDirection);
+            renderGraphResources.CameraUniform.Data.Matrix = camera.GetMatrix();
+            renderGraphResources.ModelUniform.Data.Matrix = MakeRotationMatrix(modelRotation);
+            renderGraphResources.LightUniform.Data.Color = lightColor;
+            renderGraphResources.LightUniform.Data.Direction = Normalize(lightDirection);
 
             renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());
@@ -644,7 +573,6 @@ int main()
 
     Vulkan.GetDevice().waitIdle();
 
-    Vulkan.GetDevice().destroyDescriptorSetLayout(renderGraphResources.DescriptorSetLayout);
     Vulkan.GetDevice().destroySampler(renderGraphResources.TextureSampler);
 
     ImGuiVulkanContext::Destroy();

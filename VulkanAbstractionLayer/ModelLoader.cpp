@@ -33,9 +33,9 @@
 
 namespace VulkanAbstractionLayer
 {
-    ModelLoader::LoadedModel ModelLoader::LoadFromObj(const std::string& filepath)
+    ModelData ModelLoader::LoadFromObj(const std::string& filepath)
     {
-        LoadedModel result;
+        ModelData result;
 
         tinyobj::ObjReaderConfig reader_config;
         tinyobj::ObjReader reader;

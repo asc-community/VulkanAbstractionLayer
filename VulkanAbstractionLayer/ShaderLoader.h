@@ -36,22 +36,23 @@
 
 namespace VulkanAbstractionLayer
 {
+    struct ShaderData
+    {
+        using BytecodeSPIRV = std::vector<uint32_t>;
+        using Attributes = std::vector<VertexAttribute>;
+        using UniformBlock = std::vector<Uniform>;
+        using Uniforms = std::vector<UniformBlock>;
+
+        BytecodeSPIRV Bytecode;
+        Attributes InputAttributes;
+        Uniforms UniformBlocks;
+    };
+
     class ShaderLoader
     {
     public:
-        struct LoadedShader
-        {
-            using Bytecode = std::vector<uint32_t>;
-            using Attributes = std::vector<VertexAttribute>;
-
-            Bytecode Data;
-            Attributes VertexAttributes;
-        };
-
-        static std::vector<uint32_t> LoadFromBinary(const std::string& filepath);
-        static std::vector<uint32_t> LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion);
-        static LoadedShader LoadFromSourceWithReflection(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion);
-        static LoadedShader LoadFromBinaryWithReflection(const std::string& filepath);
-        static LoadedShader LoadFromMemoryWithReflection(std::vector<uint32_t> bytecode);
+        static ShaderData LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion);
+        static ShaderData LoadFromBinary(const std::string& filepath);
+        static ShaderData LoadFromMemory(std::vector<uint32_t> bytecode);
     };
 }

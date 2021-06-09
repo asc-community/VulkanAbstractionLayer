@@ -183,25 +183,20 @@ namespace VulkanAbstractionLayer
         if (type->numeric.matrix.column_count > 0) 
             componentCount = type->numeric.matrix.column_count;
 
-        return VertexAttribute{ FromNativeFormat((vk::Format)type->format), componentCount, byteSize };
+        return VertexAttribute{ FromNative((vk::Format)type->format), componentCount, byteSize };
     }
 
-    std::vector<uint32_t> ShaderLoader::LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion)
+    ShaderData ShaderLoader::LoadFromBinary(const std::string& filepath)
     {
-        return ShaderLoader::LoadFromSourceWithReflection(filepath, type, language, vulkanVersion).Data;
-    }
-
-    std::vector<uint32_t> ShaderLoader::LoadFromBinary(const std::string& filepath)
-    {
-        std::vector<uint32_t> result;
+        std::vector<uint32_t> bytecode;
         std::ifstream file(filepath, std::ios_base::binary);
         auto binaryData = std::vector<char>(std::istreambuf_iterator(file), std::istreambuf_iterator<char>());
-        result.resize(binaryData.size() / sizeof(uint32_t));
-        std::copy((uint32_t*)binaryData.data(), (uint32_t*)(binaryData.data() + binaryData.size()), result.begin());
-        return result;
+        bytecode.resize(binaryData.size() / sizeof(uint32_t));
+        std::copy((uint32_t*)binaryData.data(), (uint32_t*)(binaryData.data() + binaryData.size()), bytecode.begin());
+        return ShaderLoader::LoadFromMemory(std::move(bytecode));
     }
 
-    ShaderLoader::LoadedShader ShaderLoader::LoadFromSourceWithReflection(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion)
+    ShaderData ShaderLoader::LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion)
     {
         std::ifstream file(filepath);
         std::string source{ std::istreambuf_iterator(file), std::istreambuf_iterator<char>() };
@@ -215,40 +210,34 @@ namespace VulkanAbstractionLayer
         shader.setEnvClient(glslang::EShClient::EShClientVulkan, (glslang::EShTargetClientVersion)vulkanVersion);
         shader.setEnvTarget(glslang::EShTargetLanguage::EShTargetSpv, glslang::EShTargetLanguageVersion::EShTargetSpv_1_5);
         bool isParsed = shader.parse(&ResourceLimits, 100, false, EShMessages::EShMsgDefault);
-        if (!isParsed) return LoadedShader{ };
+        if (!isParsed) return ShaderData{ };
 
         glslang::TProgram program;
         program.addShader(&shader);
         bool isLinked = program.link(EShMessages::EShMsgDefault);
-        if (!isLinked) return LoadedShader{ };
+        if (!isLinked) return ShaderData{ };
 
         auto intermediate = program.getIntermediate(ShaderTypeTable[(size_t)type]);
         std::vector<uint32_t> bytecode;
         glslang::GlslangToSpv(*intermediate, bytecode);
 
-        return ShaderLoader::LoadFromMemoryWithReflection(bytecode);
+        return ShaderLoader::LoadFromMemory(std::move(bytecode));
     }
 
-    ShaderLoader::LoadedShader ShaderLoader::LoadFromBinaryWithReflection(const std::string& filepath)
+    ShaderData ShaderLoader::LoadFromMemory(std::vector<uint32_t> bytecode)
     {
-        auto bytecode = ShaderLoader::LoadFromBinary(filepath);
-        return ShaderLoader::LoadFromMemoryWithReflection(bytecode);
-    }
-
-    ShaderLoader::LoadedShader ShaderLoader::LoadFromMemoryWithReflection(std::vector<uint32_t> bytecode)
-    {
-        LoadedShader result;
-        result.Data = std::move(bytecode);
+        ShaderData result;
+        result.Bytecode = std::move(bytecode);
 
         SpvReflectResult spvResult;
         SpvReflectShaderModule reflectedShader;
-        spvResult = spvReflectCreateShaderModule(result.Data.size() * sizeof(uint32_t), (const void*)result.Data.data(), &reflectedShader);
+        spvResult = spvReflectCreateShaderModule(result.Bytecode.size() * sizeof(uint32_t), (const void*)result.Bytecode.data(), &reflectedShader);
         assert(spvResult == SPV_REFLECT_RESULT_SUCCESS);
 
         uint32_t inputAttributeCount = 0;
-        spvResult = spvReflectEnumerateInputVariables(&reflectedShader, &inputAttributeCount, NULL);
+        spvResult = spvReflectEnumerateInputVariables(&reflectedShader, &inputAttributeCount, nullptr);
         assert(spvResult == SPV_REFLECT_RESULT_SUCCESS);
-        std::vector< SpvReflectInterfaceVariable*> inputAttributes(inputAttributeCount);
+        std::vector<SpvReflectInterfaceVariable*> inputAttributes(inputAttributeCount);
         spvResult = spvReflectEnumerateInputVariables(&reflectedShader, &inputAttributeCount, inputAttributes.data());
         assert(spvResult == SPV_REFLECT_RESULT_SUCCESS);
 
@@ -256,7 +245,28 @@ namespace VulkanAbstractionLayer
         std::sort(inputAttributes.begin(), inputAttributes.end(), [](const auto& v1, const auto& v2) { return v1->location < v2->location; });
         for (const auto& inputAttribute : inputAttributes)
         {
-            result.VertexAttributes.push_back(GetVertexAttributeByReflectedType(inputAttribute));
+            result.InputAttributes.push_back(GetVertexAttributeByReflectedType(inputAttribute));
+        }
+
+        uint32_t descriptorBindingCount = 0;
+        spvResult = spvReflectEnumerateDescriptorBindings(&reflectedShader, &descriptorBindingCount, nullptr);
+        assert(spvResult == SPV_REFLECT_RESULT_SUCCESS);
+        std::vector<SpvReflectDescriptorBinding*> descriptorBindings(descriptorBindingCount);
+        spvResult = spvReflectEnumerateDescriptorBindings(&reflectedShader, &descriptorBindingCount, descriptorBindings.data());
+        assert(spvResult == SPV_REFLECT_RESULT_SUCCESS);
+
+        for (const auto& descriptorBinding : descriptorBindings)
+        {
+            if (result.UniformBlocks.size() < (size_t)descriptorBinding->set + 1)
+                result.UniformBlocks.resize((size_t)descriptorBinding->set + 1);
+
+            auto& uniformBlock = result.UniformBlocks[descriptorBinding->set];
+
+            uniformBlock.push_back(Uniform { 
+                FromNative((vk::DescriptorType)descriptorBinding->descriptor_type),
+                descriptorBinding->binding,
+                descriptorBinding->count
+            });
         }
 
         spvReflectDestroyShaderModule(&reflectedShader);

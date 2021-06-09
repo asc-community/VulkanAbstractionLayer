@@ -85,7 +85,7 @@ namespace VulkanAbstractionLayer
         imageViewCreateInfo
             .setImage(this->handle)
             .setViewType(vk::ImageViewType::e2D)
-            .setFormat(ToNativeFormat(format))
+            .setFormat(ToNative(format))
             .setComponents(vk::ComponentMapping{
                 vk::ComponentSwizzle::eIdentity,
                 vk::ComponentSwizzle::eIdentity,
@@ -153,7 +153,7 @@ namespace VulkanAbstractionLayer
         vk::ImageCreateInfo imageCreateInfo;
         imageCreateInfo
             .setImageType(vk::ImageType::e2D)
-            .setFormat(ToNativeFormat(format))
+            .setFormat(ToNative(format))
             .setExtent(vk::Extent3D{ width, height, 1 })
             .setSamples(vk::SampleCountFlagBits::e1)
             .setMipLevels(1)

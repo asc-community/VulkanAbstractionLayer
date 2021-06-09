@@ -37,9 +37,8 @@
 
 namespace VulkanAbstractionLayer
 {
-    class ModelLoader
+    struct ModelData
     {
-    public:
         struct Vertex
         {
             Vector3 Position{ 0.0f, 0.0f, 0.0f };
@@ -52,11 +51,12 @@ namespace VulkanAbstractionLayer
             std::vector<Vertex> Vertices;
         };
 
-        struct LoadedModel
-        {
-            std::vector<Shape> Shapes;
-        };
+        std::vector<Shape> Shapes;
+    };
 
-        static LoadedModel LoadFromObj(const std::string& filepath);
+    class ModelLoader
+    {
+    public:
+        static ModelData LoadFromObj(const std::string& filepath);
     };
 }

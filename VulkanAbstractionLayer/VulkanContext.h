@@ -107,7 +107,7 @@ namespace VulkanAbstractionLayer
 
         const vk::Instance& GetInstance() const { return this->instance; }
         const vk::SurfaceKHR& GetSurface() const { return this->surface; }
-        const Format GetSurfaceFormat() const { return FromNativeFormat(this->surfaceFormat.format); }
+        const Format GetSurfaceFormat() const { return FromNative(this->surfaceFormat.format); }
         const vk::Extent2D& GetSurfaceExtent() const { return this->surfaceExtent; }
         const vk::PhysicalDevice& GetPhysicalDevice() const { return this->physicalDevice; }
         const vk::Device& GetDevice() const { return this->device; }

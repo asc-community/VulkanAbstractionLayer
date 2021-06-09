@@ -34,6 +34,7 @@
 namespace vk
 {
     enum class Format;
+    enum class DescriptorType;
 }
 
 namespace VulkanAbstractionLayer
@@ -173,8 +174,28 @@ namespace VulkanAbstractionLayer
         D32_SFLOAT_S8_UINT,
     };
 
-    const vk::Format& ToNativeFormat(Format format);
-    Format FromNativeFormat(const vk::Format& format);
+    const vk::Format& ToNative(Format format);
+    Format FromNative(const vk::Format& format);
+
+    enum class UniformType : uint32_t
+    {
+        SAMPLER = 0,
+        COMBINED_IMAGE_SAMPLER,
+        SAMPLED_IMAGE,
+        STORAGE_IMAGE,
+        UNIFORM_TEXEL_BUFFER,
+        STORAGE_TEXEL_BUFFER,
+        UNIFORM_BUFFER,
+        STORAGE_BUFFER,
+        UNIFORM_BUFFER_DYNAMIC,
+        STORAGE_BUFFER_DYNAMIC,
+        INPUT_ATTACHMENT,
+        INLINE_UNIFORM_BLOCK_EXT,
+        ACCELERATION_STRUCTURE_KHR,
+    };
+
+    const vk::DescriptorType& ToNative(UniformType type);
+    UniformType FromNative(const vk::DescriptorType& type);
 
     struct VertexAttribute
     {
@@ -197,5 +218,12 @@ namespace VulkanAbstractionLayer
         uint32_t BindingRange;
 
         constexpr static uint32_t BindingRangeAll = uint32_t(-1);
+    };
+
+    struct Uniform
+    {
+        UniformType Type;
+        uint32_t Binding;
+        uint32_t Count;
     };
 }

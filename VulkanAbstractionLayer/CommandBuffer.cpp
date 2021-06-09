@@ -57,7 +57,10 @@ namespace VulkanAbstractionLayer
         this->handle.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 
         vk::Pipeline graphicPipeline = renderPass.GetPipeline();
+        vk::PipelineLayout pipelineLayout = renderPass.GetPipelineLayout();
+        vk::DescriptorSet descriptorSet = renderPass.GetDescriptorSet();
         if ((bool)graphicPipeline) this->handle.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicPipeline);
+        if ((bool)descriptorSet) this->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, descriptorSet, { });
     }
 
     void CommandBuffer::EndRenderPass()

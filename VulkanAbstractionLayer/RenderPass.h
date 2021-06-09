@@ -35,20 +35,41 @@ namespace VulkanAbstractionLayer
     class RenderPass
     {
         vk::RenderPass handle;
+        vk::DescriptorSet descriptorSet;
+        vk::DescriptorSetLayout descriptorSetLayout;
         vk::Rect2D renderArea;
         vk::Framebuffer framebuffer;
         std::vector<vk::ClearValue> clearValues;
         vk::Pipeline pipeline;
         vk::PipelineLayout pipelineLayout;
     public:
-        RenderPass(vk::RenderPass renderPass, vk::Pipeline pipeline, vk::PipelineLayout pipelineLayout, vk::Rect2D renderArea, vk::Framebuffer framebuffer, std::vector<vk::ClearValue> clearValues)
-            : handle(renderPass), pipeline(pipeline), pipelineLayout(pipelineLayout), renderArea(renderArea), framebuffer(framebuffer), clearValues(clearValues) { }
+        RenderPass(
+            vk::RenderPass renderPass, 
+            vk::DescriptorSet descriptorSet, 
+            vk::DescriptorSetLayout descriptorSetLayout,
+            vk::Pipeline pipeline, 
+            vk::PipelineLayout pipelineLayout,
+            vk::Rect2D renderArea, 
+            vk::Framebuffer framebuffer, 
+            std::vector<vk::ClearValue> clearValues
+        )
+            : 
+            handle(renderPass), 
+            descriptorSet(descriptorSet), 
+            descriptorSetLayout(descriptorSetLayout),
+            pipeline(pipeline), 
+            pipelineLayout(pipelineLayout), 
+            renderArea(renderArea), 
+            framebuffer(framebuffer), 
+            clearValues(clearValues) { }
 
-        const vk::RenderPass& GetNativeHandle() const { return this->handle; }
-        const vk::Pipeline& GetPipeline() const { return this->pipeline; }
-        const vk::PipelineLayout& GetPipelineLayout() const { return this->pipelineLayout; }
-        const vk::Rect2D& GetRenderArea() const { return this->renderArea; }
-        const vk::Framebuffer& GetFramebuffer() const { return this->framebuffer; }
-        const std::vector<vk::ClearValue>& GetClearValues() const { return this->clearValues; }
+        const auto& GetNativeHandle() const { return this->handle; }
+        const auto& GetPipeline() const { return this->pipeline; }
+        const auto& GetPipelineLayout() const { return this->pipelineLayout; }
+        const auto& GetRenderArea() const { return this->renderArea; }
+        const auto& GetFramebuffer() const { return this->framebuffer; }
+        const auto& GetDescriptorSet() const { return this->descriptorSet; }
+        const auto& GetDescriptorSetLayout() const { return this->descriptorSetLayout; }
+        const auto& GetClearValues() const { return this->clearValues; }
     };
 }
