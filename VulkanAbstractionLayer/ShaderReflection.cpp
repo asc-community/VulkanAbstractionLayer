@@ -167,6 +167,23 @@ namespace VulkanAbstractionLayer
         vk::Format::eD32SfloatS8Uint,
     };
 
+    vk::ShaderStageFlagBits ShaderStageTable[] = {
+        vk::ShaderStageFlagBits::eVertex,
+        vk::ShaderStageFlagBits::eTessellationControl,
+        vk::ShaderStageFlagBits::eTessellationEvaluation,
+        vk::ShaderStageFlagBits::eGeometry,
+        vk::ShaderStageFlagBits::eFragment,
+        vk::ShaderStageFlagBits::eCompute,
+        vk::ShaderStageFlagBits::eRaygenKHR,
+        vk::ShaderStageFlagBits::eIntersectionKHR,
+        vk::ShaderStageFlagBits::eAnyHitKHR,
+        vk::ShaderStageFlagBits::eClosestHitKHR,
+        vk::ShaderStageFlagBits::eMissKHR,
+        vk::ShaderStageFlagBits::eCallableKHR,
+        vk::ShaderStageFlagBits::eTaskNV,
+        vk::ShaderStageFlagBits::eMeshNV,
+    };
+
     vk::DescriptorType DescriptorTypeTable[] = {
         vk::DescriptorType::eSampler,
         vk::DescriptorType::eCombinedImageSampler,
@@ -184,67 +201,73 @@ namespace VulkanAbstractionLayer
     };
 
     template<>
-    VertexAttribute VertexAttribute::OfType<float>()
+    TypeSPIRV TypeSPIRV::As<float>()
     {
         return { Format::R32_SFLOAT, 1, sizeof(float) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<Vector2>()
+    TypeSPIRV TypeSPIRV::As<Vector2>()
     {
         return { Format::R32G32_SFLOAT, 1, sizeof(Vector2) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<Vector3>()
+    TypeSPIRV TypeSPIRV::As<Vector3>()
     {
         return { Format::R32G32B32_SFLOAT, 1, sizeof(Vector3) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<Vector4>()
+    TypeSPIRV TypeSPIRV::As<Vector4>()
     {
         return { Format::R32G32B32A32_SFLOAT, 1, sizeof(Vector4) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<int32_t>()
+    TypeSPIRV TypeSPIRV::As<int32_t>()
     {
         return { Format::R32_SINT, 1, sizeof(int32_t) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<VectorInt2>()
+    TypeSPIRV TypeSPIRV::As<uint32_t>()
+    {
+        return { Format::R32_UINT, 1, sizeof(uint32_t) };
+    }
+
+    template<>
+    TypeSPIRV TypeSPIRV::As<VectorInt2>()
     {
         return { Format::R32G32_SINT, 1, sizeof(VectorInt2) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<VectorInt3>()
+    TypeSPIRV TypeSPIRV::As<VectorInt3>()
     {
         return { Format::R32G32B32_SINT, 1, sizeof(VectorInt3) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<VectorInt4>()
+    TypeSPIRV TypeSPIRV::As<VectorInt4>()
     {
         return { Format::R32G32B32A32_SINT, 1, sizeof(VectorInt4) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<Matrix2x2>()
+    TypeSPIRV TypeSPIRV::As<Matrix2x2>()
     {
         return { Format::R32G32_SFLOAT, 2, sizeof(Matrix2x2) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<Matrix3x3>()
+    TypeSPIRV TypeSPIRV::As<Matrix3x3>()
     {
         return { Format::R32G32B32_SFLOAT, 3, sizeof(Matrix3x3) };
     }
 
     template<>
-    VertexAttribute VertexAttribute::OfType<Matrix4x4>()
+    TypeSPIRV TypeSPIRV::As<Matrix4x4>()
     {
         return { Format::R32G32B32A32_SFLOAT, 4, sizeof(Matrix4x4) };
     }
@@ -280,5 +303,21 @@ namespace VulkanAbstractionLayer
         }
         assert(false);
         return (UniformType)0;
+    }
+
+    const vk::ShaderStageFlagBits& ToNative(ShaderType type)
+    {
+        return ShaderStageTable[(size_t)type];
+    }
+
+    ShaderType FromNative(const vk::ShaderStageFlagBits& type)
+    {
+        for (size_t i = 0; i < std::size(ShaderStageTable); i++)
+        {
+            if (ShaderStageTable[i] == type)
+                return (ShaderType)i;
+        }
+        assert(false);
+        return (ShaderType)0;
     }
 }

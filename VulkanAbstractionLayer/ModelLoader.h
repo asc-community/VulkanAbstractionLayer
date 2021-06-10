@@ -28,10 +28,8 @@
 
 #pragma once
 
-#include <vector>
 #include <string>
 
-#include "ShaderType.h"
 #include "ShaderReflection.h"
 #include "VectorMath.h"
 

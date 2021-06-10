@@ -170,7 +170,7 @@ namespace VulkanAbstractionLayer
         };
     }
 
-    VertexAttribute GetVertexAttributeByReflectedType(const SpvReflectInterfaceVariable* type)
+    TypeSPIRV GetVertexAttributeByReflectedType(const SpvReflectInterfaceVariable* type)
     {
         int32_t byteSize = type->numeric.scalar.width / 8;
         int32_t componentCount = 1;
@@ -183,7 +183,7 @@ namespace VulkanAbstractionLayer
         if (type->numeric.matrix.column_count > 0) 
             componentCount = type->numeric.matrix.column_count;
 
-        return VertexAttribute{ FromNative((vk::Format)type->format), componentCount, byteSize };
+        return TypeSPIRV{ FromNative((vk::Format)type->format), componentCount, byteSize };
     }
 
     ShaderData ShaderLoader::LoadFromBinary(const std::string& filepath)
@@ -263,6 +263,7 @@ namespace VulkanAbstractionLayer
             auto& uniformBlock = result.UniformBlocks[descriptorBinding->set];
 
             uniformBlock.push_back(Uniform { 
+                { }, // TODO
                 FromNative((vk::DescriptorType)descriptorBinding->descriptor_type),
                 descriptorBinding->binding,
                 descriptorBinding->count

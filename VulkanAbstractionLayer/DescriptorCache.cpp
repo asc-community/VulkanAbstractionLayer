@@ -68,7 +68,7 @@ namespace VulkanAbstractionLayer
         this->cache.clear();
     }
 
-    vk::DescriptorSetLayout DescriptorCache::CreateDescriptorSetLayout(ArrayView<UniformsPerStage> specification)
+    vk::DescriptorSetLayout DescriptorCache::CreateDescriptorSetLayout(ArrayView<ShaderUniforms> specification)
     {
         auto& vulkan = GetCurrentVulkanContext();
 
@@ -86,7 +86,7 @@ namespace VulkanAbstractionLayer
                     uniform.Binding,
                     ToNative(uniform.Type),
                     uniform.Count,
-                    uniformsPerStage.ShaderStage
+                    ToNative(uniformsPerStage.ShaderStage)
                 });
             }
         }
@@ -97,12 +97,12 @@ namespace VulkanAbstractionLayer
         return vulkan.GetDevice().createDescriptorSetLayout(layoutCreateInfo);
     }
 
-    vk::DescriptorSetLayout DescriptorCache::GetDescriptorSetLayout(ArrayView<UniformsPerStage> specification)
+    vk::DescriptorSetLayout DescriptorCache::GetDescriptorSetLayout(ArrayView<ShaderUniforms> specification)
     {
         auto it = std::find_if(this->cache.begin(), this->cache.end(), [&specification](const DescriptorCacheEntry& e)
         {
             return std::equal(e.Specification.begin(), e.Specification.end(), specification.begin(), specification.end(),
-                [](const UniformsPerStage& u1, const UniformsPerStage& u2) 
+                [](const ShaderUniforms& u1, const ShaderUniforms& u2) 
                 {
                     return u1.ShaderStage == u2.ShaderStage && u1.Uniforms == u2.Uniforms;
                 });

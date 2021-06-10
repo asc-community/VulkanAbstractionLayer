@@ -37,14 +37,7 @@ namespace VulkanAbstractionLayer
 {
 	class DescriptorCache
 	{
-	public:
-		struct UniformsPerStage
-		{
-			std::vector<Uniform> Uniforms;
-			vk::ShaderStageFlagBits ShaderStage;
-		};
-
-		using LayoutSpecification = std::vector<UniformsPerStage>;
+		using LayoutSpecification = std::vector<ShaderUniforms>;
 
 		struct DescriptorCacheEntry
 		{
@@ -52,11 +45,10 @@ namespace VulkanAbstractionLayer
 			vk::DescriptorSetLayout DescriptorSetLayout;
 		};
 
-	private:
 		vk::DescriptorPool descriptorPool;
 		std::vector<DescriptorCacheEntry> cache;
 
-		static vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<UniformsPerStage> specification);
+		static vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<ShaderUniforms> specification);
 	public:
 
 		void Init();
@@ -64,6 +56,6 @@ namespace VulkanAbstractionLayer
 
 		const auto& GetDescriptorPool() const { return this->descriptorPool; }
 
-		vk::DescriptorSetLayout GetDescriptorSetLayout(ArrayView<UniformsPerStage> specification);
+		vk::DescriptorSetLayout GetDescriptorSetLayout(ArrayView<ShaderUniforms> specification);
 	};
 }

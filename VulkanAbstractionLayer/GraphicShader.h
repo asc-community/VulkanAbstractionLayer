@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "ShaderType.h"
 #include "ShaderLoader.h"
 #include "DescriptorCache.h"
 
@@ -41,7 +40,7 @@ namespace VulkanAbstractionLayer
         vk::ShaderModule vertexShader;
         vk::ShaderModule fragmentShader;
 
-        std::vector<VertexAttribute> vertexAttributes;
+        std::vector<TypeSPIRV> vertexAttributes;
         vk::DescriptorSetLayout descriptorSetLayout;
 
         void Destroy();

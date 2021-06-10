@@ -30,15 +30,44 @@
 
 #include <cstdint>
 #include <utility>
+#include <vector>
 
 namespace vk
 {
     enum class Format;
     enum class DescriptorType;
+    enum class ShaderStageFlagBits : uint32_t;
 }
 
 namespace VulkanAbstractionLayer
 {
+    enum class ShaderType : uint32_t
+    {
+        VERTEX = 0,
+        TESS_CONTROL,
+        TESS_EVALUATION,
+        GEOMETRY,
+        FRAGMENT,
+        COMPUTE,
+        RAY_GEN,
+        INTERSECT,
+        ANY_HIT,
+        CLOSEST_HIT,
+        MISS,
+        CALLABLE,
+        TASK_NV,
+        MESH_NV,
+    };
+
+    const vk::ShaderStageFlagBits& ToNative(ShaderType type);
+    ShaderType FromNative(const vk::ShaderStageFlagBits& type);
+
+    enum class ShaderLanguage
+    {
+        GLSL = 0,
+        HLSL,
+    };
+
     enum class Format : uint32_t
     {
         UNDEFINED = 0,
@@ -197,14 +226,14 @@ namespace VulkanAbstractionLayer
     const vk::DescriptorType& ToNative(UniformType type);
     UniformType FromNative(const vk::DescriptorType& type);
 
-    struct VertexAttribute
+    struct TypeSPIRV
     {
         Format LayoutFormat;
         int32_t ComponentCount;
         int32_t ByteSize;
 
         template<typename T>
-        static VertexAttribute OfType();
+        static TypeSPIRV As();
     };
 
     struct VertexBinding
@@ -222,11 +251,21 @@ namespace VulkanAbstractionLayer
 
     struct Uniform
     {
+        std::vector<TypeSPIRV> Layout;
         UniformType Type;
         uint32_t Binding;
         uint32_t Count;
     };
 
+    struct ShaderUniforms
+    {
+        std::vector<Uniform> Uniforms;
+        ShaderType ShaderStage;
+    };
+
     inline bool operator==(const Uniform& u1, const Uniform& u2) { return u1.Type == u2.Type && u1.Binding == u2.Binding && u1.Count == u2.Count; }
     inline bool operator!=(const Uniform& u1, const Uniform& u2) { return !(u1 == u2); }
+
+    inline bool operator==(const ShaderUniforms& u1, const ShaderUniforms& u2) { return u1.ShaderStage == u2.ShaderStage && u1.Uniforms == u2.Uniforms; }
+    inline bool operator!=(const ShaderUniforms& u1, const ShaderUniforms& u2) { return !(u1 == u2); }
 }

@@ -65,8 +65,8 @@ namespace VulkanAbstractionLayer
         this->vertexAttributes = vertex.InputAttributes;
         
         auto specification = std::array{
-            DescriptorCache::UniformsPerStage{ vertex.UniformBlocks[0], vk::ShaderStageFlagBits::eVertex },
-            DescriptorCache::UniformsPerStage{ fragment.UniformBlocks[0], vk::ShaderStageFlagBits::eFragment },
+            ShaderUniforms{ vertex.UniformBlocks[0], ShaderType::VERTEX },
+            ShaderUniforms{ fragment.UniformBlocks[0], ShaderType::FRAGMENT },
         };
 
         this->descriptorSetLayout = vulkan.GetDescriptorCache().GetDescriptorSetLayout(specification);

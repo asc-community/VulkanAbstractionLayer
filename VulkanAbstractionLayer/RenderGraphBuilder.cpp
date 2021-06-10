@@ -313,13 +313,13 @@ namespace VulkanAbstractionLayer
             std::array shaderStageCreateInfos = {
                 vk::PipelineShaderStageCreateInfo {
                     vk::PipelineShaderStageCreateFlags{ },
-                    vk::ShaderStageFlagBits::eVertex,
+                    ToNative(ShaderType::VERTEX),
                     graphicPipeline.Shader.GetNativeShader(ShaderType::VERTEX),
                     "main"
                 },
                 vk::PipelineShaderStageCreateInfo {
                     vk::PipelineShaderStageCreateFlags{ },
-                    vk::ShaderStageFlagBits::eFragment,
+                    ToNative(ShaderType::FRAGMENT),
                     graphicPipeline.Shader.GetNativeShader(ShaderType::FRAGMENT),
                     "main"
                 }

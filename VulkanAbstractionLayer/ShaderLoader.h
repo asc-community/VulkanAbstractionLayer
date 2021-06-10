@@ -28,10 +28,8 @@
 
 #pragma once
 
-#include <vector>
 #include <string>
 
-#include "ShaderType.h"
 #include "ShaderReflection.h"
 
 namespace VulkanAbstractionLayer
@@ -39,7 +37,7 @@ namespace VulkanAbstractionLayer
     struct ShaderData
     {
         using BytecodeSPIRV = std::vector<uint32_t>;
-        using Attributes = std::vector<VertexAttribute>;
+        using Attributes = std::vector<TypeSPIRV>;
         using UniformBlock = std::vector<Uniform>;
         using Uniforms = std::vector<UniformBlock>;
 
