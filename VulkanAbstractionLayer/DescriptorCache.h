@@ -28,36 +28,42 @@
 
 #pragma once
 
-#include "Buffer.h"
-#include "CommandBuffer.h"
 #include <vulkan/vulkan.hpp>
+
+#include "ShaderReflection.h"
+#include "ArrayUtils.h"
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
+	class DescriptorCache
+	{
+	public:
+		struct UniformsPerStage
+		{
+			std::vector<Uniform> Uniforms;
+			vk::ShaderStageFlagBits ShaderStage;
+		};
 
-    struct VirtualFrame
-    {
-        CommandBuffer Commands{ vk::CommandBuffer{ } };
-        Buffer StageBuffer;
-        vk::Fence CommandQueueFence;
-    };
+		using LayoutSpecification = std::vector<UniformsPerStage>;
 
-    class VirtualFrameProvider
-    {
-        std::vector<VirtualFrame> virtualFrames;
-        uint32_t presentImageIndex = 0;
-        size_t currentFrame = 0;
-    public:
-        void Init(size_t frameCount, size_t stageBufferSize);
-        void Destroy();
+		struct DescriptorCacheEntry
+		{
+			LayoutSpecification Specification;
+			vk::DescriptorSetLayout DescriptorSetLayout;
+		};
 
-        void StartFrame();
-        VirtualFrame& GetCurrentFrame();
-        VirtualFrame& GetNextFrame();
-        const VirtualFrame& GetCurrentFrame() const;
-        const VirtualFrame& GetNextFrame() const;
-        uint32_t GetPresentImageIndex() const;
-        void EndFrame();
-    };
+	private:
+		vk::DescriptorPool descriptorPool;
+		std::vector<DescriptorCacheEntry> cache;
+
+		static vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<UniformsPerStage> specification);
+	public:
+
+		void Init();
+		void Destroy();
+
+		const auto& GetDescriptorPool() const { return this->descriptorPool; }
+
+		vk::DescriptorSetLayout GetDescriptorSetLayout(ArrayView<UniformsPerStage> specification);
+	};
 }

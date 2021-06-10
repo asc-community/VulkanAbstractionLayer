@@ -38,9 +38,11 @@ namespace VulkanAbstractionLayer
         auto& device = vulkan.GetDevice();
         if ((bool)this->vertexShader) device.destroyShaderModule(this->vertexShader);
         if ((bool)this->fragmentShader) device.destroyShaderModule(this->fragmentShader);
+        // descriptorSetLayout is not deleted as it belongs to VulkanContext::DescriptorCache
 
         this->vertexShader = vk::ShaderModule{ };
         this->fragmentShader = vk::ShaderModule{ };
+        this->descriptorSetLayout = vk::DescriptorSetLayout{ };
     }
 
     GraphicShader::GraphicShader(const ShaderData& vertex, const ShaderData& fragment)
@@ -50,33 +52,36 @@ namespace VulkanAbstractionLayer
 
     void GraphicShader::Init(const ShaderData& vertex, const ShaderData& fragment)
     {
-        auto& device = GetCurrentVulkanContext().GetDevice();
+        auto& vulkan = GetCurrentVulkanContext();
 
         vk::ShaderModuleCreateInfo vertexShaderInfo;
         vertexShaderInfo.setCode(vertex.Bytecode);
-        this->vertexShader = device.createShaderModule(vertexShaderInfo);
+        this->vertexShader = vulkan.GetDevice().createShaderModule(vertexShaderInfo);
 
         vk::ShaderModuleCreateInfo fragmentShaderInfo;
         fragmentShaderInfo.setCode(fragment.Bytecode);
-        this->fragmentShader = device.createShaderModule(fragmentShaderInfo);
+        this->fragmentShader = vulkan.GetDevice().createShaderModule(fragmentShaderInfo);
 
         this->vertexAttributes = vertex.InputAttributes;
         
-        this->uniforms = std::vector{
-            UniformsPerShaderStage{ vertex.UniformBlocks[0], vk::ShaderStageFlagBits::eVertex },
-            UniformsPerShaderStage{ fragment.UniformBlocks[0], vk::ShaderStageFlagBits::eFragment },
+        auto specification = std::array{
+            DescriptorCache::UniformsPerStage{ vertex.UniformBlocks[0], vk::ShaderStageFlagBits::eVertex },
+            DescriptorCache::UniformsPerStage{ fragment.UniformBlocks[0], vk::ShaderStageFlagBits::eFragment },
         };
+
+        this->descriptorSetLayout = vulkan.GetDescriptorCache().GetDescriptorSetLayout(specification);
     }
 
     GraphicShader::GraphicShader(GraphicShader&& other) noexcept
     {
         this->vertexShader = other.vertexShader;
         this->fragmentShader = other.fragmentShader;
+        this->descriptorSetLayout = other.descriptorSetLayout;
         this->vertexAttributes = std::move(other.vertexAttributes);
-        this->uniforms = std::move(other.uniforms);
 
         other.vertexShader = vk::ShaderModule{ };
         other.fragmentShader = vk::ShaderModule{ };
+        other.descriptorSetLayout = vk::DescriptorSetLayout{ };
     }
 
     GraphicShader& GraphicShader::operator=(GraphicShader&& other) noexcept
@@ -85,11 +90,12 @@ namespace VulkanAbstractionLayer
 
         this->vertexShader = other.vertexShader;
         this->fragmentShader = other.fragmentShader;
+        this->descriptorSetLayout = other.descriptorSetLayout;
         this->vertexAttributes = std::move(other.vertexAttributes);
-        this->uniforms = std::move(other.uniforms);
 
         other.vertexShader = vk::ShaderModule{ };
         other.fragmentShader = vk::ShaderModule{ };
+        other.descriptorSetLayout = vk::DescriptorSetLayout{ };
 
         return *this;
     }

@@ -226,4 +226,7 @@ namespace VulkanAbstractionLayer
         uint32_t Binding;
         uint32_t Count;
     };
+
+    inline bool operator==(const Uniform& u1, const Uniform& u2) { return u1.Type == u2.Type && u1.Binding == u2.Binding && u1.Count == u2.Count; }
+    inline bool operator!=(const Uniform& u1, const Uniform& u2) { return !(u1 == u2); }
 }

@@ -32,7 +32,7 @@ set(SOURCES
 "submodules/imgui/imgui_widgets.cpp"
 "submodules/imgui/backends/imgui_impl_vulkan.cpp"
 "submodules/imgui/backends/imgui_impl_glfw.cpp"
-"submodules/spirv-reflect/spirv_reflect.c")
+"submodules/spirv-reflect/spirv_reflect.c" "VulkanAbstractionLayer/DescriptorCache.h" "VulkanAbstractionLayer/DescriptorCache.cpp")
 
 find_package(Vulkan REQUIRED FATAL_ERROR)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw)

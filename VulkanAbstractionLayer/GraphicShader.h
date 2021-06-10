@@ -29,20 +29,12 @@
 #pragma once
 
 #include "ShaderType.h"
-#include "ShaderReflection.h"
 #include "ShaderLoader.h"
-
-#include <vulkan/vulkan.hpp>
+#include "DescriptorCache.h"
 
 namespace VulkanAbstractionLayer
 {
     class VulkanContext;
-
-    struct UniformsPerShaderStage
-    {
-        std::vector<Uniform> Uniforms;
-        vk::ShaderStageFlags Stage;
-    };
 
     class GraphicShader
     {
@@ -50,7 +42,7 @@ namespace VulkanAbstractionLayer
         vk::ShaderModule fragmentShader;
 
         std::vector<VertexAttribute> vertexAttributes;
-        std::vector<UniformsPerShaderStage> uniforms;
+        vk::DescriptorSetLayout descriptorSetLayout;
 
         void Destroy();
     public:
@@ -66,7 +58,7 @@ namespace VulkanAbstractionLayer
         ~GraphicShader();
 
         const auto& GetVertexAttributes() const { return this->vertexAttributes; }
-        const auto& GetUniforms() const { return this->uniforms; }
+        const auto& GetDescriptorSetLayout() const { return this->descriptorSetLayout; }
 
         const vk::ShaderModule& GetNativeShader(ShaderType type) const
         {

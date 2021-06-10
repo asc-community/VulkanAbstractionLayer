@@ -148,8 +148,8 @@ namespace VulkanAbstractionLayer
         this->device.waitIdle();
 
         this->virtualFrames.Destroy();
+        this->descriptorCache.Destroy();
        
-        if ((bool)this->descriptorPool) this->device.destroyDescriptorPool(this->descriptorPool);
         if ((bool)this->commandPool) this->device.destroyCommandPool(this->commandPool);
 
         this->swapchainImages.clear();
@@ -306,30 +306,10 @@ namespace VulkanAbstractionLayer
 
         this->commandPool = this->device.createCommandPool(commandPoolCreateInfo);
 
-        // TODO: rework
-        std::array descriptorPoolSizes = {
-            vk::DescriptorPoolSize { vk::DescriptorType::eSampler,              1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eCombinedImageSampler, 1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eSampledImage,         1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eStorageImage,         1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eUniformTexelBuffer,   1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eStorageTexelBuffer,   1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eUniformBuffer,        1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eStorageBuffer,        1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eUniformBufferDynamic, 1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eStorageBufferDynamic, 1024 },
-            vk::DescriptorPoolSize { vk::DescriptorType::eInputAttachment,      1024 },
-        };
-        vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
-        descriptorPoolCreateInfo
-            .setPoolSizes(descriptorPoolSizes)
-            .setMaxSets(1000 * (uint32_t)descriptorPoolSizes.size());
-
-        this->descriptorPool = this->device.createDescriptorPool(descriptorPoolCreateInfo);
-
         if (options.InfoCallback)
-            options.InfoCallback("created command buffer pool and descriptor pool");
+            options.InfoCallback("created command buffer pool");
 
+        this->descriptorCache.Init();
         this->virtualFrames.Init(options.VirtualFrameCount, options.MaxStageBufferSize);
     }
 

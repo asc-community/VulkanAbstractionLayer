@@ -167,49 +167,16 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    struct DescriptorAllocation
+    vk::DescriptorSet AllocateDescriptorSet(vk::DescriptorSetLayout layout)
     {
-        vk::DescriptorSet DescriptorSet;
-        vk::DescriptorSetLayout DescriptorSetLayout;
-    };
-
-    DescriptorAllocation AllocateDescriptorSet(const std::vector<UniformsPerShaderStage>& uniforms)
-    {
-        DescriptorAllocation allocation;
         auto& vulkan = GetCurrentVulkanContext();
-
-        std::vector<vk::DescriptorSetLayoutBinding> layoutBindings;
-        size_t totalUniformCount = 0;
-        for (const auto& uniformsPerStage : uniforms)
-            totalUniformCount += uniformsPerStage.Uniforms.size();
-        layoutBindings.reserve(totalUniformCount);
-
-        for (const auto& uniformsPerStage : uniforms)
-        {
-            for (const auto& uniform : uniformsPerStage.Uniforms)
-            {
-                layoutBindings.push_back(vk::DescriptorSetLayoutBinding{
-                    uniform.Binding,
-                    ToNative(uniform.Type),
-                    uniform.Count,
-                    uniformsPerStage.Stage
-                });
-            }
-        }
-
-        vk::DescriptorSetLayoutCreateInfo layoutCreateInfo;
-        layoutCreateInfo.setBindings(layoutBindings);
-
-        allocation.DescriptorSetLayout = vulkan.GetDevice().createDescriptorSetLayout(layoutCreateInfo);
 
         vk::DescriptorSetAllocateInfo descriptorAllocateInfo;
         descriptorAllocateInfo
-            .setDescriptorPool(vulkan.GetDescriptorPool())
-            .setSetLayouts(allocation.DescriptorSetLayout);
+            .setDescriptorPool(vulkan.GetDescriptorCache().GetDescriptorPool())
+            .setSetLayouts(layout);
 
-        allocation.DescriptorSet = vulkan.GetDevice().allocateDescriptorSets(descriptorAllocateInfo).front();
-
-        return allocation;
+        return vulkan.GetDevice().allocateDescriptorSets(descriptorAllocateInfo).front();
     }
 
     RenderPass RenderGraphBuilder::BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments)
@@ -338,10 +305,10 @@ namespace VulkanAbstractionLayer
         vk::Pipeline pipeline;
         vk::PipelineLayout pipelineLayout;
         vk::DescriptorSet descriptorSet;
-        vk::DescriptorSetLayout descriptorSetLayout;
         if (renderPassBuilder.graphicPipeline.has_value())
         {
             const auto& graphicPipeline = renderPassBuilder.graphicPipeline.value();
+            descriptorSet = AllocateDescriptorSet(graphicPipeline.Shader.GetDescriptorSetLayout());
 
             std::array shaderStageCreateInfos = {
                 vk::PipelineShaderStageCreateInfo {
@@ -359,10 +326,7 @@ namespace VulkanAbstractionLayer
             };
             
             auto& vertexAttributes = graphicPipeline.Shader.GetVertexAttributes();
-            auto& vertexBindings = graphicPipeline.VertexBindings;
-            auto descriptorAllocation = AllocateDescriptorSet(graphicPipeline.Shader.GetUniforms());
-            descriptorSet = descriptorAllocation.DescriptorSet;
-            descriptorSetLayout = descriptorAllocation.DescriptorSetLayout;
+            auto& vertexBindings = graphicPipeline.VertexBindings;            
 
             std::vector<vk::VertexInputBindingDescription> vertexBindingDescriptions;
             std::vector<vk::VertexInputAttributeDescription> vertexAttributeDescriptions;
@@ -472,7 +436,7 @@ namespace VulkanAbstractionLayer
             dynamicStateCreateInfo.setDynamicStates(dynamicStates);
 
             vk::PipelineLayoutCreateInfo layoutCreateInfo;
-            layoutCreateInfo.setSetLayouts(descriptorSetLayout);
+            layoutCreateInfo.setSetLayouts(graphicPipeline.Shader.GetDescriptorSetLayout());
 
             pipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
 
@@ -497,7 +461,7 @@ namespace VulkanAbstractionLayer
             pipeline = GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
         }
 
-        return RenderPass{ renderPass, descriptorSet, descriptorSetLayout, pipeline, pipelineLayout, renderArea, framebuffer, clearValues };
+        return RenderPass{ renderPass, descriptorSet, pipeline, pipelineLayout, renderArea, framebuffer, clearValues };
     }
 
     AttachmentLayout RenderGraphBuilder::ResolveImageTransitions(StringId outputName)
@@ -629,7 +593,6 @@ namespace VulkanAbstractionLayer
             if ((bool)pass.GetPipelineLayout())      device.destroyPipelineLayout(pass.GetPipelineLayout());
             if ((bool)pass.GetFramebuffer())         device.destroyFramebuffer(pass.GetFramebuffer());
             if ((bool)pass.GetNativeHandle())        device.destroyRenderPass(pass.GetNativeHandle());
-            if ((bool)pass.GetDescriptorSetLayout()) device.destroyDescriptorSetLayout(pass.GetDescriptorSetLayout());
         };
 
         return RenderGraph{ std::move(nodes), std::move(attachments), std::move(this->outputName), std::move(OnPresent), std::move(OnDestroy) };

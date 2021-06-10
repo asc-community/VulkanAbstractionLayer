@@ -48,7 +48,7 @@ namespace VulkanAbstractionLayer
         init_info.QueueFamily = vulkanContext.GetQueueFamilyIndex();
         init_info.Queue = vulkanContext.GetGraphicsQueue();
         init_info.PipelineCache = vk::PipelineCache{ };
-        init_info.DescriptorPool = vulkanContext.GetDescriptorPool();
+        init_info.DescriptorPool = vulkanContext.GetDescriptorCache().GetDescriptorPool();
         init_info.Allocator = nullptr;
         init_info.MinImageCount = vulkanContext.GetPresentImageCount();
         init_info.ImageCount = vulkanContext.GetPresentImageCount();

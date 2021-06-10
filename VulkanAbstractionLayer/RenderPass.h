@@ -36,7 +36,6 @@ namespace VulkanAbstractionLayer
     {
         vk::RenderPass handle;
         vk::DescriptorSet descriptorSet;
-        vk::DescriptorSetLayout descriptorSetLayout;
         vk::Rect2D renderArea;
         vk::Framebuffer framebuffer;
         std::vector<vk::ClearValue> clearValues;
@@ -46,7 +45,6 @@ namespace VulkanAbstractionLayer
         RenderPass(
             vk::RenderPass renderPass, 
             vk::DescriptorSet descriptorSet, 
-            vk::DescriptorSetLayout descriptorSetLayout,
             vk::Pipeline pipeline, 
             vk::PipelineLayout pipelineLayout,
             vk::Rect2D renderArea, 
@@ -56,7 +54,6 @@ namespace VulkanAbstractionLayer
             : 
             handle(renderPass), 
             descriptorSet(descriptorSet), 
-            descriptorSetLayout(descriptorSetLayout),
             pipeline(pipeline), 
             pipelineLayout(pipelineLayout), 
             renderArea(renderArea), 
@@ -69,7 +66,6 @@ namespace VulkanAbstractionLayer
         const auto& GetRenderArea() const { return this->renderArea; }
         const auto& GetFramebuffer() const { return this->framebuffer; }
         const auto& GetDescriptorSet() const { return this->descriptorSet; }
-        const auto& GetDescriptorSetLayout() const { return this->descriptorSetLayout; }
         const auto& GetClearValues() const { return this->clearValues; }
     };
 }

@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "VirtualFrame.h"
+#include "DescriptorCache.h"
 #include "Image.h"
 #include "CommandBuffer.h"
 
@@ -89,10 +90,10 @@ namespace VulkanAbstractionLayer
         vk::Semaphore renderingFinishedSemaphore;
         vk::CommandPool commandPool;
         vk::SwapchainKHR swapchain;
-        vk::DescriptorPool descriptorPool;
         VmaAllocator allocator;
         std::vector<Image> swapchainImages;
         VirtualFrameProvider virtualFrames;
+        DescriptorCache descriptorCache;
         uint32_t queueFamilyIndex = { };
         uint32_t apiVersion = { };
         bool renderingEnabled = true;
@@ -117,7 +118,7 @@ namespace VulkanAbstractionLayer
         const vk::Semaphore& GetImageAvailableSemaphore() const { return this->imageAvailableSemaphore; }
         const vk::SwapchainKHR& GetSwapchain() const { return this->swapchain; }
         const vk::CommandPool& GetCommandPool() const { return this->commandPool; }
-        const vk::DescriptorPool& GetDescriptorPool() const { return this->descriptorPool; }
+        DescriptorCache& GetDescriptorCache() { return this->descriptorCache; }
         uint32_t GetQueueFamilyIndex() const { return this->queueFamilyIndex; }
         uint32_t GetPresentImageCount() const { return this->presentImageCount; }
         uint32_t GetAPIVersion() const { return this->apiVersion; }

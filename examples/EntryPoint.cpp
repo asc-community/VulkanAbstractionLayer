@@ -77,6 +77,88 @@ struct RenderGraphResources
     Mesh PlaneMesh;
 };
 
+void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGraphResources& resources)
+{
+    auto MakeDescriptorBufferInfo = [](const Buffer& buffer)
+    {
+        vk::DescriptorBufferInfo descriptorBufferInfo;
+        descriptorBufferInfo
+            .setBuffer(buffer.GetNativeHandle())
+            .setOffset(0)
+            .setRange(buffer.GetByteSize());
+        return descriptorBufferInfo;
+    };
+
+    auto MakeDescriptorBufferWrite = [&descriptorSet](const vk::DescriptorBufferInfo& info, uint32_t binding)
+    {
+        vk::WriteDescriptorSet descriptorBufferWrite;
+        descriptorBufferWrite
+            .setDstSet(descriptorSet)
+            .setDstBinding(binding)
+            .setDstArrayElement(0)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setBufferInfo(info);
+        return descriptorBufferWrite;
+    };
+
+    auto MakeDescriptorSamplerWrite = [&descriptorSet](const vk::DescriptorImageInfo& info, uint32_t binding)
+    {
+        vk::WriteDescriptorSet descriptorSamplerWrite;
+        descriptorSamplerWrite
+            .setDstSet(descriptorSet)
+            .setDstBinding(binding)
+            .setDstArrayElement(0)
+            .setDescriptorType(vk::DescriptorType::eSampler)
+            .setImageInfo(info);
+        return descriptorSamplerWrite;
+    };
+
+    auto MakeDescriptorSampledImageWrite = [&descriptorSet](ArrayView<vk::DescriptorImageInfo> info, uint32_t binding)
+    {
+        vk::WriteDescriptorSet descriptorSampledImagesWrite;
+        descriptorSampledImagesWrite
+            .setDstSet(descriptorSet)
+            .setDstBinding(binding)
+            .setDstArrayElement(0)
+            .setDescriptorType(vk::DescriptorType::eSampledImage)
+            .setDescriptorCount((uint32_t)info.size())
+            .setPImageInfo(info.data());
+        return descriptorSampledImagesWrite;
+    };
+
+    vk::DescriptorImageInfo samplerInfo;
+    samplerInfo.setSampler(resources.TextureSampler);
+
+    std::array sampledImageInfos = {
+        vk::DescriptorImageInfo{
+            { },
+            resources.DragonMesh.Texture.GetNativeView(),
+            vk::ImageLayout::eShaderReadOnlyOptimal
+        },
+        vk::DescriptorImageInfo{
+            { },
+            resources.PlaneMesh.Texture.GetNativeView(),
+            vk::ImageLayout::eShaderReadOnlyOptimal
+        }
+    };
+
+    std::array descriptorBufferInfos = {
+        MakeDescriptorBufferInfo(resources.CameraUniform.Buffer),
+        MakeDescriptorBufferInfo(resources.ModelUniform.Buffer),
+        MakeDescriptorBufferInfo(resources.LightUniform.Buffer),
+    };
+
+    std::array descriptorWrites = {
+        MakeDescriptorBufferWrite(descriptorBufferInfos[0], 0),
+        MakeDescriptorBufferWrite(descriptorBufferInfos[1], 1),
+        MakeDescriptorBufferWrite(descriptorBufferInfos[2], 2),
+        MakeDescriptorSamplerWrite(samplerInfo, 3),
+        MakeDescriptorSampledImageWrite(sampledImageInfos, 4),
+    };
+
+    GetCurrentVulkanContext().GetDevice().updateDescriptorSets(descriptorWrites, { });
+}
+
 RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const VulkanContext& context)
 {
     RenderGraphBuilder renderGraphBuilder;
@@ -180,7 +262,11 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
         .AddAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT)
         .SetOutputName("Output"_id);
 
-    return renderGraphBuilder.Build();
+    auto renderGraph = renderGraphBuilder.Build();
+
+    WriteDescriptorSet(renderGraph.GetNodeByName("OpaquePass"_id).Pass.GetDescriptorSet(), resources);
+
+    return std::move(renderGraph);
 }
 
 vk::Sampler CreateSampler()
@@ -195,88 +281,6 @@ vk::Sampler CreateSampler()
 
     vk::Sampler sampler = GetCurrentVulkanContext().GetDevice().createSampler(samplerCreateInfo);
     return sampler;
-}
-
-void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGraphResources& resources)
-{
-    auto MakeDescriptorBufferInfo = [](const Buffer& buffer)
-    {
-        vk::DescriptorBufferInfo descriptorBufferInfo;
-        descriptorBufferInfo
-            .setBuffer(buffer.GetNativeHandle())
-            .setOffset(0)
-            .setRange(buffer.GetByteSize());
-        return descriptorBufferInfo;
-    };
-
-    auto MakeDescriptorBufferWrite = [&descriptorSet](const vk::DescriptorBufferInfo& info, uint32_t binding)
-    {
-        vk::WriteDescriptorSet descriptorBufferWrite;
-        descriptorBufferWrite
-            .setDstSet(descriptorSet)
-            .setDstBinding(binding)
-            .setDstArrayElement(0)
-            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            .setBufferInfo(info);
-        return descriptorBufferWrite;
-    };
-
-    auto MakeDescriptorSamplerWrite = [&descriptorSet](const vk::DescriptorImageInfo& info, uint32_t binding)
-    {
-        vk::WriteDescriptorSet descriptorSamplerWrite;
-        descriptorSamplerWrite
-            .setDstSet(descriptorSet)
-            .setDstBinding(binding)
-            .setDstArrayElement(0)
-            .setDescriptorType(vk::DescriptorType::eSampler)
-            .setImageInfo(info);
-        return descriptorSamplerWrite;
-    };
-
-    auto MakeDescriptorSampledImageWrite = [&descriptorSet](ArrayView<vk::DescriptorImageInfo> info, uint32_t binding)
-    {
-        vk::WriteDescriptorSet descriptorSampledImagesWrite;
-        descriptorSampledImagesWrite
-            .setDstSet(descriptorSet)
-            .setDstBinding(binding)
-            .setDstArrayElement(0)
-            .setDescriptorType(vk::DescriptorType::eSampledImage)
-            .setDescriptorCount((uint32_t)info.size())
-            .setPImageInfo(info.data());
-        return descriptorSampledImagesWrite;
-    };
-
-    vk::DescriptorImageInfo samplerInfo;
-    samplerInfo.setSampler(resources.TextureSampler);
-
-    std::array sampledImageInfos = {
-        vk::DescriptorImageInfo{
-            { },
-            resources.DragonMesh.Texture.GetNativeView(),
-            vk::ImageLayout::eShaderReadOnlyOptimal
-        },
-        vk::DescriptorImageInfo{
-            { },
-            resources.PlaneMesh.Texture.GetNativeView(),
-            vk::ImageLayout::eShaderReadOnlyOptimal
-        }
-    };
-
-    std::array descriptorBufferInfos = {
-        MakeDescriptorBufferInfo(resources.CameraUniform.Buffer),
-        MakeDescriptorBufferInfo(resources.ModelUniform.Buffer),
-        MakeDescriptorBufferInfo(resources.LightUniform.Buffer),
-    };
-
-    std::array descriptorWrites = {
-        MakeDescriptorBufferWrite(descriptorBufferInfos[0], 0),
-        MakeDescriptorBufferWrite(descriptorBufferInfos[1], 1),
-        MakeDescriptorBufferWrite(descriptorBufferInfos[2], 2),
-        MakeDescriptorSamplerWrite(samplerInfo, 3),
-        MakeDescriptorSampledImageWrite(sampledImageInfos, 4),
-    };
-
-    GetCurrentVulkanContext().GetDevice().updateDescriptorSets(descriptorWrites, { });
 }
 
 template<typename T>
@@ -495,8 +499,6 @@ int main()
     };
 
     RenderGraph renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
-
-    WriteDescriptorSet(renderGraph.GetNodeByName("OpaquePass"_id).Pass.GetDescriptorSet(), renderGraphResources);
 
     Camera camera;
     Vector3 modelRotation{ -HalfPi, Pi, 0.0f };
