@@ -63,7 +63,7 @@ struct Mesh
 {
     Buffer VertexBuffer;
     Buffer InstanceBuffer;
-    Image Texture;
+    std::vector<Image> Textures;
 };
 
 struct RenderGraphResources
@@ -130,18 +130,23 @@ void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGrap
     vk::DescriptorImageInfo samplerInfo;
     samplerInfo.setSampler(resources.BaseSampler.GetNativeHandle());
 
-    std::array sampledImageInfos = {
-        vk::DescriptorImageInfo{
+    std::vector<vk::DescriptorImageInfo> sampledImageInfos;
+    for (const auto& texture : resources.DragonMesh.Textures)
+    {
+        sampledImageInfos.push_back(vk::DescriptorImageInfo{
             { },
-            resources.DragonMesh.Texture.GetNativeView(),
+            texture.GetNativeView(),
             vk::ImageLayout::eShaderReadOnlyOptimal
-        },
-        vk::DescriptorImageInfo{
+        });
+    }
+    for (const auto& texture : resources.PlaneMesh.Textures)
+    {
+        sampledImageInfos.push_back(vk::DescriptorImageInfo{
             { },
-            resources.PlaneMesh.Texture.GetNativeView(),
+            texture.GetNativeView(),
             vk::ImageLayout::eShaderReadOnlyOptimal
-        }
-    };
+        });
+    }
 
     std::array descriptorBufferInfos = {
         MakeDescriptorBufferInfo(resources.CameraUniform.Buffer),
@@ -177,7 +182,7 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     },
                     VertexBinding{
                         VertexBinding::Rate::PER_INSTANCE,
-                        VertexBinding::BindingRangeAll
+                        2,
                     },
                 }
             })
@@ -276,47 +281,69 @@ UniformData<T> CreateUniform()
     return { Buffer(sizeof(T), BufferUsageType::UNIFORM_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY), T{ } };
 }
 
-Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vector<InstanceData>& instances, ImageData texture)
+Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vector<InstanceData>& instances, ArrayView<ImageData> textures)
 {
     Mesh result;
 
     auto& vulkanContext = GetCurrentVulkanContext();
     auto& stageBuffer = vulkanContext.GetCurrentStageBuffer();
     auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
+    size_t offset = 0;
 
     size_t instanceBufferSize = instances.size() * sizeof(InstanceData);
     size_t vertexBufferSize = vertices.size() * sizeof(ModelData::Vertex);
-    size_t textureSize = size_t(texture.Width * texture.Height * texture.Channels * texture.ChannelSize);
 
     result.InstanceBuffer.Init(instanceBufferSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
     result.VertexBuffer.Init(vertexBufferSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
-    result.Texture.Init(texture.Width, texture.Height, Format::R8G8B8A8_UNORM, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst, MemoryUsage::GPU_ONLY);
-
-    stageBuffer.LoadData((uint8_t*)instances.data(), instanceBufferSize, 0);
+    
+    stageBuffer.LoadData((uint8_t*)instances.data(), instanceBufferSize, offset);
+    offset += instanceBufferSize;
     stageBuffer.LoadData((uint8_t*)vertices.data(), vertexBufferSize, instanceBufferSize);
-    stageBuffer.LoadData(texture.ByteData, textureSize, instanceBufferSize + vertexBufferSize);
+    offset += vertexBufferSize;
 
+    for (const auto& texture : textures)
+    {
+        auto& image = result.Textures.emplace_back();
+        image.Init(
+            texture.Width, 
+            texture.Height, 
+            Format::R8G8B8A8_UNORM, 
+            vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst, 
+            MemoryUsage::GPU_ONLY
+        );
+        stageBuffer.LoadData(texture.ByteData, texture.GetByteSize(), offset);
+        offset += texture.GetByteSize();
+    }
 
     commandBuffer.Begin();
 
+    offset = 0;
     commandBuffer.CopyBuffer(
-        stageBuffer, vk::AccessFlagBits::eHostWrite, 0,
+        stageBuffer, vk::AccessFlagBits::eHostWrite, offset,
         result.InstanceBuffer, vk::AccessFlags{ }, 0,
         vk::PipelineStageFlagBits::eHost,
         instanceBufferSize
     );
+    offset += instanceBufferSize;
+
     commandBuffer.CopyBuffer(
-        stageBuffer, vk::AccessFlagBits::eTransferRead, instanceBufferSize,
+        stageBuffer, vk::AccessFlagBits::eTransferRead, offset,
         result.VertexBuffer, vk::AccessFlags{ }, 0,
         vk::PipelineStageFlagBits::eTransfer,
         vertexBufferSize
     );
-    commandBuffer.CopyBufferToImage(
-        stageBuffer, vk::AccessFlagBits::eTransferRead, instanceBufferSize + vertexBufferSize,
-        result.Texture, vk::ImageLayout::eUndefined, vk::AccessFlags{ },
-        vk::PipelineStageFlagBits::eTransfer,
-        textureSize
-    );
+    offset += vertexBufferSize;
+
+    for (size_t i = 0; i < result.Textures.size(); i++)
+    {
+        commandBuffer.CopyBufferToImage(
+            stageBuffer, vk::AccessFlagBits::eTransferRead, offset,
+            result.Textures[i], vk::ImageLayout::eUndefined, vk::AccessFlags{ },
+            vk::PipelineStageFlagBits::eTransfer,
+            textures[i].GetByteSize()
+        );
+        offset += textures[i].GetByteSize();
+    }
 
     vk::ImageSubresourceRange subresourceRange{
         vk::ImageAspectFlagBits::eColor,
@@ -326,32 +353,35 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
         1  // layer count
     };
 
-    vk::ImageMemoryBarrier imageLayoutToShaderRead;
-    imageLayoutToShaderRead
-        .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
-        .setDstAccessMask(vk::AccessFlagBits::eShaderRead)
-        .setOldLayout(vk::ImageLayout::eTransferDstOptimal)
-        .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
-        .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-        .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-        .setImage(result.Texture.GetNativeHandle())
-        .setSubresourceRange(subresourceRange);
-
-    commandBuffer.GetNativeHandle().pipelineBarrier(
-        vk::PipelineStageFlagBits::eTransfer,
-        vk::PipelineStageFlagBits::eFragmentShader,
-        { },
-        { },
-        { },
+    for (const auto& texture : result.Textures)
+    {
+        vk::ImageMemoryBarrier imageLayoutToShaderRead;
         imageLayoutToShaderRead
-    );
+            .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setDstAccessMask(vk::AccessFlagBits::eShaderRead)
+            .setOldLayout(vk::ImageLayout::eTransferDstOptimal)
+            .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setImage(texture.GetNativeHandle())
+            .setSubresourceRange(subresourceRange);
+
+        commandBuffer.GetNativeHandle().pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eFragmentShader,
+            { },
+            { },
+            { },
+            imageLayoutToShaderRead
+        );
+    }
 
     commandBuffer.End();
     vulkanContext.SubmitCommandsImmediate(commandBuffer);
     return result;
 }
 
-Mesh CreatePlaneMesh()
+Mesh CreatePlaneMesh(uint32_t& globalTextureIndex)
 {
     std::vector vertices = {
         ModelData::Vertex{ { -500.0f, -500.0f, -0.01f }, { -15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
@@ -362,31 +392,36 @@ Mesh CreatePlaneMesh()
         ModelData::Vertex{ {  500.0f, -500.0f, -0.01f }, {  15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
     };
     std::vector instances = {
-        InstanceData{ { 0.0f, 0.0f, 0.0f }, 1 },
+        InstanceData{ { 0.0f, 0.0f, 0.0f }, globalTextureIndex++ },
     };
 
     auto texture = ImageLoader::LoadFromFile("models/sand.png");
 
-    return CreateMesh(vertices, instances, texture);
+    return CreateMesh(vertices, instances, std::array{ texture });
 }
 
-Mesh CreateDragonMesh()
+Mesh CreateDragonMesh(uint32_t& globalTextureIndex)
 {
     std::vector instances = {
-        InstanceData{ { 0.0f, 0.0f, -40.0f }, 0 },
-        InstanceData{ { 0.0f, 0.0f, -20.0f }, 0 },
-        InstanceData{ { 0.0f, 0.0f,   0.0f }, 0 },
-        InstanceData{ { 0.0f, 0.0f,  20.0f }, 0 },
-        InstanceData{ { 0.0f, 0.0f,  40.0f }, 0 },
+        InstanceData{ { 0.0f, 0.0f, -40.0f }, globalTextureIndex++ },
+        InstanceData{ { 0.0f, 0.0f, -20.0f }, globalTextureIndex++ },
+        InstanceData{ { 0.0f, 0.0f,   0.0f }, globalTextureIndex++ },
+        InstanceData{ { 0.0f, 0.0f,  20.0f }, globalTextureIndex++ },
+        InstanceData{ { 0.0f, 0.0f,  40.0f }, globalTextureIndex++ },
     };
 
     auto model = ModelLoader::LoadFromObj("models/dragon.obj");
     auto& vertices = model.Shapes.front().Vertices;
 
-    std::array<uint8_t, 4> whiteColor = { 255, 255, 255, 255 };
-    ImageData texture{ whiteColor.data(), 1, 1, 4, sizeof(uint8_t) };
+    std::array textures = {
+        ImageData{ (std::array<uint8_t, 4>{ 255, 255, 255, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ (std::array<uint8_t, 4>{ 150, 225, 100, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ (std::array<uint8_t, 4>{ 100, 150, 225, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ (std::array<uint8_t, 4>{ 255, 220,  60, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ (std::array<uint8_t, 4>{ 150, 150, 150, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
+    };
 
-    return CreateMesh(vertices, instances, texture);
+    return CreateMesh(vertices, instances, textures);
 }
 
 struct Camera
@@ -475,6 +510,8 @@ int main()
     auto fragmentShader = ShaderLoader::LoadFromSource("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
     Sampler sampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MinFilter::LINEAR);
 
+    uint32_t globalTextureIndex = 0;
+
     RenderGraphResources renderGraphResources{
         std::move(vertexShader),
         std::move(fragmentShader),
@@ -482,8 +519,8 @@ int main()
         CreateUniform<CameraUniformData>(),
         CreateUniform<ModelUniformData>(),
         CreateUniform<LightUniformData>(),
-        CreateDragonMesh(),
-        CreatePlaneMesh(),
+        CreateDragonMesh(globalTextureIndex),
+        CreatePlaneMesh(globalTextureIndex),
     };
 
     RenderGraph renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);

@@ -40,6 +40,11 @@ namespace VulkanAbstractionLayer
         uint32_t Height = 0;
         uint32_t Channels = 0;
         uint32_t ChannelSize = 0;
+
+        uint32_t GetByteSize() const
+        {
+            return this->Width * this->Height * this->Channels * this->ChannelSize;
+        }
     };
 
     class ImageLoader

@@ -79,7 +79,7 @@ namespace VulkanAbstractionLayer
         vk::Instance instance;
         vk::SurfaceKHR surface;
         vk::SurfaceFormatKHR surfaceFormat;
-        vk::PresentModeKHR surfacePresentMode;
+        vk::PresentModeKHR surfacePresentMode = { };
         vk::Extent2D surfaceExtent;
         uint32_t presentImageCount = { };
         vk::PhysicalDevice physicalDevice;
@@ -90,7 +90,7 @@ namespace VulkanAbstractionLayer
         vk::Semaphore renderingFinishedSemaphore;
         vk::CommandPool commandPool;
         vk::SwapchainKHR swapchain;
-        VmaAllocator allocator;
+        VmaAllocator allocator = { };
         std::vector<Image> swapchainImages;
         VirtualFrameProvider virtualFrames;
         DescriptorCache descriptorCache;

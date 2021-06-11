@@ -13,7 +13,7 @@ layout(set = 0, binding = 2) uniform uLightBuffer
 };
 
 layout(set = 0, binding = 3) uniform sampler uImageSampler;
-layout(set = 0, binding = 4) uniform texture2D uTextures[2];
+layout(set = 0, binding = 4) uniform texture2D uTextures[8192];
 
 void main() 
 {

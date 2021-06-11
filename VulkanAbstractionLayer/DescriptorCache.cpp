@@ -71,7 +71,8 @@ namespace VulkanAbstractionLayer
 
         for (const auto& [specification, descriptor] : this->cache)
         {
-            vulkan.GetDevice().destroyDescriptorSetLayout(descriptor.SetLayout);
+            this->DestroyDescriptorSetLayout(descriptor.SetLayout);
+            // descriptor sets are already freed when pool is destroyed
         }
         this->cache.clear();
     }
@@ -81,10 +82,12 @@ namespace VulkanAbstractionLayer
         auto& vulkan = GetCurrentVulkanContext();
 
         std::vector<vk::DescriptorSetLayoutBinding> layoutBindings;
+        std::vector<vk::DescriptorBindingFlags> bindingFlags;
         size_t totalUniformCount = 0;
         for (const auto& uniformsPerStage : specification)
             totalUniformCount += uniformsPerStage.Uniforms.size();
         layoutBindings.reserve(totalUniformCount);
+        bindingFlags.reserve(totalUniformCount);
 
         for (const auto& uniformsPerStage : specification)
         {
@@ -96,11 +99,20 @@ namespace VulkanAbstractionLayer
                     uniform.Count,
                     ToNative(uniformsPerStage.ShaderStage)
                 });
+                bindingFlags.push_back(
+                    uniform.Count > 1 ? 
+                    vk::DescriptorBindingFlagBits::ePartiallyBound :
+                    vk::DescriptorBindingFlagBits{ }
+                );
             }
         }
 
+        vk::DescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo;
+        bindingFlagsCreateInfo.setBindingFlags(bindingFlags);
+
         vk::DescriptorSetLayoutCreateInfo layoutCreateInfo;
         layoutCreateInfo.setBindings(layoutBindings);
+        layoutCreateInfo.setPNext(&bindingFlagsCreateInfo);
 
         return vulkan.GetDevice().createDescriptorSetLayout(layoutCreateInfo);
     }
@@ -117,6 +129,16 @@ namespace VulkanAbstractionLayer
         return vulkan.GetDevice().allocateDescriptorSets(descriptorAllocateInfo).front();
     }
 
+    void DescriptorCache::DestroyDescriptorSetLayout(vk::DescriptorSetLayout layout)
+    {
+        GetCurrentVulkanContext().GetDevice().destroyDescriptorSetLayout(layout);
+    }
+
+    void DescriptorCache::FreeDescriptorSet(vk::DescriptorSet set)
+    {
+        GetCurrentVulkanContext().GetDevice().freeDescriptorSets(this->descriptorPool, set);
+    }
+
     DescriptorCache::Descriptor DescriptorCache::GetDescriptor(ArrayView<ShaderUniforms> specification)
     {
         auto searchIt = std::find_if(this->cache.begin(), this->cache.end(), [&specification](const DescriptorCacheEntry& e)
@@ -127,7 +149,7 @@ namespace VulkanAbstractionLayer
                     return u1.ShaderStage == u2.ShaderStage && IsLayoutSubSet(u1.Uniforms, u2.Uniforms);
                 });
         });
-        if (searchIt != this->cache.end()) return searchIt->Set;
+        if (searchIt != this->cache.end()) return searchIt->SetInfo;
 
         auto removeIt = std::remove_if(this->cache.begin(), this->cache.end(), [&specification](const DescriptorCacheEntry& e)
         {
@@ -137,7 +159,11 @@ namespace VulkanAbstractionLayer
                     return u1.ShaderStage == u2.ShaderStage && IsLayoutSubSet(u2.Uniforms, u1.Uniforms);
                 });
         });
-        this->cache.erase(removeIt, this->cache.end());
+        for (auto it = removeIt; it != this->cache.end(); it++)
+        {
+            this->FreeDescriptorSet(it->SetInfo.Set);
+            this->DestroyDescriptorSetLayout(it->SetInfo.SetLayout);
+        }
 
         auto descriptorSetLayout = this->CreateDescriptorSetLayout(specification);
         auto descriptorSet = this->AllocateDescriptorSet(descriptorSetLayout);

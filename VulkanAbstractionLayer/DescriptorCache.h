@@ -50,7 +50,7 @@ namespace VulkanAbstractionLayer
 		struct DescriptorCacheEntry
 		{
 			LayoutSpecification Specification;
-			Descriptor Set;
+			Descriptor SetInfo;
 		};
 
 		vk::DescriptorPool descriptorPool;
@@ -58,6 +58,8 @@ namespace VulkanAbstractionLayer
 
 		vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<ShaderUniforms> specification);
 		vk::DescriptorSet AllocateDescriptorSet(vk::DescriptorSetLayout layout);
+		void DestroyDescriptorSetLayout(vk::DescriptorSetLayout layout);
+		void FreeDescriptorSet(vk::DescriptorSet set);
 	public:
 
 		void Init();
