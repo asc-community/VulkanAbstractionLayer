@@ -67,6 +67,8 @@ namespace VulkanAbstractionLayer
 
     void ImGuiVulkanContext::Destroy()
     {
+        GetCurrentVulkanContext().GetDevice().waitIdle();
+
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
     }

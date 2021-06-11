@@ -9,6 +9,7 @@
 #include "VulkanAbstractionLayer/ModelLoader.h"
 #include "VulkanAbstractionLayer/ImageLoader.h"
 #include "VulkanAbstractionLayer/Buffer.h"
+#include "VulkanAbstractionLayer/Sampler.h"
 #include "imgui.h"
 
 using namespace VulkanAbstractionLayer;
@@ -69,7 +70,7 @@ struct RenderGraphResources
 {
     ShaderData OpaquePassVertexShader;
     ShaderData OpaquePassFragmentShader;
-    vk::Sampler TextureSampler;
+    Sampler BaseSampler;
     UniformData<CameraUniformData> CameraUniform;
     UniformData<ModelUniformData> ModelUniform;
     UniformData<LightUniformData> LightUniform;
@@ -127,7 +128,7 @@ void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGrap
     };
 
     vk::DescriptorImageInfo samplerInfo;
-    samplerInfo.setSampler(resources.TextureSampler);
+    samplerInfo.setSampler(resources.BaseSampler.GetNativeHandle());
 
     std::array sampledImageInfos = {
         vk::DescriptorImageInfo{
@@ -267,20 +268,6 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
     WriteDescriptorSet(renderGraph.GetNodeByName("OpaquePass"_id).Pass.GetDescriptorSet(), resources);
 
     return std::move(renderGraph);
-}
-
-vk::Sampler CreateSampler()
-{
-    vk::SamplerCreateInfo samplerCreateInfo;
-    samplerCreateInfo
-        .setMinFilter(vk::Filter::eLinear)
-        .setMagFilter(vk::Filter::eLinear)
-        .setAddressModeU(vk::SamplerAddressMode::eRepeat)
-        .setAddressModeV(vk::SamplerAddressMode::eRepeat)
-        .setMipmapMode(vk::SamplerMipmapMode::eLinear);
-
-    vk::Sampler sampler = GetCurrentVulkanContext().GetDevice().createSampler(samplerCreateInfo);
-    return sampler;
 }
 
 template<typename T>
@@ -486,11 +473,12 @@ int main()
 
     auto vertexShader = ShaderLoader::LoadFromSource("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
     auto fragmentShader = ShaderLoader::LoadFromSource("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
+    Sampler sampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MinFilter::LINEAR);
 
     RenderGraphResources renderGraphResources{
         std::move(vertexShader),
         std::move(fragmentShader),
-        CreateSampler(),
+        std::move(sampler),
         CreateUniform<CameraUniformData>(),
         CreateUniform<ModelUniformData>(),
         CreateUniform<LightUniformData>(),
@@ -572,10 +560,6 @@ int main()
             Vulkan.EndFrame();
         }
     }
-
-    Vulkan.GetDevice().waitIdle();
-
-    Vulkan.GetDevice().destroySampler(renderGraphResources.TextureSampler);
 
     ImGuiVulkanContext::Destroy();
 
