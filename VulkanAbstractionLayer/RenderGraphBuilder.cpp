@@ -167,18 +167,6 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    vk::DescriptorSet AllocateDescriptorSet(vk::DescriptorSetLayout layout)
-    {
-        auto& vulkan = GetCurrentVulkanContext();
-
-        vk::DescriptorSetAllocateInfo descriptorAllocateInfo;
-        descriptorAllocateInfo
-            .setDescriptorPool(vulkan.GetDescriptorCache().GetDescriptorPool())
-            .setSetLayouts(layout);
-
-        return vulkan.GetDevice().allocateDescriptorSets(descriptorAllocateInfo).front();
-    }
-
     RenderPass RenderGraphBuilder::BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments)
     {
         std::vector<vk::AttachmentDescription> attachmentDescriptions;
@@ -308,7 +296,7 @@ namespace VulkanAbstractionLayer
         if (renderPassBuilder.graphicPipeline.has_value())
         {
             const auto& graphicPipeline = renderPassBuilder.graphicPipeline.value();
-            descriptorSet = AllocateDescriptorSet(graphicPipeline.Shader.GetDescriptorSetLayout());
+            descriptorSet = graphicPipeline.Shader.GetDescriptorSet();
 
             std::array shaderStageCreateInfos = {
                 vk::PipelineShaderStageCreateInfo {

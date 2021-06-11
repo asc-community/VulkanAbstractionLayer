@@ -170,20 +170,45 @@ namespace VulkanAbstractionLayer
         };
     }
 
-    TypeSPIRV GetVertexAttributeByReflectedType(const SpvReflectInterfaceVariable* type)
+    TypeSPIRV GetTypeByReflection(const SpvReflectTypeDescription& type)
     {
-        int32_t byteSize = type->numeric.scalar.width / 8;
+        Format format = Format::UNDEFINED;
+        if (type.type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT)
+        {
+            if (type.traits.numeric.vector.component_count <  2 || type.traits.numeric.matrix.column_count <  2)
+                format = Format::R32_SFLOAT;
+            if (type.traits.numeric.vector.component_count == 2 || type.traits.numeric.matrix.column_count == 2)
+                format = Format::R32G32_SFLOAT;
+            if (type.traits.numeric.vector.component_count == 3 || type.traits.numeric.matrix.column_count == 3)
+                format = Format::R32G32B32_SFLOAT;
+            if (type.traits.numeric.vector.component_count == 4 || type.traits.numeric.matrix.column_count == 4)
+                format = Format::R32G32B32A32_SFLOAT;
+        }
+        if (type.type_flags & SPV_REFLECT_TYPE_FLAG_INT)
+        {
+            if (type.traits.numeric.vector.component_count <  2 || type.traits.numeric.matrix.column_count <  2)
+                format = type.traits.numeric.scalar.signedness ? Format::R32_SINT : Format::R32_UINT;
+            if (type.traits.numeric.vector.component_count == 2 || type.traits.numeric.matrix.column_count == 2)
+                format = type.traits.numeric.scalar.signedness ? Format::R32G32_SINT : Format::R32G32_UINT;
+            if (type.traits.numeric.vector.component_count == 3 || type.traits.numeric.matrix.column_count == 3)
+                format = type.traits.numeric.scalar.signedness ? Format::R32G32B32_SINT : Format::R32G32B32_UINT;
+            if (type.traits.numeric.vector.component_count == 4 || type.traits.numeric.matrix.column_count == 4)
+                format = type.traits.numeric.scalar.signedness ? Format::R32G32B32A32_SINT : Format::R32G32B32A32_UINT;
+        }
+        assert(format != Format::UNDEFINED);
+
+        int32_t byteSize = type.traits.numeric.scalar.width / 8;
         int32_t componentCount = 1;
 
-        if (type->numeric.vector.component_count > 0) 
-            byteSize *= type->numeric.vector.component_count;
-        else if (type->numeric.matrix.row_count > 0)
-            byteSize *= type->numeric.matrix.row_count;
+        if (type.traits.numeric.vector.component_count > 0)
+            byteSize *= type.traits.numeric.vector.component_count;
+        else if (type.traits.numeric.matrix.row_count > 0)
+            byteSize *= type.traits.numeric.matrix.row_count;
 
-        if (type->numeric.matrix.column_count > 0) 
-            componentCount = type->numeric.matrix.column_count;
+        if (type.traits.numeric.matrix.column_count > 0)
+            componentCount = type.traits.numeric.matrix.column_count;
 
-        return TypeSPIRV{ FromNative((vk::Format)type->format), componentCount, byteSize };
+        return TypeSPIRV{ format, componentCount, byteSize };
     }
 
     ShaderData ShaderLoader::LoadFromBinary(const std::string& filepath)
@@ -245,7 +270,7 @@ namespace VulkanAbstractionLayer
         std::sort(inputAttributes.begin(), inputAttributes.end(), [](const auto& v1, const auto& v2) { return v1->location < v2->location; });
         for (const auto& inputAttribute : inputAttributes)
         {
-            result.InputAttributes.push_back(GetVertexAttributeByReflectedType(inputAttribute));
+            result.InputAttributes.push_back(GetTypeByReflection(*inputAttribute->type_description));
         }
 
         uint32_t descriptorBindingCount = 0;
@@ -262,8 +287,15 @@ namespace VulkanAbstractionLayer
 
             auto& uniformBlock = result.UniformBlocks[descriptorBinding->set];
 
+            std::vector<TypeSPIRV> uniformVariables(descriptorBinding->type_description->member_count);
+            for (uint32_t i = 0; i < uniformVariables.size(); i++)
+            {
+                SpvReflectTypeDescription& member = descriptorBinding->type_description->members[i];
+                uniformVariables[i] = GetTypeByReflection(member);
+            }
+
             uniformBlock.push_back(Uniform { 
-                { }, // TODO
+                std::move(uniformVariables),
                 FromNative((vk::DescriptorType)descriptorBinding->descriptor_type),
                 descriptorBinding->binding,
                 descriptorBinding->count

@@ -38,11 +38,12 @@ namespace VulkanAbstractionLayer
         auto& device = vulkan.GetDevice();
         if ((bool)this->vertexShader) device.destroyShaderModule(this->vertexShader);
         if ((bool)this->fragmentShader) device.destroyShaderModule(this->fragmentShader);
-        // descriptorSetLayout is not deleted as it belongs to VulkanContext::DescriptorCache
+        // descriptorSetLayout & descriptorSet are not deleted as they belong to VulkanContext::DescriptorCache
 
         this->vertexShader = vk::ShaderModule{ };
         this->fragmentShader = vk::ShaderModule{ };
         this->descriptorSetLayout = vk::DescriptorSetLayout{ };
+        this->descriptorSet = vk::DescriptorSet{ };
     }
 
     GraphicShader::GraphicShader(const ShaderData& vertex, const ShaderData& fragment)
@@ -69,7 +70,9 @@ namespace VulkanAbstractionLayer
             ShaderUniforms{ fragment.UniformBlocks[0], ShaderType::FRAGMENT },
         };
 
-        this->descriptorSetLayout = vulkan.GetDescriptorCache().GetDescriptorSetLayout(specification);
+        auto descriptor = vulkan.GetDescriptorCache().GetDescriptor(specification);
+        this->descriptorSetLayout = descriptor.SetLayout;
+        this->descriptorSet = descriptor.Set;
     }
 
     GraphicShader::GraphicShader(GraphicShader&& other) noexcept
@@ -77,6 +80,7 @@ namespace VulkanAbstractionLayer
         this->vertexShader = other.vertexShader;
         this->fragmentShader = other.fragmentShader;
         this->descriptorSetLayout = other.descriptorSetLayout;
+        this->descriptorSet = other.descriptorSet;
         this->vertexAttributes = std::move(other.vertexAttributes);
 
         other.vertexShader = vk::ShaderModule{ };
@@ -91,11 +95,13 @@ namespace VulkanAbstractionLayer
         this->vertexShader = other.vertexShader;
         this->fragmentShader = other.fragmentShader;
         this->descriptorSetLayout = other.descriptorSetLayout;
+        this->descriptorSet = other.descriptorSet;
         this->vertexAttributes = std::move(other.vertexAttributes);
 
         other.vertexShader = vk::ShaderModule{ };
         other.fragmentShader = vk::ShaderModule{ };
         other.descriptorSetLayout = vk::DescriptorSetLayout{ };
+        other.descriptorSet = vk::DescriptorSet{ };
 
         return *this;
     }

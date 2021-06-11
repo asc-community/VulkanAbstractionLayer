@@ -37,18 +37,27 @@ namespace VulkanAbstractionLayer
 {
 	class DescriptorCache
 	{
+	public:
+		struct Descriptor
+		{
+			vk::DescriptorSetLayout SetLayout;
+			vk::DescriptorSet Set;
+		};
+
+	private:
 		using LayoutSpecification = std::vector<ShaderUniforms>;
 
 		struct DescriptorCacheEntry
 		{
 			LayoutSpecification Specification;
-			vk::DescriptorSetLayout DescriptorSetLayout;
+			Descriptor Set;
 		};
 
 		vk::DescriptorPool descriptorPool;
 		std::vector<DescriptorCacheEntry> cache;
 
-		static vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<ShaderUniforms> specification);
+		vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<ShaderUniforms> specification);
+		vk::DescriptorSet AllocateDescriptorSet(vk::DescriptorSetLayout layout);
 	public:
 
 		void Init();
@@ -56,6 +65,6 @@ namespace VulkanAbstractionLayer
 
 		const auto& GetDescriptorPool() const { return this->descriptorPool; }
 
-		vk::DescriptorSetLayout GetDescriptorSetLayout(ArrayView<ShaderUniforms> specification);
+		Descriptor GetDescriptor(ArrayView<ShaderUniforms> specification);
 	};
 }
