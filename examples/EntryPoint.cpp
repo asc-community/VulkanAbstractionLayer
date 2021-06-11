@@ -8,8 +8,7 @@
 #include "VulkanAbstractionLayer/ShaderLoader.h"
 #include "VulkanAbstractionLayer/ModelLoader.h"
 #include "VulkanAbstractionLayer/ImageLoader.h"
-#include "VulkanAbstractionLayer/Buffer.h"
-#include "VulkanAbstractionLayer/Sampler.h"
+#include "VulkanAbstractionLayer/DescriptorBinding.h"
 #include "imgui.h"
 
 using namespace VulkanAbstractionLayer;
@@ -80,89 +79,19 @@ struct RenderGraphResources
 
 void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGraphResources& resources)
 {
-    auto MakeDescriptorBufferInfo = [](const Buffer& buffer)
-    {
-        vk::DescriptorBufferInfo descriptorBufferInfo;
-        descriptorBufferInfo
-            .setBuffer(buffer.GetNativeHandle())
-            .setOffset(0)
-            .setRange(buffer.GetByteSize());
-        return descriptorBufferInfo;
-    };
-
-    auto MakeDescriptorBufferWrite = [&descriptorSet](const vk::DescriptorBufferInfo& info, uint32_t binding)
-    {
-        vk::WriteDescriptorSet descriptorBufferWrite;
-        descriptorBufferWrite
-            .setDstSet(descriptorSet)
-            .setDstBinding(binding)
-            .setDstArrayElement(0)
-            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            .setBufferInfo(info);
-        return descriptorBufferWrite;
-    };
-
-    auto MakeDescriptorSamplerWrite = [&descriptorSet](const vk::DescriptorImageInfo& info, uint32_t binding)
-    {
-        vk::WriteDescriptorSet descriptorSamplerWrite;
-        descriptorSamplerWrite
-            .setDstSet(descriptorSet)
-            .setDstBinding(binding)
-            .setDstArrayElement(0)
-            .setDescriptorType(vk::DescriptorType::eSampler)
-            .setImageInfo(info);
-        return descriptorSamplerWrite;
-    };
-
-    auto MakeDescriptorSampledImageWrite = [&descriptorSet](ArrayView<vk::DescriptorImageInfo> info, uint32_t binding)
-    {
-        vk::WriteDescriptorSet descriptorSampledImagesWrite;
-        descriptorSampledImagesWrite
-            .setDstSet(descriptorSet)
-            .setDstBinding(binding)
-            .setDstArrayElement(0)
-            .setDescriptorType(vk::DescriptorType::eSampledImage)
-            .setDescriptorCount((uint32_t)info.size())
-            .setPImageInfo(info.data());
-        return descriptorSampledImagesWrite;
-    };
-
-    vk::DescriptorImageInfo samplerInfo;
-    samplerInfo.setSampler(resources.BaseSampler.GetNativeHandle());
-
-    std::vector<vk::DescriptorImageInfo> sampledImageInfos;
+    std::vector<DescriptorBinding::ImageRef> imageReferences;
     for (const auto& texture : resources.DragonMesh.Textures)
-    {
-        sampledImageInfos.push_back(vk::DescriptorImageInfo{
-            { },
-            texture.GetNativeView(),
-            vk::ImageLayout::eShaderReadOnlyOptimal
-        });
-    }
+        imageReferences.push_back(std::ref(texture));
     for (const auto& texture : resources.PlaneMesh.Textures)
-    {
-        sampledImageInfos.push_back(vk::DescriptorImageInfo{
-            { },
-            texture.GetNativeView(),
-            vk::ImageLayout::eShaderReadOnlyOptimal
-        });
-    }
+        imageReferences.push_back(std::ref(texture));
 
-    std::array descriptorBufferInfos = {
-        MakeDescriptorBufferInfo(resources.CameraUniform.Buffer),
-        MakeDescriptorBufferInfo(resources.ModelUniform.Buffer),
-        MakeDescriptorBufferInfo(resources.LightUniform.Buffer),
-    };
-
-    std::array descriptorWrites = {
-        MakeDescriptorBufferWrite(descriptorBufferInfos[0], 0),
-        MakeDescriptorBufferWrite(descriptorBufferInfos[1], 1),
-        MakeDescriptorBufferWrite(descriptorBufferInfos[2], 2),
-        MakeDescriptorSamplerWrite(samplerInfo, 3),
-        MakeDescriptorSampledImageWrite(sampledImageInfos, 4),
-    };
-
-    GetCurrentVulkanContext().GetDevice().updateDescriptorSets(descriptorWrites, { });
+    DescriptorBinding{ }
+        .Bind(0, resources.CameraUniform.Buffer, UniformType::UNIFORM_BUFFER)
+        .Bind(1, resources.ModelUniform.Buffer, UniformType::UNIFORM_BUFFER)
+        .Bind(2, resources.LightUniform.Buffer, UniformType::UNIFORM_BUFFER)
+        .Bind(3, resources.BaseSampler, UniformType::SAMPLER)
+        .Bind(4, imageReferences, UniformType::SAMPLED_IMAGE)
+        .Write(descriptorSet);
 }
 
 RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const VulkanContext& context)
@@ -429,8 +358,8 @@ struct Camera
     Vector3 Position{ 40.0f, 25.0f, -90.0f };
     Vector2 Rotation{ 5.74f, 0.0f };
     float Fov = 65.0f;
-    float MovementSpeed = 0.5f;
-    float RotationMovementSpeed = 0.01f;
+    float MovementSpeed = 250.0f;
+    float RotationMovementSpeed = 2.5f;
     float AspectRatio = 16.0f / 9.0f;
     float ZNear = 0.001f;
     float ZFar = 10000.0f;
@@ -548,9 +477,11 @@ int main()
             Vulkan.StartFrame();
             ImGuiVulkanContext::StartFrame();
 
+            auto dt = ImGui::GetIO().DeltaTime;
+
             auto mouseMovement = ImGui::GetMouseDragDelta(MouseButton::RIGHT, 0.0f);
             ImGui::ResetMouseDragDelta(MouseButton::RIGHT);
-            camera.Rotate({ -mouseMovement.x, -mouseMovement.y });
+            camera.Rotate(Vector2{ -mouseMovement.x, -mouseMovement.y } * dt);
 
             Vector3 movementDirection{ 0.0f };
             if (ImGui::IsKeyDown(KeyCode::W))
@@ -566,11 +497,11 @@ int main()
             if (ImGui::IsKeyDown(KeyCode::LEFT_SHIFT))
                 movementDirection += Vector3{  0.0f, -1.0f,  0.0f };
             if (movementDirection != Vector3{ 0.0f }) movementDirection = Normalize(movementDirection);
-            camera.Move(movementDirection);
+            camera.Move(movementDirection * dt);
 
             ImGui::Begin("Camera");
             ImGui::DragFloat("movement speed", &camera.MovementSpeed, 0.1f);
-            ImGui::DragFloat("rotation movement speed", &camera.RotationMovementSpeed, 0.01f);
+            ImGui::DragFloat("rotation movement speed", &camera.RotationMovementSpeed, 0.1f);
             ImGui::DragFloat3("position", &camera.Position[0]);
             ImGui::DragFloat2("rotation", &camera.Rotation[0], 0.01f);
             ImGui::DragFloat("fov", &camera.Fov);

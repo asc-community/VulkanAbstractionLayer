@@ -95,6 +95,7 @@ namespace VulkanAbstractionLayer
     {
         GraphicShader Shader;
         std::vector<VertexBinding> VertexBindings;
+        // std::vector<ShaderBinding> ShaderBindings;
     };
 
     class RenderPassBuilder
