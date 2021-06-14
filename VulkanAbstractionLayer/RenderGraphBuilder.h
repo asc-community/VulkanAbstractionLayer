@@ -146,6 +146,7 @@ namespace VulkanAbstractionLayer
 
         RenderPass BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments);
         AttachmentLayout ResolveImageTransitions(StringId outputName);
+        void PreWarmDescriptorSets();
         AttachmentHashMap AllocateAttachments();
     public:
         RenderGraphBuilder& AddRenderPass(RenderPassBuilder&& renderPass);

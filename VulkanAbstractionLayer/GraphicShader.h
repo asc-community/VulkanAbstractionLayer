@@ -40,9 +40,8 @@ namespace VulkanAbstractionLayer
         vk::ShaderModule vertexShader;
         vk::ShaderModule fragmentShader;
 
+        std::vector<ShaderUniforms> shaderUniforms;
         std::vector<TypeSPIRV> vertexAttributes;
-        vk::DescriptorSetLayout descriptorSetLayout;
-        vk::DescriptorSet descriptorSet;
 
         void Destroy();
     public:
@@ -58,8 +57,7 @@ namespace VulkanAbstractionLayer
         ~GraphicShader();
 
         const auto& GetVertexAttributes() const { return this->vertexAttributes; }
-        const auto& GetDescriptorSetLayout() const { return this->descriptorSetLayout; }
-        const auto& GetDescriptorSet() const { return this->descriptorSet; }
+        const auto& GetShaderUniforms() const { return this->shaderUniforms; }
 
         const vk::ShaderModule& GetNativeShader(ShaderType type) const
         {

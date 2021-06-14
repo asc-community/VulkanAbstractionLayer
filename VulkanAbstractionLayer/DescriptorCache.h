@@ -56,7 +56,7 @@ namespace VulkanAbstractionLayer
 		vk::DescriptorPool descriptorPool;
 		std::vector<DescriptorCacheEntry> cache;
 
-		vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<ShaderUniforms> specification);
+		vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<const ShaderUniforms> specification);
 		vk::DescriptorSet AllocateDescriptorSet(vk::DescriptorSetLayout layout);
 		void DestroyDescriptorSetLayout(vk::DescriptorSetLayout layout);
 		void FreeDescriptorSet(vk::DescriptorSet set);
@@ -67,6 +67,6 @@ namespace VulkanAbstractionLayer
 
 		const auto& GetDescriptorPool() const { return this->descriptorPool; }
 
-		Descriptor GetDescriptor(ArrayView<ShaderUniforms> specification);
+		Descriptor GetDescriptor(ArrayView<const ShaderUniforms> specification);
 	};
 }

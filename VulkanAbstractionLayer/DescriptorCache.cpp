@@ -77,7 +77,7 @@ namespace VulkanAbstractionLayer
         this->cache.clear();
     }
 
-    vk::DescriptorSetLayout DescriptorCache::CreateDescriptorSetLayout(ArrayView<ShaderUniforms> specification)
+    vk::DescriptorSetLayout DescriptorCache::CreateDescriptorSetLayout(ArrayView<const ShaderUniforms> specification)
     {
         auto& vulkan = GetCurrentVulkanContext();
 
@@ -139,7 +139,7 @@ namespace VulkanAbstractionLayer
         GetCurrentVulkanContext().GetDevice().freeDescriptorSets(this->descriptorPool, set);
     }
 
-    DescriptorCache::Descriptor DescriptorCache::GetDescriptor(ArrayView<ShaderUniforms> specification)
+    DescriptorCache::Descriptor DescriptorCache::GetDescriptor(ArrayView<const ShaderUniforms> specification)
     {
         auto searchIt = std::find_if(this->cache.begin(), this->cache.end(), [&specification](const DescriptorCacheEntry& e)
         {

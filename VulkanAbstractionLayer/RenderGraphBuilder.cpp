@@ -293,10 +293,13 @@ namespace VulkanAbstractionLayer
         vk::Pipeline pipeline;
         vk::PipelineLayout pipelineLayout;
         vk::DescriptorSet descriptorSet;
+        vk::DescriptorSetLayout descriptorSetLayout;
         if (renderPassBuilder.graphicPipeline.has_value())
         {
             const auto& graphicPipeline = renderPassBuilder.graphicPipeline.value();
-            descriptorSet = graphicPipeline.Shader.GetDescriptorSet();
+            auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(graphicPipeline.Shader.GetShaderUniforms());
+            descriptorSet = descriptor.Set;
+            descriptorSetLayout = descriptor.SetLayout;
 
             std::array shaderStageCreateInfos = {
                 vk::PipelineShaderStageCreateInfo {
@@ -396,7 +399,12 @@ namespace VulkanAbstractionLayer
                 .setSrcAlphaBlendFactor(vk::BlendFactor::eOne)
                 .setDstAlphaBlendFactor(vk::BlendFactor::eZero)
                 .setAlphaBlendOp(vk::BlendOp::eAdd)
-                .setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+                .setColorWriteMask(
+                    vk::ColorComponentFlagBits::eR | 
+                    vk::ColorComponentFlagBits::eG | 
+                    vk::ColorComponentFlagBits::eB | 
+                    vk::ColorComponentFlagBits::eA
+                );
 
             vk::PipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
             colorBlendStateCreateInfo
@@ -424,7 +432,7 @@ namespace VulkanAbstractionLayer
             dynamicStateCreateInfo.setDynamicStates(dynamicStates);
 
             vk::PipelineLayoutCreateInfo layoutCreateInfo;
-            layoutCreateInfo.setSetLayouts(graphicPipeline.Shader.GetDescriptorSetLayout());
+            layoutCreateInfo.setSetLayouts(descriptorSetLayout);
 
             pipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
 
@@ -543,12 +551,28 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
+    void RenderGraphBuilder::PreWarmDescriptorSets()
+    {
+        auto& descriptorCache = GetCurrentVulkanContext().GetDescriptorCache();
+        for (const auto& renderPass : this->renderPasses)
+        {
+            if (renderPass.graphicPipeline.has_value())
+            {
+                auto& uniforms = renderPass.graphicPipeline->Shader.GetShaderUniforms();
+                (void)descriptorCache.GetDescriptor(uniforms);
+            }
+        }
+    }
+
     RenderGraph RenderGraphBuilder::Build()
     {
         AttachmentLayout outputLayout = this->ResolveImageTransitions(this->outputName);
         AttachmentHashMap attachments = this->AllocateAttachments();
 
         std::vector<RenderGraphNode> nodes;
+
+        this->PreWarmDescriptorSets();
+
         for (auto& renderPass : this->renderPasses)
         {
             std::vector<StringId> colorAttachments;
