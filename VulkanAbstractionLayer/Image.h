@@ -34,6 +34,26 @@
 
 namespace VulkanAbstractionLayer
 {
+    vk::ImageAspectFlags ImageFormatToImageAspect(Format format);
+
+    struct ImageUsage
+    {
+        using Value = uint32_t;
+
+        enum Bits : Value
+        {
+            UNKNOWN = (Value)vk::ImageViewCreateFlagBits{ },
+            TRANSFER_SOURCE = (Value)vk::ImageUsageFlagBits::eTransferSrc,
+            TRANSFER_DISTINATION = (Value)vk::ImageUsageFlagBits::eTransferDst,
+            SHADER_READ = (Value)vk::ImageUsageFlagBits::eSampled,
+            STORAGE = (Value)vk::ImageUsageFlagBits::eStorage,
+            COLOR_ATTACHMENT = (Value)vk::ImageUsageFlagBits::eColorAttachment,
+            DEPTH_SPENCIL_ATTACHMENT = (Value)vk::ImageUsageFlagBits::eDepthStencilAttachment,
+            INPUT_ATTACHMENT = (Value)vk::ImageUsageFlagBits::eInputAttachment,
+            FRAGMENT_SHADING_RATE_ATTACHMENT = (Value)vk::ImageUsageFlagBits::eFragmentShadingRateAttachmentKHR,
+        };
+    };
+
     class Image
     {
         vk::Image handle;
@@ -46,13 +66,13 @@ namespace VulkanAbstractionLayer
         void InitView(const vk::Image& image, Format format);
     public:
         Image() = default;
-        Image(uint32_t width, uint32_t height, Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
+        Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage);
         Image(vk::Image image, uint32_t width, uint32_t height, Format format);
         Image(Image&& other) noexcept;
         Image& operator=(Image&& other) noexcept;
         ~Image();
 
-        void Init(uint32_t width, uint32_t height, Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage);
+        void Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage);
 
         vk::Image GetNativeHandle() const { return this->handle; }
         vk::ImageView GetNativeView() const { return this->view; }

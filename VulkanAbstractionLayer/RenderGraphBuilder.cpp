@@ -69,13 +69,13 @@ namespace VulkanAbstractionLayer
 
     RenderPassBuilder& RenderPassBuilder::AddWriteOnlyColorAttachment(StringId name, ClearColor clear)
     {
-        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, AttachmentLayout::UNKWNON, AttachmentInitialState::CLEAR, clear });
+        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, ImageUsage::UNKNOWN, AttachmentInitialState::CLEAR, clear });
         return *this;
     }
 
     RenderPassBuilder& RenderPassBuilder::AddWriteOnlyColorAttachment(StringId name, AttachmentInitialState state)
     {
-        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, AttachmentLayout::UNKWNON, state });
+        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, ImageUsage::UNKNOWN, state });
         return *this;
     }
 
@@ -87,13 +87,13 @@ namespace VulkanAbstractionLayer
 
     RenderPassBuilder& RenderPassBuilder::SetWriteOnlyDepthAttachment(StringId name, ClearDepthSpencil clear)
     {
-        this->depthAttachment = WriteOnlyDepthAttachment{ name, AttachmentLayout::UNKWNON, AttachmentInitialState::CLEAR, clear };
+        this->depthAttachment = WriteOnlyDepthAttachment{ name, ImageUsage::UNKNOWN, AttachmentInitialState::CLEAR, clear };
         return *this;
     }
 
     RenderPassBuilder& RenderPassBuilder::SetWriteOnlyDepthAttachment(StringId name, AttachmentInitialState state)
     {
-        this->depthAttachment = WriteOnlyDepthAttachment{ name, AttachmentLayout::UNKWNON, state };
+        this->depthAttachment = WriteOnlyDepthAttachment{ name, ImageUsage::UNKNOWN, state };
         return *this;
     }
 
@@ -102,15 +102,6 @@ namespace VulkanAbstractionLayer
         this->graphicPipeline = std::move(pipeline);
         return *this;
     }
-
-    std::array LayoutTable = {
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eShaderReadOnlyOptimal,
-        vk::ImageLayout::eColorAttachmentOptimal,
-        vk::ImageLayout::eDepthAttachmentOptimal,
-        vk::ImageLayout::eTransferSrcOptimal,
-        vk::ImageLayout::eTransferDstOptimal,
-    };
 
     std::array LoadOpTable = {
         vk::AttachmentLoadOp::eClear,
@@ -123,47 +114,85 @@ namespace VulkanAbstractionLayer
         vk::VertexInputRate::eInstance,
     };
 
-    vk::AccessFlags AttachmentLayoutToAccessFlags(AttachmentLayout layout)
+    vk::ImageLayout ImageUsageToImageLayout(ImageUsage::Bits layout)
     {
         switch (layout)
         {
-        case AttachmentLayout::UNKWNON:
-            return vk::AccessFlags{ };
-        case AttachmentLayout::SHADER_READ:
-            return vk::AccessFlagBits::eShaderRead;
-        case AttachmentLayout::COLOR_ATTACHMENT:
-            return vk::AccessFlagBits::eColorAttachmentWrite;
-        case AttachmentLayout::DEPTH_ATTACHMENT:
-            return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-        case AttachmentLayout::TRANSFER_SOURCE:
-            return vk::AccessFlagBits::eTransferRead;
-        case AttachmentLayout::TRANSFER_DISTANCE:
-            return vk::AccessFlagBits::eTransferWrite;
+        case VulkanAbstractionLayer::ImageUsage::UNKNOWN:
+            return vk::ImageLayout::eUndefined;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_SOURCE:
+            return vk::ImageLayout::eTransferSrcOptimal;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION:
+            return vk::ImageLayout::eTransferDstOptimal;
+        case VulkanAbstractionLayer::ImageUsage::SHADER_READ:
+            return vk::ImageLayout::eShaderReadOnlyOptimal;
+        case VulkanAbstractionLayer::ImageUsage::STORAGE:
+            return vk::ImageLayout::eShaderReadOnlyOptimal; // TODO: what if writes?
+        case VulkanAbstractionLayer::ImageUsage::COLOR_ATTACHMENT:
+            return vk::ImageLayout::eColorAttachmentOptimal;
+        case VulkanAbstractionLayer::ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+            return vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        case VulkanAbstractionLayer::ImageUsage::INPUT_ATTACHMENT:
+            return vk::ImageLayout::eAttachmentOptimalKHR; // TODO: is it ok?
+        case VulkanAbstractionLayer::ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return vk::ImageLayout::eFragmentShadingRateAttachmentOptimalKHR;
         default:
             assert(false);
-            return vk::AccessFlags{ };
+            return vk::ImageLayout::eUndefined;
         }
     }
 
-    vk::ImageUsageFlags AttachmentLayoutToImageUsage(AttachmentLayout layout)
+    vk::PipelineStageFlags ImageUsageToPipelineStage(ImageUsage::Bits layout)
     {
         switch (layout)
         {
-        case AttachmentLayout::UNKWNON:
-            return vk::ImageUsageFlags{ };
-        case AttachmentLayout::SHADER_READ:
-            return vk::ImageUsageFlagBits::eSampled;
-        case AttachmentLayout::COLOR_ATTACHMENT:
-            return vk::ImageUsageFlagBits::eColorAttachment;
-        case AttachmentLayout::DEPTH_ATTACHMENT:
-            return vk::ImageUsageFlagBits::eDepthStencilAttachment;
-        case AttachmentLayout::TRANSFER_SOURCE:
-            return vk::ImageUsageFlagBits::eTransferSrc;
-        case AttachmentLayout::TRANSFER_DISTANCE:
-            return vk::ImageUsageFlagBits::eTransferDst;
+        case VulkanAbstractionLayer::ImageUsage::UNKNOWN:
+            return vk::PipelineStageFlags{ };
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_SOURCE:
+            return vk::PipelineStageFlagBits::eTransfer;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION:
+            return vk::PipelineStageFlagBits::eTransfer;
+        case VulkanAbstractionLayer::ImageUsage::SHADER_READ:
+            return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
+        case VulkanAbstractionLayer::ImageUsage::STORAGE:
+            return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
+        case VulkanAbstractionLayer::ImageUsage::COLOR_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        case VulkanAbstractionLayer::ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eEarlyFragmentTests; // TODO: whats for late fragment test?
+        case VulkanAbstractionLayer::ImageUsage::INPUT_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eFragmentShader; // TODO: check if at least works
+        case VulkanAbstractionLayer::ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eFragmentShadingRateAttachmentKHR;
         default:
             assert(false);
-            return vk::ImageUsageFlags{ };
+            return vk::PipelineStageFlags{ };
+        }
+    }
+
+    vk::AccessFlags ImageUsageToAccessFlags(ImageUsage::Bits layout)
+    {
+        switch (layout)
+        {
+        case ImageUsage::UNKNOWN:
+            return vk::AccessFlags{ };
+        case ImageUsage::TRANSFER_SOURCE:
+            return vk::AccessFlagBits::eTransferRead;
+        case ImageUsage::TRANSFER_DISTINATION:
+            return vk::AccessFlagBits::eTransferWrite;
+        case ImageUsage::STORAGE:
+            return vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite; // TODO: what if storage is not read or write?
+        case ImageUsage::COLOR_ATTACHMENT:
+            return vk::AccessFlagBits::eColorAttachmentWrite;
+        case ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+            return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        case ImageUsage::INPUT_ATTACHMENT:
+            return vk::AccessFlagBits::eInputAttachmentRead;
+        case ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return vk::AccessFlagBits::eFragmentShadingRateAttachmentReadKHR;
+        default:
+            assert(false);
+            return vk::AccessFlags{ };
         }
     }
 
@@ -195,7 +224,7 @@ namespace VulkanAbstractionLayer
                 .setStoreOp(vk::AttachmentStoreOp::eStore)
                 .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
                 .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-                .setInitialLayout(LayoutTable[(size_t)outputColorAttachment.InitialLayout])
+                .setInitialLayout(ImageUsageToImageLayout(outputColorAttachment.InitialLayout))
                 .setFinalLayout(vk::ImageLayout::eColorAttachmentOptimal);
         
             attachmentDescriptions.push_back(std::move(attachmentDescription));
@@ -227,7 +256,7 @@ namespace VulkanAbstractionLayer
                 .setStoreOp(vk::AttachmentStoreOp::eStore)
                 .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
                 .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-                .setInitialLayout(LayoutTable[(size_t)depthAttachment.InitialLayout])
+                .setInitialLayout(ImageUsageToImageLayout(depthAttachment.InitialLayout))
                 .setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
             attachmentDescriptions.push_back(std::move(depthAttachmentDescription));
@@ -455,28 +484,30 @@ namespace VulkanAbstractionLayer
                 .setBasePipelineIndex(0);
 
             pipeline = GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
+
+            graphicPipeline.DescriptorBindings.Write(descriptorSet);
         }
 
         return RenderPass{ renderPass, descriptorSet, pipeline, pipelineLayout, renderArea, framebuffer, clearValues };
     }
 
-    AttachmentLayout RenderGraphBuilder::ResolveImageTransitions(StringId outputName)
+    ImageUsage::Bits RenderGraphBuilder::ResolveImageTransitions(StringId outputName)
     {
-        std::unordered_map<StringId, AttachmentLayout> layoutTransitions;
+        std::unordered_map<StringId, ImageUsage::Bits> layoutTransitions;
         for (auto& renderPass : this->renderPasses)
         {
             for (auto& inputAttachment : renderPass.inputColorAttachments)
             {
                 inputAttachment.InitialLayout = layoutTransitions[inputAttachment.Name];
-                layoutTransitions[inputAttachment.Name] = AttachmentLayout::SHADER_READ;
+                layoutTransitions[inputAttachment.Name] = ImageUsage::SHADER_READ;
             }
             for (auto& outputAttachment : renderPass.outputColorAttachments)
             {
                 outputAttachment.InitialLayout = layoutTransitions[outputAttachment.Name];
-                layoutTransitions[outputAttachment.Name] = AttachmentLayout::COLOR_ATTACHMENT;
+                layoutTransitions[outputAttachment.Name] = ImageUsage::COLOR_ATTACHMENT;
             }
             renderPass.depthAttachment.InitialLayout = layoutTransitions[renderPass.depthAttachment.Name];
-            layoutTransitions[renderPass.depthAttachment.Name] = AttachmentLayout::DEPTH_ATTACHMENT;
+            layoutTransitions[renderPass.depthAttachment.Name] = ImageUsage::DEPTH_SPENCIL_ATTACHMENT;
         }
         return layoutTransitions[outputName];
     }
@@ -485,20 +516,20 @@ namespace VulkanAbstractionLayer
     {
         AttachmentHashMap attachments;
 
-        std::unordered_map<StringId, vk::ImageUsageFlags> attachmentUsages;
+        std::unordered_map<StringId, ImageUsage::Value> attachmentUsages;
         for (const auto& renderPass : this->renderPasses)
         {
             for (const auto& colorAttachment : renderPass.inputColorAttachments)
             {
-                attachmentUsages[colorAttachment.Name] |= AttachmentLayoutToImageUsage(AttachmentLayout::SHADER_READ);
+                attachmentUsages[colorAttachment.Name] |= ImageUsage::SHADER_READ;
             }
             for (const auto& colorAttachment : renderPass.outputColorAttachments)
             {
-                attachmentUsages[colorAttachment.Name] |= AttachmentLayoutToImageUsage(AttachmentLayout::COLOR_ATTACHMENT);
+                attachmentUsages[colorAttachment.Name] |= ImageUsage::COLOR_ATTACHMENT;
             }
-            attachmentUsages[renderPass.depthAttachment.Name] |= AttachmentLayoutToImageUsage(AttachmentLayout::DEPTH_ATTACHMENT);
+            attachmentUsages[renderPass.depthAttachment.Name] |= ImageUsage::DEPTH_SPENCIL_ATTACHMENT;
         }
-        attachmentUsages[this->outputName] |= AttachmentLayoutToImageUsage(AttachmentLayout::TRANSFER_SOURCE);
+        attachmentUsages[this->outputName] |= ImageUsage::TRANSFER_SOURCE;
         // remove empty attachment
         attachmentUsages.erase(StringId{ });
 
@@ -566,7 +597,7 @@ namespace VulkanAbstractionLayer
 
     RenderGraph RenderGraphBuilder::Build()
     {
-        AttachmentLayout outputLayout = this->ResolveImageTransitions(this->outputName);
+        ImageUsage::Bits outputLayout = this->ResolveImageTransitions(this->outputName);
         AttachmentHashMap attachments = this->AllocateAttachments();
 
         std::vector<RenderGraphNode> nodes;
@@ -592,9 +623,9 @@ namespace VulkanAbstractionLayer
         auto OnPresent = [outputLayout](CommandBuffer& commandBuffer, const Image& outputImage, const Image& presentImage)
         {
             commandBuffer.BlitImage(
-                outputImage, LayoutTable[(size_t)outputLayout], AttachmentLayoutToAccessFlags(outputLayout), 
+                outputImage, ImageUsageToImageLayout(outputLayout), ImageUsageToAccessFlags(outputLayout),
                 presentImage, vk::ImageLayout::eUndefined, vk::AccessFlagBits::eMemoryRead,
-                vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::Filter::eLinear
+                ImageUsageToPipelineStage(outputLayout), vk::Filter::eLinear
             );
         };
 

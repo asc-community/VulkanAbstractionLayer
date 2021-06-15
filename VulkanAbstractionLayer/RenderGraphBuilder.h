@@ -35,19 +35,10 @@
 #include "StringId.h"
 #include "RenderGraph.h"
 #include "GraphicShader.h"
+#include "DescriptorBinding.h"
 
 namespace VulkanAbstractionLayer
 {
-    enum class AttachmentLayout
-    {
-        UNKWNON = 0,
-        SHADER_READ,
-        COLOR_ATTACHMENT,
-        DEPTH_ATTACHMENT,
-        TRANSFER_SOURCE,
-        TRANSFER_DISTANCE,
-    };
-
     enum class AttachmentInitialState
     {
         CLEAR = 0,
@@ -69,7 +60,7 @@ namespace VulkanAbstractionLayer
     struct Attachment
     {
         StringId Name = { };
-        AttachmentLayout InitialLayout = AttachmentLayout::UNKWNON;
+        ImageUsage::Bits InitialLayout = ImageUsage::UNKNOWN;
     };
 
     struct WriteOnlyAttachment : Attachment
@@ -95,7 +86,7 @@ namespace VulkanAbstractionLayer
     {
         GraphicShader Shader;
         std::vector<VertexBinding> VertexBindings;
-        // std::vector<ShaderBinding> ShaderBindings;
+        DescriptorBinding DescriptorBindings;
     };
 
     class RenderPassBuilder
@@ -145,7 +136,7 @@ namespace VulkanAbstractionLayer
         StringId outputName = { };
 
         RenderPass BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments);
-        AttachmentLayout ResolveImageTransitions(StringId outputName);
+        ImageUsage::Bits ResolveImageTransitions(StringId outputName);
         void PreWarmDescriptorSets();
         AttachmentHashMap AllocateAttachments();
     public:

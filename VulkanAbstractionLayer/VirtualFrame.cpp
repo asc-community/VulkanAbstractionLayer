@@ -48,7 +48,7 @@ namespace VulkanAbstractionLayer
         {
             VirtualFrame& virtualFrame = this->virtualFrames[i];
             virtualFrame.Commands = CommandBuffer{ commandBuffers[i] };
-            virtualFrame.StageBuffer.Init(stageBufferSize, BufferUsageType::TRANSFER_SOURCE, MemoryUsage::CPU_TO_GPU);
+            virtualFrame.StageBuffer.Init(stageBufferSize, BufferUsage::TRANSFER_SOURCE, MemoryUsage::CPU_TO_GPU);
             (void)virtualFrame.StageBuffer.MapMemory(); // map memory for future use as stage point for other resources
             virtualFrame.CommandQueueFence = vulkanContext.GetDevice().createFence(vk::FenceCreateInfo{ vk::FenceCreateFlagBits::eSignaled });
         }
@@ -88,7 +88,7 @@ namespace VulkanAbstractionLayer
         auto& presentImage = vulkanContext.GetSwapchainImage(this->presentImageIndex);
 
         vk::ImageSubresourceRange subresourceRange{
-            vk::ImageAspectFlagBits::eColor,
+            ImageFormatToImageAspect(presentImage.GetFormat()),
             0, // base mip level
             1, // level count
             0, // base layer

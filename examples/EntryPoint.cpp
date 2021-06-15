@@ -77,7 +77,7 @@ struct RenderGraphResources
     Mesh PlaneMesh;
 };
 
-void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGraphResources& resources)
+RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const VulkanContext& context)
 {
     std::vector<DescriptorBinding::ImageRef> imageReferences;
     for (const auto& texture : resources.DragonMesh.Textures)
@@ -85,17 +85,6 @@ void WriteDescriptorSet(const vk::DescriptorSet& descriptorSet, const RenderGrap
     for (const auto& texture : resources.PlaneMesh.Textures)
         imageReferences.push_back(std::ref(texture));
 
-    DescriptorBinding{ }
-        .Bind(0, resources.CameraUniform.Buffer, UniformType::UNIFORM_BUFFER)
-        .Bind(1, resources.ModelUniform.Buffer, UniformType::UNIFORM_BUFFER)
-        .Bind(2, resources.LightUniform.Buffer, UniformType::UNIFORM_BUFFER)
-        .Bind(3, resources.BaseSampler, UniformType::SAMPLER)
-        .Bind(4, imageReferences, UniformType::SAMPLED_IMAGE)
-        .Write(descriptorSet);
-}
-
-RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const VulkanContext& context)
-{
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
         .AddRenderPass(RenderPassBuilder{ "OpaquePass"_id }
@@ -113,7 +102,13 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                         VertexBinding::Rate::PER_INSTANCE,
                         2,
                     },
-                }
+                },
+                DescriptorBinding{ }
+                    .Bind(0, resources.CameraUniform.Buffer, UniformType::UNIFORM_BUFFER)
+                    .Bind(1, resources.ModelUniform.Buffer, UniformType::UNIFORM_BUFFER)
+                    .Bind(2, resources.LightUniform.Buffer, UniformType::UNIFORM_BUFFER)
+                    .Bind(3, resources.BaseSampler, UniformType::SAMPLER)
+                    .Bind(4, imageReferences, UniformType::SAMPLED_IMAGE)
             })
             .AddWriteOnlyColorAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f })
             .SetWriteOnlyDepthAttachment("OutputDepth"_id, ClearDepthSpencil{ })
@@ -199,15 +194,13 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
 
     auto renderGraph = renderGraphBuilder.Build();
 
-    WriteDescriptorSet(renderGraph.GetNodeByName("OpaquePass"_id).Pass.GetDescriptorSet(), resources);
-
     return std::move(renderGraph);
 }
 
 template<typename T>
 UniformData<T> CreateUniform()
 {
-    return { Buffer(sizeof(T), BufferUsageType::UNIFORM_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY), T{ } };
+    return { Buffer(sizeof(T), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY), T{ } };
 }
 
 Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vector<InstanceData>& instances, ArrayView<ImageData> textures)
@@ -222,8 +215,8 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
     size_t instanceBufferSize = instances.size() * sizeof(InstanceData);
     size_t vertexBufferSize = vertices.size() * sizeof(ModelData::Vertex);
 
-    result.InstanceBuffer.Init(instanceBufferSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
-    result.VertexBuffer.Init(vertexBufferSize, BufferUsageType::VERTEX_BUFFER | BufferUsageType::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    result.InstanceBuffer.Init(instanceBufferSize, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    result.VertexBuffer.Init(vertexBufferSize, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
     
     stageBuffer.LoadData((uint8_t*)instances.data(), instanceBufferSize, offset);
     offset += instanceBufferSize;
@@ -237,7 +230,7 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
             texture.Width, 
             texture.Height, 
             Format::R8G8B8A8_UNORM, 
-            vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst, 
+            ImageUsage::TRANSFER_DISTINATION | ImageUsage::SHADER_READ,
             MemoryUsage::GPU_ONLY
         );
         stageBuffer.LoadData(texture.ByteData, texture.GetByteSize(), offset);

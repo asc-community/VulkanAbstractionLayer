@@ -68,6 +68,6 @@ namespace VulkanAbstractionLayer
 		DescriptorBinding& Bind(uint32_t binding, const std::vector<ImageRef>& images, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, const std::vector<SamplerRef>& samplers, UniformType type);
 
-		void Write(const vk::DescriptorSet& descriptorSet);
+		void Write(const vk::DescriptorSet& descriptorSet) const;
 	};
 }

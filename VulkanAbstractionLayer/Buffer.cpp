@@ -32,12 +32,12 @@
 
 namespace VulkanAbstractionLayer
 {
-    Buffer::Buffer(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage)
+    Buffer::Buffer(size_t byteSize, BufferUsage::Value usage, MemoryUsage memoryUsage)
     {
         this->Init(byteSize, usage, memoryUsage);
     }
 
-    void Buffer::Init(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage)
+    void Buffer::Init(size_t byteSize, BufferUsage::Value usage, MemoryUsage memoryUsage)
     {
         constexpr std::array BufferQueueFamiliyIndicies = { (uint32_t)0 };
         // destroy previous buffer

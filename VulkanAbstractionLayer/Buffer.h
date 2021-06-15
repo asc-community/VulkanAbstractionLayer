@@ -33,28 +33,28 @@
 
 namespace VulkanAbstractionLayer
 {
-    struct BufferUsageType
+    struct BufferUsage
     {
         using Value = uint32_t;
 
         enum Bits : Value
         {
-            TRANSFER_SOURCE = (uint32_t)vk::BufferUsageFlagBits::eTransferSrc,
-            TRANSFER_DESTINATION = (uint32_t)vk::BufferUsageFlagBits::eTransferDst,
-            UNIFORM_TEXEL_BUFFER = (uint32_t)vk::BufferUsageFlagBits::eUniformTexelBuffer,
-            STORAGE_TEXEL_BUFFER = (uint32_t)vk::BufferUsageFlagBits::eStorageTexelBuffer,
-            UNIFORM_BUFFER = (uint32_t)vk::BufferUsageFlagBits::eUniformBuffer,
-            STORAGE_BUFFER = (uint32_t)vk::BufferUsageFlagBits::eStorageBuffer,
-            INDEX_BUFFER = (uint32_t)vk::BufferUsageFlagBits::eIndexBuffer,
-            VERTEX_BUFFER = (uint32_t)vk::BufferUsageFlagBits::eVertexBuffer,
-            INDIRECT_BUFFER = (uint32_t)vk::BufferUsageFlagBits::eIndexBuffer,
-            SHADER_DEVICE_ADDRESS = (uint32_t)vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            TRANSFORM_FEEDBACK_BUFFER = (uint32_t)vk::BufferUsageFlagBits::eTransformFeedbackBufferEXT,
-            TRANSFORM_FEEDBACK_COUNTER_BUFFER = (uint32_t)vk::BufferUsageFlagBits::eTransformFeedbackCounterBufferEXT,
-            CONDITIONAL_RENDERING = (uint32_t)vk::BufferUsageFlagBits::eConditionalRenderingEXT,
-            ACCELERATION_STRUCTURE_BUILD_INPUT_READONLY = (uint32_t)vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
-            ACCELERATION_STRUCTURE_STORAGE = (uint32_t)vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR,
-            SHADER_BINDING_TABLE = (uint32_t)vk::BufferUsageFlagBits::eShaderBindingTableKHR,
+            TRANSFER_SOURCE = (Value)vk::BufferUsageFlagBits::eTransferSrc,
+            TRANSFER_DESTINATION = (Value)vk::BufferUsageFlagBits::eTransferDst,
+            UNIFORM_TEXEL_BUFFER = (Value)vk::BufferUsageFlagBits::eUniformTexelBuffer,
+            STORAGE_TEXEL_BUFFER = (Value)vk::BufferUsageFlagBits::eStorageTexelBuffer,
+            UNIFORM_BUFFER = (Value)vk::BufferUsageFlagBits::eUniformBuffer,
+            STORAGE_BUFFER = (Value)vk::BufferUsageFlagBits::eStorageBuffer,
+            INDEX_BUFFER = (Value)vk::BufferUsageFlagBits::eIndexBuffer,
+            VERTEX_BUFFER = (Value)vk::BufferUsageFlagBits::eVertexBuffer,
+            INDIRECT_BUFFER = (Value)vk::BufferUsageFlagBits::eIndexBuffer,
+            SHADER_DEVICE_ADDRESS = (Value)vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            TRANSFORM_FEEDBACK_BUFFER = (Value)vk::BufferUsageFlagBits::eTransformFeedbackBufferEXT,
+            TRANSFORM_FEEDBACK_COUNTER_BUFFER = (Value)vk::BufferUsageFlagBits::eTransformFeedbackCounterBufferEXT,
+            CONDITIONAL_RENDERING = (Value)vk::BufferUsageFlagBits::eConditionalRenderingEXT,
+            ACCELERATION_STRUCTURE_BUILD_INPUT_READONLY = (Value)vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
+            ACCELERATION_STRUCTURE_STORAGE = (Value)vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR,
+            SHADER_BINDING_TABLE = (Value)vk::BufferUsageFlagBits::eShaderBindingTableKHR,
         };
     };
 
@@ -74,8 +74,8 @@ namespace VulkanAbstractionLayer
         Buffer& operator=(Buffer&& other) noexcept;
         ~Buffer();
 
-        Buffer(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage);
-        void Init(size_t byteSize, BufferUsageType::Value usage, MemoryUsage memoryUsage);
+        Buffer(size_t byteSize, BufferUsage::Value usage, MemoryUsage memoryUsage);
+        void Init(size_t byteSize, BufferUsage::Value usage, MemoryUsage memoryUsage);
 
         vk::Buffer GetNativeHandle() const { return this->handle; }
         size_t GetByteSize() const { return this->byteSize; }

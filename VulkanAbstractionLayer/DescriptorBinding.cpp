@@ -147,7 +147,7 @@ namespace VulkanAbstractionLayer
 		}
 	}
 
-	void DescriptorBinding::Write(const vk::DescriptorSet& descriptorSet)
+	void DescriptorBinding::Write(const vk::DescriptorSet& descriptorSet) const
 	{
 		std::vector<vk::WriteDescriptorSet> writesDescriptorSet;
 		writesDescriptorSet.reserve(this->descriptorWrites.size());

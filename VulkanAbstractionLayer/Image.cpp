@@ -32,14 +32,14 @@
 
 namespace VulkanAbstractionLayer
 {
-    vk::ImageAspectFlags GetImageAspectByFormat(Format format)
+    vk::ImageAspectFlags ImageFormatToImageAspect(Format format)
     {
         switch (format)
         {
         case Format::D16_UNORM:
             return vk::ImageAspectFlagBits::eDepth;
         case Format::X8D24_UNORM_PACK_32:
-            return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+            return vk::ImageAspectFlagBits::eDepth;
         case Format::D32_SFLOAT:
             return vk::ImageAspectFlagBits::eDepth;
         case Format::D16_UNORM_S8_UINT:
@@ -74,7 +74,7 @@ namespace VulkanAbstractionLayer
         this->format = format;
 
         vk::ImageSubresourceRange subresourceRange{
-            GetImageAspectByFormat(format),
+            ImageFormatToImageAspect(format),
             0, // base mip level
             1, // level count
             0, // base layer
@@ -97,7 +97,7 @@ namespace VulkanAbstractionLayer
         this->view = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
     }
 
-    Image::Image(uint32_t width, uint32_t height, Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage)
+    Image::Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage)
     {
         this->Init(width, height, format, usage, memoryUsage);
     }
@@ -148,7 +148,7 @@ namespace VulkanAbstractionLayer
         this->Destroy();
     }
 
-    void Image::Init(uint32_t width, uint32_t height, Format format, vk::ImageUsageFlags usage, MemoryUsage memoryUsage)
+    void Image::Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage)
     {
         vk::ImageCreateInfo imageCreateInfo;
         imageCreateInfo
@@ -159,7 +159,7 @@ namespace VulkanAbstractionLayer
             .setMipLevels(1)
             .setArrayLayers(1)
             .setTiling(vk::ImageTiling::eOptimal)
-            .setUsage(usage)
+            .setUsage((vk::ImageUsageFlags)usage)
             .setSharingMode(vk::SharingMode::eExclusive)
             .setInitialLayout(vk::ImageLayout::eUndefined);
         
