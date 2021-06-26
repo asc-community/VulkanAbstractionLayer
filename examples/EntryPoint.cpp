@@ -8,7 +8,6 @@
 #include "VulkanAbstractionLayer/ShaderLoader.h"
 #include "VulkanAbstractionLayer/ModelLoader.h"
 #include "VulkanAbstractionLayer/ImageLoader.h"
-#include "VulkanAbstractionLayer/DescriptorBinding.h"
 #include "imgui.h"
 
 using namespace VulkanAbstractionLayer;
