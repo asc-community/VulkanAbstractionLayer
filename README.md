@@ -5,7 +5,7 @@ WIP library for abstracting Vulkan API to later use in my projects (including [M
 ![vulkan-logo](preview/vulkan-logo.png)
 
 ## Installation
-1. clone to your system using: `git clone --recurse-submodules https://github.com/MomoDeve/VulkanAbstractionLayer`
+1. clone to your system using: `git clone --recurse-submodules https://github.com/vkdev-team/VulkanAbstractionLayer`
 2. make sure you have Vulkan SDK installed (Vulkan 1.2 is recommended)
 3. build examples by running main `CMakeLists.txt`
 
