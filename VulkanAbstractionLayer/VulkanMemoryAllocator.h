@@ -29,6 +29,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 
 struct VmaAllocator_T;
 struct VmaAllocation_T;

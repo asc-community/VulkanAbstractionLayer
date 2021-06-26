@@ -29,32 +29,32 @@ void WindowErrorCallback(const char* message)
 
 struct InstanceData
 {
-    Vector3 Position;
-    uint32_t AlbedoTextureIndex;
+    Vector3 position;
+    uint32_t albedoTextureIndex;
 };
 
 struct CameraUniformData
 {
-    Matrix4x4 Matrix;
+    Matrix4x4 matrix;
 };
 
 struct ModelUniformData
 {
-    Matrix3x4 Matrix;
+    Matrix3x4 matrix;
 };
 
 struct LightUniformData
 {
-    Vector3 Color;
-    float Padding_1;
-    Vector3 Direction;
+    Vector3 color;
+    float padding_1;
+    Vector3 direction;
 };
 
 template<typename T>
 struct UniformData
 {
-    Buffer Buffer;
-    T Data;
+    Buffer buffer;
+    T data;
 };
 
 struct Mesh
@@ -103,9 +103,9 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     },
                 },
                 DescriptorBinding{ }
-                    .Bind(0, resources.CameraUniform.Buffer, UniformType::UNIFORM_BUFFER)
-                    .Bind(1, resources.ModelUniform.Buffer, UniformType::UNIFORM_BUFFER)
-                    .Bind(2, resources.LightUniform.Buffer, UniformType::UNIFORM_BUFFER)
+                    .Bind(0, resources.CameraUniform.buffer, UniformType::UNIFORM_BUFFER)
+                    .Bind(1, resources.ModelUniform.buffer, UniformType::UNIFORM_BUFFER)
+                    .Bind(2, resources.LightUniform.buffer, UniformType::UNIFORM_BUFFER)
                     .Bind(3, resources.BaseSampler, UniformType::SAMPLER)
                     .Bind(4, imageReferences, UniformType::SAMPLED_IMAGE)
             })
@@ -131,12 +131,12 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     {
                         auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
 
-                        size_t dataSize = sizeof(uniform.Data);
+                        size_t dataSize = sizeof(uniform.data);
 
-                        stageBuffer.LoadData((uint8_t*)&uniform.Data, dataSize, stageBufferOffset);
+                        stageBuffer.LoadData((uint8_t*)&uniform.data, dataSize, stageBufferOffset);
                         state.Commands.CopyBuffer(
                             stageBuffer, vk::AccessFlagBits::eHostWrite, stageBufferOffset,
-                            uniform.Buffer, vk::AccessFlagBits::eUniformRead, 0,
+                            uniform.buffer, vk::AccessFlagBits::eUniformRead, 0,
                             vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eVertexShader,
                             dataSize
                         );
@@ -153,9 +153,9 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                         { }, // dependency flags
                         { }, // memory barriers
                         {
-                            MakeBarrier(resources.CameraUniform.Buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
-                            MakeBarrier(resources.ModelUniform.Buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
-                            MakeBarrier(resources.LightUniform.Buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
+                            MakeBarrier(resources.CameraUniform.buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
+                            MakeBarrier(resources.ModelUniform.buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
+                            MakeBarrier(resources.LightUniform.buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
                         },
                         { } // image barriers
                     );
@@ -514,10 +514,10 @@ int main()
             ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
             ImGui::End();
 
-            renderGraphResources.CameraUniform.Data.Matrix = camera.GetMatrix();
-            renderGraphResources.ModelUniform.Data.Matrix = MakeRotationMatrix(modelRotation);
-            renderGraphResources.LightUniform.Data.Color = lightColor;
-            renderGraphResources.LightUniform.Data.Direction = Normalize(lightDirection);
+            renderGraphResources.CameraUniform.data.matrix = camera.GetMatrix();
+            renderGraphResources.ModelUniform.data.matrix = MakeRotationMatrix(modelRotation);
+            renderGraphResources.LightUniform.data.color = lightColor;
+            renderGraphResources.LightUniform.data.direction = Normalize(lightDirection);
 
             renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());

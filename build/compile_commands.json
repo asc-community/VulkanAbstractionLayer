@@ -1,0 +1,337 @@
+[
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/glslang/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -o submodules/glslang/glslang/CMakeFiles/glslang.dir/CInterface/glslang_c_interface.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/CInterface/glslang_c_interface.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/CInterface/glslang_c_interface.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -x c++-header -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx.gch -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx.cxx",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx.cxx"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/glslang_tab.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/glslang_tab.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/glslang_tab.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/attribute.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/attribute.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/attribute.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/Constant.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Constant.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Constant.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/iomapper.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/iomapper.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/iomapper.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/InfoSink.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/InfoSink.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/InfoSink.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/Initialize.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Initialize.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Initialize.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/IntermTraverse.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/IntermTraverse.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/IntermTraverse.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/Intermediate.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Intermediate.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Intermediate.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/ParseContextBase.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/ParseContextBase.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/ParseContextBase.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/ParseHelper.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/ParseHelper.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/ParseHelper.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/PoolAlloc.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/PoolAlloc.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/PoolAlloc.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/RemoveTree.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/RemoveTree.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/RemoveTree.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/Scan.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Scan.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Scan.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/ShaderLang.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/ShaderLang.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/ShaderLang.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/SymbolTable.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/SymbolTable.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/SymbolTable.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/Versions.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Versions.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/Versions.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/intermOut.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/intermOut.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/intermOut.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/limits.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/limits.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/limits.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/linkValidate.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/linkValidate.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/linkValidate.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/parseConst.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/parseConst.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/parseConst.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/reflection.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/reflection.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/reflection.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/preprocessor/Pp.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/Pp.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/Pp.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/preprocessor/PpAtom.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/PpAtom.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/PpAtom.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/preprocessor/PpContext.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/PpContext.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/PpContext.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/preprocessor/PpScanner.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/PpScanner.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/PpScanner.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/preprocessor/PpTokens.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/PpTokens.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/preprocessor/PpTokens.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/MachineIndependent/propagateNoContraction.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/propagateNoContraction.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/MachineIndependent/propagateNoContraction.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/HLSL/hlslAttributes.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslAttributes.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslAttributes.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/HLSL/hlslParseHelper.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslParseHelper.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslParseHelper.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/HLSL/hlslScanContext.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslScanContext.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslScanContext.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/HLSL/hlslOpMap.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslOpMap.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslOpMap.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/HLSL/hlslTokenStream.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslTokenStream.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslTokenStream.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/HLSL/hlslGrammar.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslGrammar.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslGrammar.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -Winvalid-pch -include /home/artamonovoleg/Documents/VulkanAbstractionLayer/build/submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/cmake_pch.hxx -o submodules/glslang/glslang/CMakeFiles/MachineIndependent.dir/HLSL/hlslParseables.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslParseables.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/HLSL/hlslParseables.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/glslang/CMakeFiles/GenericCodeGen.dir/GenericCodeGen/CodeGen.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/GenericCodeGen/CodeGen.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/GenericCodeGen/CodeGen.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/glslang/CMakeFiles/GenericCodeGen.dir/GenericCodeGen/Link.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/GenericCodeGen/Link.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/GenericCodeGen/Link.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -pthread -std=c++11 -o submodules/glslang/glslang/OSDependent/Unix/CMakeFiles/OSDependent.dir/ossource.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/OSDependent/Unix/ossource.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/glslang/OSDependent/Unix/ossource.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/OGLCompilersDLL/CMakeFiles/OGLCompiler.dir/InitializeDll.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/OGLCompilersDLL/InitializeDll.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/OGLCompilersDLL/InitializeDll.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/glslang/.. -Iinclude -I../submodules/glslang/SPIRV/.. -I../submodules/glslang/StandAlone -I../submodules/glslang  -g   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/StandAlone/CMakeFiles/spirv-remap.dir/spirv-remap.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/StandAlone/spirv-remap.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/StandAlone/spirv-remap.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/StandAlone/../External -I../submodules/glslang/glslang/.. -Iinclude -I../submodules/glslang/SPIRV/.. -I../submodules/glslang/StandAlone -I../submodules/glslang  -g   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/StandAlone/CMakeFiles/glslangValidator.dir/StandAlone.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/StandAlone/StandAlone.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/StandAlone/StandAlone.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/StandAlone -I../submodules/glslang  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/StandAlone/CMakeFiles/glslang-default-resource-limits.dir/ResourceLimits.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/StandAlone/ResourceLimits.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/StandAlone/ResourceLimits.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/StandAlone -I../submodules/glslang  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/StandAlone/CMakeFiles/glslang-default-resource-limits.dir/resource_limits_c.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/StandAlone/resource_limits_c.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/StandAlone/resource_limits_c.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPVRemapper.dir/SPVRemapper.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/SPVRemapper.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/SPVRemapper.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPVRemapper.dir/doc.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/doc.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/doc.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/SPIRV/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPIRV.dir/GlslangToSpv.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/GlslangToSpv.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/GlslangToSpv.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/SPIRV/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPIRV.dir/InReadableOrder.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/InReadableOrder.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/InReadableOrder.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/SPIRV/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPIRV.dir/Logger.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/Logger.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/Logger.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/SPIRV/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPIRV.dir/SpvBuilder.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/SpvBuilder.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/SpvBuilder.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/SPIRV/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPIRV.dir/SpvPostProcess.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/SpvPostProcess.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/SpvPostProcess.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/SPIRV/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPIRV.dir/doc.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/doc.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/doc.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/SPIRV/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPIRV.dir/SpvTools.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/SpvTools.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/SpvTools.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/SPIRV/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPIRV.dir/disassemble.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/disassemble.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/disassemble.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX -I../submodules/glslang/SPIRV/.. -Iinclude  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/SPIRV/CMakeFiles/SPIRV.dir/CInterface/spirv_c_interface.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/CInterface/spirv_c_interface.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/SPIRV/CInterface/spirv_c_interface.cpp"
+},
+
+{
+  "directory": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/build",
+  "command": "/usr/bin/c++  -DENABLE_HLSL -DENABLE_OPT=0 -DGLSLANG_OSINCLUDE_UNIX  -g -fPIC   -Wall -Wmaybe-uninitialized -Wuninitialized -Wunused -Wunused-local-typedefs -Wunused-parameter -Wunused-value -Wunused-variable -Wunused-but-set-parameter -Wunused-but-set-variable -fno-exceptions -Wno-reorder -fno-rtti -Werror=deprecated-copy -std=c++11 -o submodules/glslang/hlsl/CMakeFiles/HLSL.dir/stub.cpp.o -c /home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/hlsl/stub.cpp",
+  "file": "/home/artamonovoleg/Documents/VulkanAbstractionLayer/submodules/glslang/hlsl/stub.cpp"
+}
+]
