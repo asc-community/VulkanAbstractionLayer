@@ -54,11 +54,11 @@ namespace VulkanAbstractionLayer
             : 
             handle(renderPass), 
             descriptorSet(descriptorSet), 
-            pipeline(pipeline), 
-            pipelineLayout(pipelineLayout), 
             renderArea(renderArea), 
             framebuffer(framebuffer), 
-            clearValues(clearValues) { }
+            clearValues(clearValues),
+            pipeline(pipeline),
+            pipelineLayout(pipelineLayout) { }
 
         const auto& GetNativeHandle() const { return this->handle; }
         const auto& GetPipeline() const { return this->pipeline; }

@@ -59,18 +59,6 @@ namespace VulkanAbstractionLayer
         const auto& GetVertexAttributes() const { return this->vertexAttributes; }
         const auto& GetShaderUniforms() const { return this->shaderUniforms; }
 
-        const vk::ShaderModule& GetNativeShader(ShaderType type) const
-        {
-            switch (type)
-            {
-            case ShaderType::VERTEX:
-                return this->vertexShader;
-            case ShaderType::FRAGMENT:
-                return this->fragmentShader;
-            default:
-                assert(false);
-                return *(vk::ShaderModule*)nullptr;
-            }
-        }
+        const vk::ShaderModule& GetNativeShader(ShaderType type) const;
     };
 }

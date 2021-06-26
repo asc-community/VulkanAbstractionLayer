@@ -59,7 +59,8 @@ namespace VulkanAbstractionLayer
     {
         for (const auto& node : this->nodes)
         {
-            this->ExecuteRenderGraphNode(node, CommandBuffer{ commandBuffer });
+            CommandBuffer command{ commandBuffer };
+            this->ExecuteRenderGraphNode(node, command);
         }
     }
 

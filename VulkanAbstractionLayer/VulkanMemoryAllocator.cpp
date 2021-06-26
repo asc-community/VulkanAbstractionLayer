@@ -25,10 +25,17 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define VMA_IMPLEMENTATION
+# if defined(__clang__) // remove shitty warnings from clang
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#include <vk_mem_alloc.h>
+# pragma clang diagnostic pop
+#else
+#include <vk_mem_alloc.h>
+#endif
 
 #include "VulkanMemoryAllocator.h"
 #include "VulkanContext.h"
-#include "vk_mem_alloc.h"
 
 namespace VulkanAbstractionLayer
 {
