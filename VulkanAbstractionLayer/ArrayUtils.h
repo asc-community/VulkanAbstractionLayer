@@ -32,3 +32,9 @@
 
 template <typename T>
 using ArrayView = tcb::span<T, tcb::dynamic_extent>;
+
+template <typename T>
+constexpr auto MakeView(T&& v)
+{
+	return ArrayView<typename T::value_type>{ v.data(), v.size() };
+}

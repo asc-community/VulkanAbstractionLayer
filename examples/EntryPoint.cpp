@@ -127,7 +127,7 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                         return barrier;
                     };
 
-                    auto FillUniform = [&state, &MakeBarrier, stageBufferOffset = (size_t)0](auto& uniform) mutable
+                    auto FillUniform = [&state, stageBufferOffset = (size_t)0](auto& uniform) mutable
                     {
                         auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
 
@@ -191,9 +191,7 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
         .AddAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT)
         .SetOutputName("Output"_id);
 
-    auto renderGraph = renderGraphBuilder.Build();
-
-    return std::move(renderGraph);
+    return renderGraphBuilder.Build();
 }
 
 template<typename T>
@@ -318,7 +316,7 @@ Mesh CreatePlaneMesh(uint32_t& globalTextureIndex)
 
     auto texture = ImageLoader::LoadFromFile("models/sand.png");
 
-    return CreateMesh(vertices, instances, std::array{ texture });
+    return CreateMesh(vertices, instances, MakeView(std::array{ texture }));
 }
 
 Mesh CreateDragonMesh(uint32_t& globalTextureIndex)
@@ -334,12 +332,20 @@ Mesh CreateDragonMesh(uint32_t& globalTextureIndex)
     auto model = ModelLoader::LoadFromObj("models/dragon.obj");
     auto& vertices = model.Shapes.front().Vertices;
 
+    std::array textureData = {
+        std::array<uint8_t, 4>{ 255, 255, 255, 255 },
+        std::array<uint8_t, 4>{ 150, 225, 100, 255 },
+        std::array<uint8_t, 4>{ 100, 150, 225, 255 },
+        std::array<uint8_t, 4>{ 255, 220,  60, 255 },
+        std::array<uint8_t, 4>{ 150, 150, 150, 255 },
+    };
+
     std::array textures = {
-        ImageData{ (std::array<uint8_t, 4>{ 255, 255, 255, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ (std::array<uint8_t, 4>{ 150, 225, 100, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ (std::array<uint8_t, 4>{ 100, 150, 225, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ (std::array<uint8_t, 4>{ 255, 220,  60, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ (std::array<uint8_t, 4>{ 150, 150, 150, 255 }).data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ textureData[0].data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ textureData[1].data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ textureData[2].data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ textureData[3].data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ textureData[4].data(), 1, 1, 4, sizeof(uint8_t) },
     };
 
     return CreateMesh(vertices, instances, textures);

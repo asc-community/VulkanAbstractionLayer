@@ -97,4 +97,18 @@ namespace VulkanAbstractionLayer
     {
         this->Destroy();
     }
+
+    const vk::ShaderModule& GraphicShader::GetNativeShader(ShaderType type) const
+    {
+        switch (type)
+        {
+        case ShaderType::VERTEX:
+            return this->vertexShader;
+        case ShaderType::FRAGMENT:
+            return this->fragmentShader;
+        default:
+            assert(false);
+            return this->fragmentShader;
+        }
+    }
 }

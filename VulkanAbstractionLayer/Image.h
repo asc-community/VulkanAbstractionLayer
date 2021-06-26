@@ -28,9 +28,10 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
 #include "VulkanMemoryAllocator.h"
 #include "ShaderReflection.h"
+
+#include <vulkan/vulkan.hpp>
 
 namespace VulkanAbstractionLayer
 {

@@ -533,8 +533,6 @@ namespace VulkanAbstractionLayer
         // remove empty attachment
         attachmentUsages.erase(StringId{ });
 
-        auto& vulkanContext = GetCurrentVulkanContext();
-
         for (const auto& [attachmentName, attachmentUsage] : attachmentUsages)
         {
             auto& attachmentCreateOptions = this->attachmentsCreateOptions.at(attachmentName);
