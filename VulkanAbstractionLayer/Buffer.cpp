@@ -90,7 +90,7 @@ namespace VulkanAbstractionLayer
         {
             (void)this->MapMemory();
             std::memcpy((void*)(this->mappedMemory + offset), (const void*)data, byteSize);
-            this->FlushMemory();
+            this->FlushMemory(byteSize, offset);
             this->UnmapMemory();
         }
         else // do not do map-unmap if memory was already mapped externally
@@ -103,7 +103,7 @@ namespace VulkanAbstractionLayer
     {
         this->CopyData(data, byteSize, offset);
         if(this->IsMemoryMapped()) 
-            this->FlushMemory();
+            this->FlushMemory(byteSize, offset);
     }
 
     void Buffer::Destroy()
