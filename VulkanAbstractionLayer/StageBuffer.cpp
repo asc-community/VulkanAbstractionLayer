@@ -26,38 +26,32 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
 #include "StageBuffer.h"
-#include "CommandBuffer.h"
-#include <vulkan/vulkan.hpp>
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
+	StageBuffer::StageBuffer(size_t byteSize)
+		: buffer(byteSize, BufferUsage::TRANSFER_SOURCE, MemoryUsage::CPU_TO_GPU), currentOffset(0)
+	{
+		(void)this->buffer.MapMemory();
+	}
 
-    struct VirtualFrame
-    {
-        CommandBuffer Commands{ vk::CommandBuffer{ } };
-        StageBuffer StagingBuffer;
-        vk::Fence CommandQueueFence;
-    };
+	StageBuffer::Allocation StageBuffer::Submit(const uint8_t* data, uint32_t byteSize)
+	{
+		assert(this->currentOffset + byteSize <= this->buffer.GetByteSize());
 
-    class VirtualFrameProvider
-    {
-        std::vector<VirtualFrame> virtualFrames;
-        uint32_t presentImageIndex = 0;
-        size_t currentFrame = 0;
-    public:
-        void Init(size_t frameCount, size_t stageBufferSize);
-        void Destroy();
+		this->buffer.CopyData(data, byteSize, this->currentOffset);
+		this->currentOffset += byteSize;
+		return Allocation{ byteSize, this->currentOffset - byteSize };
+	}
 
-        void StartFrame();
-        VirtualFrame& GetCurrentFrame();
-        VirtualFrame& GetNextFrame();
-        const VirtualFrame& GetCurrentFrame() const;
-        const VirtualFrame& GetNextFrame() const;
-        uint32_t GetPresentImageIndex() const;
-        void EndFrame();
-    };
+	void StageBuffer::Reset()
+	{
+		this->currentOffset = 0;
+	}
+
+	void StageBuffer::Flush()
+	{
+		this->buffer.FlushMemory(this->currentOffset, 0);
+	}
 }

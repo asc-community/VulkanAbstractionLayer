@@ -86,6 +86,7 @@ namespace VulkanAbstractionLayer
         void UnmapMemory();
         void FlushMemory();
         void FlushMemory(size_t byteSize, size_t offset);
-        void LoadData(const uint8_t* data, size_t byteSize, size_t offset);
+        void CopyData(const uint8_t* data, size_t byteSize, size_t offset);
+        void CopyDataWithFlush(const uint8_t* data, size_t byteSize, size_t offset);
     };
 }

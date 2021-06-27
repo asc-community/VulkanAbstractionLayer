@@ -28,36 +28,41 @@
 
 #pragma once
 
-#include "StageBuffer.h"
-#include "CommandBuffer.h"
-#include <vulkan/vulkan.hpp>
+#include "Buffer.h"
+#include "ArrayUtils.h"
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
+	class StageBuffer
+	{
+		Buffer buffer;
+		uint32_t currentOffset;
 
-    struct VirtualFrame
-    {
-        CommandBuffer Commands{ vk::CommandBuffer{ } };
-        StageBuffer StagingBuffer;
-        vk::Fence CommandQueueFence;
-    };
+	public:
+		struct Allocation
+		{
+			uint32_t Size;
+			uint32_t Offset;
+		};
 
-    class VirtualFrameProvider
-    {
-        std::vector<VirtualFrame> virtualFrames;
-        uint32_t presentImageIndex = 0;
-        size_t currentFrame = 0;
-    public:
-        void Init(size_t frameCount, size_t stageBufferSize);
-        void Destroy();
+		StageBuffer(size_t byteSize);
 
-        void StartFrame();
-        VirtualFrame& GetCurrentFrame();
-        VirtualFrame& GetNextFrame();
-        const VirtualFrame& GetCurrentFrame() const;
-        const VirtualFrame& GetNextFrame() const;
-        uint32_t GetPresentImageIndex() const;
-        void EndFrame();
-    };
+		Allocation Submit(const uint8_t* data, uint32_t byteSize);
+		void Flush();
+		void Reset();
+		Buffer& GetBuffer() { return this->buffer; }
+		const Buffer& GetBuffer() const { return this->buffer; }
+
+		template<typename T>
+		Allocation Submit(ArrayView<const T> view)
+		{
+			return this->Submit((uint8_t*)view.data(), uint32_t(view.size() * sizeof(T)));
+		}
+
+		template<typename T>
+		Allocation Submit(const T* value)
+		{
+			return this->Submit((uint8_t*)value, uint32_t(sizeof(T)));
+		}
+	};
 }

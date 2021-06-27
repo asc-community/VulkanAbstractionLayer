@@ -389,9 +389,9 @@ namespace VulkanAbstractionLayer
         return this->virtualFrames.GetCurrentFrame().Commands;
     }
 
-    Buffer& VulkanContext::GetCurrentStageBuffer()
+    StageBuffer& VulkanContext::GetCurrentStageBuffer()
     {
-        return this->virtualFrames.GetCurrentFrame().StageBuffer;
+        return this->virtualFrames.GetCurrentFrame().StagingBuffer;
     }
 
     void VulkanContext::SubmitCommandsImmediate(const CommandBuffer& commands)

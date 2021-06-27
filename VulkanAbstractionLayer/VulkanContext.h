@@ -131,7 +131,7 @@ namespace VulkanAbstractionLayer
         void StartFrame();
         const Image& GetCurrentSwapchainImage() const;
         CommandBuffer& GetCurrentCommandBuffer();
-        Buffer& GetCurrentStageBuffer();
+        StageBuffer& GetCurrentStageBuffer();
         void SubmitCommandsImmediate(const CommandBuffer& commands);
         void EndFrame();
     };

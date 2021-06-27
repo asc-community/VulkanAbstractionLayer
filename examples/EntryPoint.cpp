@@ -127,20 +127,17 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                         return barrier;
                     };
 
-                    auto FillUniform = [&state, stageBufferOffset = (size_t)0](auto& uniform) mutable
+                    auto FillUniform = [&state](auto& uniform) mutable
                     {
                         auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
 
-                        size_t dataSize = sizeof(uniform.Data);
-
-                        stageBuffer.LoadData((uint8_t*)&uniform.Data, dataSize, stageBufferOffset);
+                        auto uniformAllocation = stageBuffer.Submit(&uniform.Data);
                         state.Commands.CopyBuffer(
-                            stageBuffer, vk::AccessFlagBits::eHostWrite, stageBufferOffset,
+                            stageBuffer.GetBuffer(), vk::AccessFlagBits::eHostWrite, uniformAllocation.Offset,
                             uniform.Buffer, vk::AccessFlagBits::eUniformRead, 0,
                             vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eVertexShader,
-                            dataSize
+                            uniformAllocation.Size
                         );
-                        stageBufferOffset += dataSize;
                     };
 
                     FillUniform(resources.CameraUniform);
@@ -207,18 +204,27 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
     auto& vulkanContext = GetCurrentVulkanContext();
     auto& stageBuffer = vulkanContext.GetCurrentStageBuffer();
     auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
-    size_t offset = 0;
 
-    size_t instanceBufferSize = instances.size() * sizeof(InstanceData);
-    size_t vertexBufferSize = vertices.size() * sizeof(ModelData::Vertex);
+    commandBuffer.Begin();
 
-    result.InstanceBuffer.Init(instanceBufferSize, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
-    result.VertexBuffer.Init(vertexBufferSize, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
-    
-    stageBuffer.LoadData((uint8_t*)instances.data(), instanceBufferSize, offset);
-    offset += instanceBufferSize;
-    stageBuffer.LoadData((uint8_t*)vertices.data(), vertexBufferSize, instanceBufferSize);
-    offset += vertexBufferSize;
+    auto instanceAllocation = stageBuffer.Submit(MakeView(instances));
+    auto vertexAllocation = stageBuffer.Submit(MakeView(vertices));
+
+    result.InstanceBuffer.Init(instanceAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    result.VertexBuffer.Init(vertexAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+
+    commandBuffer.CopyBuffer(
+        stageBuffer.GetBuffer(), vk::AccessFlagBits::eHostWrite, instanceAllocation.Offset,
+        result.InstanceBuffer, vk::AccessFlags{ }, 0,
+        vk::PipelineStageFlagBits::eHost,
+        instanceAllocation.Size
+    );
+    commandBuffer.CopyBuffer(
+        stageBuffer.GetBuffer(), vk::AccessFlagBits::eTransferRead, vertexAllocation.Offset,
+        result.VertexBuffer, vk::AccessFlags{ }, 0,
+        vk::PipelineStageFlagBits::eTransfer,
+        vertexAllocation.Size
+    );
 
     for (const auto& texture : textures)
     {
@@ -230,38 +236,15 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
             ImageUsage::TRANSFER_DISTINATION | ImageUsage::SHADER_READ,
             MemoryUsage::GPU_ONLY
         );
-        stageBuffer.LoadData(texture.ByteData, texture.GetByteSize(), offset);
-        offset += texture.GetByteSize();
-    }
 
-    commandBuffer.Begin();
+        auto textureAllocation = stageBuffer.Submit(texture.ByteData, texture.GetByteSize());
 
-    offset = 0;
-    commandBuffer.CopyBuffer(
-        stageBuffer, vk::AccessFlagBits::eHostWrite, offset,
-        result.InstanceBuffer, vk::AccessFlags{ }, 0,
-        vk::PipelineStageFlagBits::eHost,
-        instanceBufferSize
-    );
-    offset += instanceBufferSize;
-
-    commandBuffer.CopyBuffer(
-        stageBuffer, vk::AccessFlagBits::eTransferRead, offset,
-        result.VertexBuffer, vk::AccessFlags{ }, 0,
-        vk::PipelineStageFlagBits::eTransfer,
-        vertexBufferSize
-    );
-    offset += vertexBufferSize;
-
-    for (size_t i = 0; i < result.Textures.size(); i++)
-    {
         commandBuffer.CopyBufferToImage(
-            stageBuffer, vk::AccessFlagBits::eTransferRead, offset,
-            result.Textures[i], vk::ImageLayout::eUndefined, vk::AccessFlags{ },
+            stageBuffer.GetBuffer(), vk::AccessFlagBits::eTransferRead, textureAllocation.Offset,
+            image, vk::ImageLayout::eUndefined, vk::AccessFlags{ },
             vk::PipelineStageFlagBits::eTransfer,
-            textures[i].GetByteSize()
+            textureAllocation.Size
         );
-        offset += textures[i].GetByteSize();
     }
 
     vk::ImageSubresourceRange subresourceRange{
@@ -272,6 +255,8 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
         1  // layer count
     };
 
+    std::vector<vk::ImageMemoryBarrier> imageBarriers;
+    imageBarriers.reserve(result.Textures.size());
     for (const auto& texture : result.Textures)
     {
         vk::ImageMemoryBarrier imageLayoutToShaderRead;
@@ -285,18 +270,23 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
             .setImage(texture.GetNativeHandle())
             .setSubresourceRange(subresourceRange);
 
-        commandBuffer.GetNativeHandle().pipelineBarrier(
-            vk::PipelineStageFlagBits::eTransfer,
-            vk::PipelineStageFlagBits::eFragmentShader,
-            { },
-            { },
-            { },
-            imageLayoutToShaderRead
-        );
+        imageBarriers.push_back(imageLayoutToShaderRead);
     }
+    commandBuffer.GetNativeHandle().pipelineBarrier(
+        vk::PipelineStageFlagBits::eTransfer,
+        vk::PipelineStageFlagBits::eFragmentShader,
+        { },
+        { },
+        { },
+        imageBarriers
+    );
 
+    stageBuffer.Flush();
     commandBuffer.End();
+
     vulkanContext.SubmitCommandsImmediate(commandBuffer);
+    stageBuffer.Reset();
+
     return result;
 }
 
