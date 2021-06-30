@@ -53,6 +53,56 @@ namespace VulkanAbstractionLayer
         }
     }
 
+    vk::ImageLayout ImageUsageToImageLayout(ImageUsage::Bits layout)
+    {
+        switch (layout)
+        {
+        case VulkanAbstractionLayer::ImageUsage::UNKNOWN:
+            return vk::ImageLayout::eUndefined;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_SOURCE:
+            return vk::ImageLayout::eTransferSrcOptimal;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION:
+            return vk::ImageLayout::eTransferDstOptimal;
+        case VulkanAbstractionLayer::ImageUsage::SHADER_READ:
+            return vk::ImageLayout::eShaderReadOnlyOptimal;
+        case VulkanAbstractionLayer::ImageUsage::STORAGE:
+            return vk::ImageLayout::eShaderReadOnlyOptimal; // TODO: what if writes?
+        case VulkanAbstractionLayer::ImageUsage::COLOR_ATTACHMENT:
+            return vk::ImageLayout::eColorAttachmentOptimal;
+        case VulkanAbstractionLayer::ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+            return vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        case VulkanAbstractionLayer::ImageUsage::INPUT_ATTACHMENT:
+            return vk::ImageLayout::eAttachmentOptimalKHR; // TODO: is it ok?
+        case VulkanAbstractionLayer::ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return vk::ImageLayout::eFragmentShadingRateAttachmentOptimalKHR;
+        default:
+            assert(false);
+            return vk::ImageLayout::eUndefined;
+        }
+    }
+
+    vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image)
+    {
+        auto subresourceRange = GetDefaultImageSubresourceRange(image);
+        return vk::ImageSubresourceLayers{
+            subresourceRange.aspectMask,
+            subresourceRange.baseMipLevel,
+            subresourceRange.baseArrayLayer,
+            subresourceRange.layerCount
+        };
+    }
+
+    vk::ImageSubresourceRange GetDefaultImageSubresourceRange(const Image& image)
+    {
+        return vk::ImageSubresourceRange{
+            ImageFormatToImageAspect(image.GetFormat()),
+            0, // base mip level
+            1, // level count
+            0, // base layer
+            1  // layer count
+        };
+    }
+
     void Image::Destroy()
     {
         if ((bool)this->handle)
@@ -73,13 +123,7 @@ namespace VulkanAbstractionLayer
         this->handle = image;
         this->format = format;
 
-        vk::ImageSubresourceRange subresourceRange{
-            ImageFormatToImageAspect(format),
-            0, // base mip level
-            1, // level count
-            0, // base layer
-            1  // layer count
-        };
+        auto subresourceRange = GetDefaultImageSubresourceRange(*this);
 
         vk::ImageViewCreateInfo imageViewCreateInfo;
         imageViewCreateInfo

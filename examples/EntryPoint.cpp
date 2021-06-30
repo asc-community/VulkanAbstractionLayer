@@ -71,6 +71,41 @@ struct RenderGraphResources
     Mesh PlaneMesh;
 };
 
+class UniformSubmitRenderPass : public RenderPass
+{
+    RenderGraphResources& resources;
+public:
+    UniformSubmitRenderPass(RenderGraphResources& resources)
+        : resources(resources) { }
+
+    virtual void SetupDependencies(DependencyState state) override
+    {
+        state.AddBuffer("CameraUniform"_id, BufferUsage::TRANSFER_DESTINATION);
+        state.AddBuffer("ModelUniform"_id, BufferUsage::TRANSFER_DESTINATION);
+        state.AddBuffer("LightUniform"_id, BufferUsage::TRANSFER_DESTINATION);
+    }
+
+    virtual void OnRender(RenderPassState state) override
+    {
+        auto FillUniform = [&state](const auto& uniformData, const auto& uniformBuffer) mutable
+        {
+            auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+
+            auto uniformAllocation = stageBuffer.Submit(&uniformData);
+            state.Commands.CopyBuffer(
+                stageBuffer.GetBuffer(), vk::AccessFlagBits::eNoneKHR, uniformAllocation.Offset,
+                uniformBuffer, vk::AccessFlagBits::eUniformRead, 0,
+                vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eVertexShader,
+                uniformAllocation.Size
+            );
+        };
+
+        FillUniform(this->resources.CameraUniform, this->resources.CameraUniformBuffer);
+        FillUniform(this->resources.ModelUniform, this->resources.ModelUniformBuffer);
+        FillUniform(this->resources.LightUniform, this->resources.LightUniformBuffer);
+    }
+};
+
 class OpaqueRenderPass : public RenderPass
 {    
     RenderGraphResources& resources;
@@ -119,44 +154,6 @@ public:
         state.AddBuffer("ModelUniform"_id, BufferUsage::UNIFORM_BUFFER);
         state.AddBuffer("LightUniform"_id, BufferUsage::UNIFORM_BUFFER);
     }
-
-    virtual void BeforeRender(RenderPassState state) override
-    {
-        auto MakeBarrier = [](const Buffer& uniformBuffer, vk::AccessFlagBits from, vk::AccessFlagBits to)
-        {
-            vk::BufferMemoryBarrier barrier;
-            barrier
-                .setSrcAccessMask(from)
-                .setDstAccessMask(to)
-                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                .setBuffer(uniformBuffer.GetNativeHandle())
-                .setSize(uniformBuffer.GetByteSize())
-                .setOffset(0);
-            return barrier;
-        };
-
-        auto FillUniform = [&state](const auto& uniformData, const auto& uniformBuffer) mutable
-        {
-            auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
-
-            auto uniformAllocation = stageBuffer.Submit(&uniformData);
-            state.Commands.CopyBuffer(
-                stageBuffer.GetBuffer(), vk::AccessFlagBits::eNoneKHR, uniformAllocation.Offset,
-                uniformBuffer, vk::AccessFlagBits::eUniformRead, 0,
-                vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eVertexShader,
-                uniformAllocation.Size
-            );
-        };
-
-        FillUniform(this->resources.CameraUniform, this->resources.CameraUniformBuffer);
-        FillUniform(this->resources.ModelUniform, this->resources.ModelUniformBuffer);
-        FillUniform(this->resources.LightUniform, this->resources.LightUniformBuffer);
-
-        MakeBarrier(this->resources.CameraUniformBuffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead);
-        MakeBarrier(this->resources.ModelUniformBuffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead);
-        MakeBarrier(this->resources.LightUniformBuffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead);
-    }
     
     virtual void OnRender(RenderPassState state) override
     {
@@ -180,6 +177,7 @@ RenderGraph CreateRenderGraph(RenderGraphResources& resources, const VulkanConte
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
+        .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
         .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .AddAttachment("Output"_id, Format::R8G8B8A8_UNORM)
@@ -236,7 +234,7 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
 
         commandBuffer.CopyBufferToImage(
             stageBuffer.GetBuffer(), vk::AccessFlagBits::eTransferRead, textureAllocation.Offset,
-            image, vk::ImageLayout::eUndefined, vk::AccessFlags{ },
+            image, ImageUsage::UNKNOWN, vk::AccessFlags{ },
             vk::PipelineStageFlagBits::eTransfer,
             textureAllocation.Size
         );

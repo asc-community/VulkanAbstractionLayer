@@ -35,8 +35,6 @@
 
 namespace VulkanAbstractionLayer
 {
-    vk::ImageAspectFlags ImageFormatToImageAspect(Format format);
-
     struct ImageUsage
     {
         using Value = uint32_t;
@@ -54,6 +52,9 @@ namespace VulkanAbstractionLayer
             FRAGMENT_SHADING_RATE_ATTACHMENT = (Value)vk::ImageUsageFlagBits::eFragmentShadingRateAttachmentKHR,
         };
     };
+
+    vk::ImageAspectFlags ImageFormatToImageAspect(Format format);
+    vk::ImageLayout ImageUsageToImageLayout(ImageUsage::Bits usage);
 
     class Image
     {
@@ -81,4 +82,7 @@ namespace VulkanAbstractionLayer
         uint32_t GetWidth() const { return this->extent.width; }
         uint32_t GetHeight() const { return this->extent.height; }
     };
+
+    vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image);
+    vk::ImageSubresourceRange GetDefaultImageSubresourceRange(const Image& image);
 }
