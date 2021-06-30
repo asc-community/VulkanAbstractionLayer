@@ -48,7 +48,7 @@ namespace VulkanAbstractionLayer
             STORAGE_BUFFER = (Value)vk::BufferUsageFlagBits::eStorageBuffer,
             INDEX_BUFFER = (Value)vk::BufferUsageFlagBits::eIndexBuffer,
             VERTEX_BUFFER = (Value)vk::BufferUsageFlagBits::eVertexBuffer,
-            INDIRECT_BUFFER = (Value)vk::BufferUsageFlagBits::eIndexBuffer,
+            INDIRECT_BUFFER = (Value)vk::BufferUsageFlagBits::eIndirectBuffer,
             SHADER_DEVICE_ADDRESS = (Value)vk::BufferUsageFlagBits::eShaderDeviceAddress,
             TRANSFORM_FEEDBACK_BUFFER = (Value)vk::BufferUsageFlagBits::eTransformFeedbackBufferEXT,
             TRANSFORM_FEEDBACK_COUNTER_BUFFER = (Value)vk::BufferUsageFlagBits::eTransformFeedbackCounterBufferEXT,

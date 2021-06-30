@@ -186,9 +186,9 @@ RenderGraph CreateRenderGraph(RenderGraphResources& resources, const VulkanConte
         )
         .AddAttachment("Output"_id, Format::R8G8B8A8_UNORM)
         .AddAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT)
-        .AddExternalBuffer("CameraUniform"_id, BufferUsage::UNIFORM_BUFFER)
-        .AddExternalBuffer("ModelUniform"_id, BufferUsage::UNIFORM_BUFFER)
-        .AddExternalBuffer("LightUniform"_id, BufferUsage::UNIFORM_BUFFER)
+        .AddExternalBuffer("CameraUniform"_id, resources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER)
+        .AddExternalBuffer("ModelUniform"_id, resources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER)
+        .AddExternalBuffer("LightUniform"_id, resources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER)
         .SetOutputName("Output"_id);
 
     return renderGraphBuilder.Build();

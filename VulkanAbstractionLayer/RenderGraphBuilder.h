@@ -79,8 +79,8 @@ namespace VulkanAbstractionLayer
 
         struct BufferTransition
         {
-            BufferUsage::Value InitialUsage;
-            BufferUsage::Value FinalUsage;
+            BufferUsage::Bits InitialUsage;
+            BufferUsage::Bits FinalUsage;
         };
 
         struct ResourceTransitions
@@ -98,20 +98,34 @@ namespace VulkanAbstractionLayer
             std::unordered_map<StringId, BufferUsage::Value> TotalBufferUsages;
         };
 
+        struct ExternalImage
+        {
+            void* ImageHandleNative;
+            ImageUsage::Bits InitialState;
+        };
+
+        struct ExternalBuffer
+        {
+            void* BufferHandleNative;
+            BufferUsage::Bits InitialState;
+        };
+
         using AttachmentHashMap = std::unordered_map<StringId, Image>;
         using AttachmentCreateOptionsHashMap = std::unordered_map<StringId, AttachmentCreateOptions>;
         using DependencyHashMap = std::unordered_map<StringId, DependencyStorage>;
-        using ExternalImagesInitialUsage = std::unordered_map<StringId, ImageUsage::Bits>;
-        using ExternalBuffersInitialUsage = std::unordered_map<StringId, BufferUsage::Bits>;
+        using InternalOnRenderCallback = std::function<void(CommandBuffer)>;
+        using ExternalImagesHashMap = std::unordered_map<StringId, ExternalImage>;
+        using ExternalBuffersHashMap = std::unordered_map<StringId, ExternalBuffer>;
 
         AttachmentCreateOptionsHashMap attachmentsCreateOptions;
-        ExternalImagesInitialUsage externalImagesInitialUsage;
-        ExternalBuffersInitialUsage externalBufferInitialUsage;
+        ExternalImagesHashMap externalImages;
+        ExternalBuffersHashMap externalBuffers;
         std::vector<RenderPassBuilder> renderPasses;
         StringId outputName = { };
 
         RenderPassNative BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions);
         DependencyHashMap AcquireRenderPassDependencies();
+        InternalOnRenderCallback CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions);
         ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies);
         AttachmentHashMap AllocateAttachments(const ResourceTransitions& transitions, const DependencyHashMap& dependencies);
         void SetupOutputImage(ResourceTransitions& transitions, StringId outputImage);
@@ -122,8 +136,8 @@ namespace VulkanAbstractionLayer
         RenderGraphBuilder& SetOutputName(StringId name);
         RenderGraphBuilder& AddAttachment(StringId name, Format format);
         RenderGraphBuilder& AddAttachment(StringId name, Format format, uint32_t width, uint32_t height);
-        RenderGraphBuilder& AddExternalImage(StringId name, ImageUsage::Bits initialUsage);
-        RenderGraphBuilder& AddExternalBuffer(StringId name, BufferUsage::Bits initialUsage);
+        RenderGraphBuilder& AddExternalImage(StringId name, const Image& image, ImageUsage::Bits initialUsage);
+        RenderGraphBuilder& AddExternalBuffer(StringId name, const Buffer& buffer, BufferUsage::Bits initialUsage);
         RenderGraph Build();
     };
 }

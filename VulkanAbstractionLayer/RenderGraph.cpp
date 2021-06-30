@@ -43,6 +43,8 @@ namespace VulkanAbstractionLayer
             
         node.PassCustom->BeforeRender(state);
 
+        node.PassNative.OnRenderCallback(commandBuffer.GetNativeHandle());
+
         commandBuffer.BeginRenderPass(node.PassNative);
         node.PassCustom->OnRender(state);
         commandBuffer.EndRenderPass();
