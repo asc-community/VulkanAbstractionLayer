@@ -28,29 +28,17 @@
 
 #pragma once
 
-#include <string>
-
-#include "ShaderReflection.h"
+#include "GraphicShader.h"
+#include "DescriptorBinding.h"
+#include <optional>
 
 namespace VulkanAbstractionLayer
 {
-    struct ShaderData
-    {
-        using BytecodeSPIRV = std::vector<uint32_t>;
-        using Attributes = std::vector<TypeSPIRV>;
-        using UniformBlock = std::vector<Uniform>;
-        using Uniforms = std::vector<UniformBlock>;
-
-        BytecodeSPIRV Bytecode;
-        Attributes InputAttributes;
-        Uniforms UniformBlocks;
-    };
-
-    class ShaderLoader
+    class Pipeline
     {
     public:
-        static ShaderData LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language);
-        static ShaderData LoadFromBinary(const std::string& filepath);
-        static ShaderData LoadFromMemory(std::vector<uint32_t> bytecode);
+        std::optional<GraphicShader> Shader;
+        std::vector<VertexBinding> VertexBindings;
+        DescriptorBinding DescriptorBindings;
     };
 }

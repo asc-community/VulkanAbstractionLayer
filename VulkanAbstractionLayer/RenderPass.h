@@ -29,6 +29,7 @@
 #pragma once
 
 #include "DependencyStorage.h"
+#include "Pipeline.h"
 #include "CommandBuffer.h"
 #include "StringId.h"
 
@@ -58,12 +59,14 @@ namespace VulkanAbstractionLayer
     };
 
     using DependencyState = DependencyStorage&;
+    using PipelineState = Pipeline&;
 
     class RenderPass
     {
     public:
         virtual ~RenderPass() = default;
 
+        virtual void SetupPipeline(PipelineState state) { }
         virtual void SetupDependencies(DependencyState state) { }
 
         virtual void BeforeRender(RenderPassState state) { }

@@ -60,8 +60,6 @@ struct Mesh
 
 struct RenderGraphResources
 {
-    ShaderData OpaquePassVertexShader;
-    ShaderData OpaquePassFragmentShader;
     Sampler BaseSampler;
     CameraUniformData CameraUniform;
     ModelUniformData ModelUniform;
@@ -80,14 +78,46 @@ public:
     OpaqueRenderPass(RenderGraphResources& resources)
         : resources(resources) { }
 
-    virtual void SetupDependencies(DependencyState dependencies) override
+    virtual void SetupPipeline(PipelineState pipeline) override
     {
-        dependencies.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
-        dependencies.AddAttachment("OutputDepth"_id, ClearDepthSpencil{ });
+        pipeline.Shader = GraphicShader{
+            ShaderLoader::LoadFromSource("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSource("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL),
+        };
 
-        dependencies.AddBuffer("CameraUniform"_id, BufferUsage::UNIFORM_BUFFER);
-        dependencies.AddBuffer("ModelUniform"_id, BufferUsage::UNIFORM_BUFFER);
-        dependencies.AddBuffer("LightUniform"_id, BufferUsage::UNIFORM_BUFFER);
+        pipeline.VertexBindings = {
+            VertexBinding{
+                VertexBinding::Rate::PER_VERTEX,
+                3,
+            },
+            VertexBinding{
+                VertexBinding::Rate::PER_INSTANCE,
+                2,
+            },
+        };
+
+        std::vector<DescriptorBinding::ImageRef> imageReferences;
+        for (const auto& texture : this->resources.DragonMesh.Textures)
+            imageReferences.push_back(std::ref(texture));
+        for (const auto& texture : this->resources.PlaneMesh.Textures)
+            imageReferences.push_back(std::ref(texture));
+
+        pipeline.DescriptorBindings
+            .Bind(0, this->resources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, this->resources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(2, this->resources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(3, this->resources.BaseSampler, UniformType::SAMPLER)
+            .Bind(4, imageReferences, UniformType::SAMPLED_IMAGE);
+    }
+
+    virtual void SetupDependencies(DependencyState state) override
+    {
+        state.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
+        state.AddAttachment("OutputDepth"_id, ClearDepthSpencil{ });
+
+        state.AddBuffer("CameraUniform"_id, BufferUsage::UNIFORM_BUFFER);
+        state.AddBuffer("ModelUniform"_id, BufferUsage::UNIFORM_BUFFER);
+        state.AddBuffer("LightUniform"_id, BufferUsage::UNIFORM_BUFFER);
     }
 
     virtual void BeforeRender(RenderPassState state) override
@@ -112,7 +142,7 @@ public:
 
             auto uniformAllocation = stageBuffer.Submit(&uniformData);
             state.Commands.CopyBuffer(
-                stageBuffer.GetBuffer(), vk::AccessFlagBits::eHostWrite, uniformAllocation.Offset,
+                stageBuffer.GetBuffer(), vk::AccessFlagBits::eNoneKHR, uniformAllocation.Offset,
                 uniformBuffer, vk::AccessFlagBits::eUniformRead, 0,
                 vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eVertexShader,
                 uniformAllocation.Size
@@ -148,42 +178,10 @@ public:
 
 RenderGraph CreateRenderGraph(RenderGraphResources& resources, const VulkanContext& context)
 {
-    std::vector<DescriptorBinding::ImageRef> imageReferences;
-    for (const auto& texture : resources.DragonMesh.Textures)
-        imageReferences.push_back(std::ref(texture));
-    for (const auto& texture : resources.PlaneMesh.Textures)
-        imageReferences.push_back(std::ref(texture));
-
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddRenderPass(RenderPassBuilder{ "OpaquePass"_id }
-            .SetPipeline(GraphicPipeline{
-                GraphicShader{
-                    resources.OpaquePassVertexShader,
-                    resources.OpaquePassFragmentShader,
-                },
-                {
-                    VertexBinding{
-                        VertexBinding::Rate::PER_VERTEX,
-                        3,
-                    },
-                    VertexBinding{
-                        VertexBinding::Rate::PER_INSTANCE,
-                        2,
-                    },
-                },
-                DescriptorBinding{ }
-                    .Bind(0, resources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-                    .Bind(1, resources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
-                    .Bind(2, resources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
-                    .Bind(3, resources.BaseSampler, UniformType::SAMPLER)
-                    .Bind(4, imageReferences, UniformType::SAMPLED_IMAGE)
-            })
-            .AddRenderPass(std::make_unique<OpaqueRenderPass>(resources))
-        )
-        .AddRenderPass(RenderPassBuilder{ "ImGuiPass"_id }
-            .AddRenderPass(std::make_unique<ImGuiRenderPass>("Output"_id))
-        )
+        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .AddAttachment("Output"_id, Format::R8G8B8A8_UNORM)
         .AddAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT)
         .AddExternalBuffer("CameraUniform"_id, resources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER)
@@ -420,15 +418,11 @@ int main()
 
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
-    auto vertexShader = ShaderLoader::LoadFromSource("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
-    auto fragmentShader = ShaderLoader::LoadFromSource("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL, Vulkan.GetAPIVersion());
     Sampler sampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MinFilter::LINEAR);
 
     uint32_t globalTextureIndex = 0;
 
     RenderGraphResources renderGraphResources{
-        std::move(vertexShader),
-        std::move(fragmentShader),
         std::move(sampler),
         { },
         { },

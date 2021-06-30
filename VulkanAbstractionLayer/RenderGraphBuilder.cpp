@@ -32,27 +32,19 @@
 
 namespace VulkanAbstractionLayer
 {
-    RenderPassBuilder::RenderPassBuilder(StringId name)
+    vk::VertexInputRate VertexBindingRateToVertexInputRate(VertexBinding::Rate rate)
     {
-        this->name = name;
+        switch (rate)
+        {
+        case VertexBinding::Rate::PER_VERTEX:
+            return vk::VertexInputRate::eVertex;
+        case VertexBinding::Rate::PER_INSTANCE:
+            return vk::VertexInputRate::eInstance;
+        default:
+            assert(false);
+            return vk::VertexInputRate::eVertex;
+        }
     }
-
-    RenderPassBuilder& RenderPassBuilder::AddRenderPass(std::unique_ptr<RenderPass> renderPass)
-    {
-        this->renderPass = std::move(renderPass);
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::SetPipeline(GraphicPipeline pipeline)
-    {
-        this->graphicPipeline = std::move(pipeline);
-        return *this;
-    }
-
-    std::array InputRateTable = {
-        vk::VertexInputRate::eVertex,
-        vk::VertexInputRate::eInstance,
-    };
 
     vk::AttachmentLoadOp AttachmentStateToLoadOp(AttachmentState state)
     {
@@ -358,7 +350,7 @@ namespace VulkanAbstractionLayer
         };
     }
 
-    RenderPassNative RenderGraphBuilder::BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions)
+    RenderPassNative RenderGraphBuilder::BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions)
     {
         std::vector<vk::AttachmentDescription> attachmentDescriptions;
         std::vector<vk::AttachmentReference> attachmentReferences;
@@ -368,9 +360,11 @@ namespace VulkanAbstractionLayer
         uint32_t renderAreaWidth = 0, renderAreaHeight = 0;
 
         DependencyStorage dependencies;
-        renderPassBuilder.renderPass->SetupDependencies(dependencies);
+        renderPassReference.Pass->SetupDependencies(dependencies);
+
+        auto& renderPassPipeline = pipelines.at(renderPassReference.Name);
         auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
-        auto& attachmentTransitions = resourceTransitions.ImageTransitions.at(renderPassBuilder.name);
+        auto& attachmentTransitions = resourceTransitions.ImageTransitions.at(renderPassReference.Name);
         std::optional<vk::AttachmentReference> depthSpencilAttachmentReference;
 
         for (size_t attachmentIndex = 0; attachmentIndex < renderPassAttachments.size(); attachmentIndex++)
@@ -474,10 +468,11 @@ namespace VulkanAbstractionLayer
         vk::PipelineLayout pipelineLayout;
         vk::DescriptorSet descriptorSet;
         vk::DescriptorSetLayout descriptorSetLayout;
-        if (renderPassBuilder.graphicPipeline.has_value())
+
+        if(renderPassPipeline.Shader.has_value())
         {
-            const auto& graphicPipeline = renderPassBuilder.graphicPipeline.value();
-            auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(graphicPipeline.Shader.GetShaderUniforms());
+            const auto& shader = renderPassPipeline.Shader.value();
+            auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(shader.GetShaderUniforms());
             descriptorSet = descriptor.Set;
             descriptorSetLayout = descriptor.SetLayout;
 
@@ -485,19 +480,19 @@ namespace VulkanAbstractionLayer
                 vk::PipelineShaderStageCreateInfo {
                     vk::PipelineShaderStageCreateFlags{ },
                     ToNative(ShaderType::VERTEX),
-                    graphicPipeline.Shader.GetNativeShader(ShaderType::VERTEX),
+                    shader.GetNativeShader(ShaderType::VERTEX),
                     "main"
                 },
                 vk::PipelineShaderStageCreateInfo {
                     vk::PipelineShaderStageCreateFlags{ },
                     ToNative(ShaderType::FRAGMENT),
-                    graphicPipeline.Shader.GetNativeShader(ShaderType::FRAGMENT),
+                    shader.GetNativeShader(ShaderType::FRAGMENT),
                     "main"
                 }
             };
             
-            auto& vertexAttributes = graphicPipeline.Shader.GetVertexAttributes();
-            auto& vertexBindings = graphicPipeline.VertexBindings;            
+            auto& vertexAttributes = shader.GetVertexAttributes();
+            auto& vertexBindings = renderPassPipeline.VertexBindings;            
 
             std::vector<vk::VertexInputBindingDescription> vertexBindingDescriptions;
             std::vector<vk::VertexInputAttributeDescription> vertexAttributeDescriptions;
@@ -525,7 +520,7 @@ namespace VulkanAbstractionLayer
                         vk::VertexInputBindingDescription{
                             vertexBindingId,
                             vertexBindingOffset,
-                            InputRateTable[(size_t)vertexBindings[vertexBindingId].InputRate]
+                            VertexBindingRateToVertexInputRate(vertexBindings[vertexBindingId].InputRate)
                         });
                     vertexBindingId++;
                     attributeLocationOffset = attributeLocationId;
@@ -539,7 +534,7 @@ namespace VulkanAbstractionLayer
                     vk::VertexInputBindingDescription{
                         vertexBindingId,
                         vertexBindingOffset,
-                        InputRateTable[(size_t)vertexBindings[vertexBindingId].InputRate]
+                        VertexBindingRateToVertexInputRate(vertexBindings[vertexBindingId].InputRate)
                     });
             }
 
@@ -636,10 +631,10 @@ namespace VulkanAbstractionLayer
 
             pipeline = GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
 
-            graphicPipeline.DescriptorBindings.Write(descriptorSet);
+            renderPassPipeline.DescriptorBindings.Write(descriptorSet);
         }
 
-        auto onRender = [callback = this->CreateInternalOnRenderCallback(renderPassBuilder.name, dependencies, resourceTransitions)](vk::CommandBuffer cmd)
+        auto onRender = [callback = this->CreateInternalOnRenderCallback(renderPassReference.Name, dependencies, resourceTransitions)](vk::CommandBuffer cmd)
         {
             return callback(CommandBuffer{ cmd });
         };
@@ -659,10 +654,10 @@ namespace VulkanAbstractionLayer
     RenderGraphBuilder::DependencyHashMap RenderGraphBuilder::AcquireRenderPassDependencies()
     {
         DependencyHashMap dependencies;
-        for (auto& renderPassBuilder : this->renderPasses)
+        for (auto& renderPassReference : this->renderPassReferences)
         {
-            auto& dependency = dependencies[renderPassBuilder.name];
-            renderPassBuilder.renderPass->SetupDependencies(dependency);
+            auto& dependency = dependencies[renderPassReference.Name];
+            renderPassReference.Pass->SetupDependencies(dependency);
         }
         return dependencies;
     }
@@ -679,11 +674,11 @@ namespace VulkanAbstractionLayer
         for (const auto& [imageName, externalImage] : this->externalImages)
             lastImageUsages[imageName] = externalImage.InitialState;
 
-        for (const auto& renderPassBuilder : this->renderPasses)
+        for (const auto& renderPassReference : this->renderPassReferences)
         {
-            auto& renderPassDependencies = dependencies.at(renderPassBuilder.name);
-            auto& bufferTransitions = resourceTransitions.BufferTransitions[renderPassBuilder.name];
-            auto& imageTransitions = resourceTransitions.ImageTransitions[renderPassBuilder.name];
+            auto& renderPassDependencies = dependencies.at(renderPassReference.Name);
+            auto& bufferTransitions = resourceTransitions.BufferTransitions[renderPassReference.Name];
+            auto& imageTransitions = resourceTransitions.ImageTransitions[renderPassReference.Name];
 
             for (const auto& bufferDependency : renderPassDependencies.GetBufferDependencies())
             {
@@ -741,16 +736,9 @@ namespace VulkanAbstractionLayer
         transitions.TotalImageUsages.at(outputImage) |= ImageUsage::TRANSFER_SOURCE;
     }
 
-    RenderGraphBuilder& RenderGraphBuilder::AddRenderPass(RenderPassBuilder&& renderPass)
+    RenderGraphBuilder& RenderGraphBuilder::AddRenderPass(StringId name, std::unique_ptr<RenderPass> renderPass)
     {
-        this->renderPasses.push_back(std::move(renderPass));
-        return *this;
-    }
-
-    RenderGraphBuilder& RenderGraphBuilder::AddRenderPass(RenderPassBuilder& renderPass)
-    {
-        // bad but simplifies user code. As RenderPassBuilder is move-only, chain function which return reference cannot match other Add function
-        this->renderPasses.push_back(std::move(renderPass));
+        this->renderPassReferences.push_back({ name, std::move(renderPass) });
         return *this;
     }
 
@@ -786,16 +774,25 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
-    void RenderGraphBuilder::PreWarmDescriptorSets()
+    RenderGraphBuilder::PipelineHashMap RenderGraphBuilder::CreatePipelines()
     {
-        auto& descriptorCache = GetCurrentVulkanContext().GetDescriptorCache();
-        for (const auto& renderPass : this->renderPasses)
+        PipelineHashMap pipelines;
+        for (const auto& renderPassReference : this->renderPassReferences)
+        {  
+            auto& pipeline = pipelines[renderPassReference.Name];
+            renderPassReference.Pass->SetupPipeline(pipeline);
+            this->PreWarmDescriptorSets(pipeline);
+        }
+        return pipelines;
+    }
+
+    void RenderGraphBuilder::PreWarmDescriptorSets(const Pipeline& pipelineState)
+    {
+        if (pipelineState.Shader.has_value())
         {
-            if (renderPass.graphicPipeline.has_value())
-            {
-                auto& uniforms = renderPass.graphicPipeline->Shader.GetShaderUniforms();
-                (void)descriptorCache.GetDescriptor(uniforms);
-            }
+            auto& descriptorCache = GetCurrentVulkanContext().GetDescriptorCache();
+            auto& uniforms = pipelineState.Shader.value().GetShaderUniforms();
+            (void)descriptorCache.GetDescriptor(uniforms);
         }
     }
 
@@ -805,21 +802,20 @@ namespace VulkanAbstractionLayer
         auto resourceTransitions = this->ResolveResourceTransitions(dependencies);
         this->SetupOutputImage(resourceTransitions, this->outputName);
         AttachmentHashMap attachments = this->AllocateAttachments(resourceTransitions, dependencies);
+        PipelineHashMap pipelines = this->CreatePipelines();
 
         std::vector<RenderGraphNode> nodes;
 
-        this->PreWarmDescriptorSets();
-
-        for (auto& renderPassBuilder : this->renderPasses)
+        for (auto& renderPassReference : this->renderPassReferences)
         {
             std::vector<StringId> colorAttachments;
-            for (const auto& attachment : dependencies[renderPassBuilder.name].GetAttachmentDependencies())
+            for (const auto& attachment : dependencies[renderPassReference.Name].GetAttachmentDependencies())
                 colorAttachments.push_back(attachment.Name);
 
             nodes.push_back(RenderGraphNode{
-                renderPassBuilder.name,
-                this->BuildRenderPass(renderPassBuilder, attachments, resourceTransitions),
-                std::move(renderPassBuilder.renderPass),
+                renderPassReference.Name,
+                this->BuildRenderPass(renderPassReference, pipelines, attachments, resourceTransitions),
+                std::move(renderPassReference.Pass),
                 std::move(colorAttachments)
             });
         }

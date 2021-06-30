@@ -26,31 +26,9 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include <string>
-
-#include "ShaderReflection.h"
+#include "Pipeline.h"
 
 namespace VulkanAbstractionLayer
 {
-    struct ShaderData
-    {
-        using BytecodeSPIRV = std::vector<uint32_t>;
-        using Attributes = std::vector<TypeSPIRV>;
-        using UniformBlock = std::vector<Uniform>;
-        using Uniforms = std::vector<UniformBlock>;
 
-        BytecodeSPIRV Bytecode;
-        Attributes InputAttributes;
-        Uniforms UniformBlocks;
-    };
-
-    class ShaderLoader
-    {
-    public:
-        static ShaderData LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language);
-        static ShaderData LoadFromBinary(const std::string& filepath);
-        static ShaderData LoadFromMemory(std::vector<uint32_t> bytecode);
-    };
 }

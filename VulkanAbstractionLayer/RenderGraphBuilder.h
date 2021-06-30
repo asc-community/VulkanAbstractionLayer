@@ -39,31 +39,14 @@
 
 namespace VulkanAbstractionLayer
 {
-    struct GraphicPipeline
-    {
-        GraphicShader Shader;
-        std::vector<VertexBinding> VertexBindings;
-        DescriptorBinding DescriptorBindings;
-    };
-
-    class RenderPassBuilder
-    {
-        StringId name = { };
-        std::unique_ptr<RenderPass> renderPass;
-        std::optional<GraphicPipeline> graphicPipeline;
-    public:
-        RenderPassBuilder(StringId name);
-        RenderPassBuilder(RenderPassBuilder&&) = default;
-        RenderPassBuilder& operator=(RenderPassBuilder&&) = default;
-
-        RenderPassBuilder& AddRenderPass(std::unique_ptr<RenderPass> renderPass);
-        RenderPassBuilder& SetPipeline(GraphicPipeline pipeline);
-
-        friend class RenderGraphBuilder;
-    };
-
     class RenderGraphBuilder
     {
+        struct RenderPassReference
+        {
+            StringId Name;
+            std::unique_ptr<RenderPass> Pass;
+        };
+
         struct AttachmentCreateOptions
         {
             Format LayoutFormat;
@@ -113,6 +96,7 @@ namespace VulkanAbstractionLayer
         using AttachmentHashMap = std::unordered_map<StringId, Image>;
         using AttachmentCreateOptionsHashMap = std::unordered_map<StringId, AttachmentCreateOptions>;
         using DependencyHashMap = std::unordered_map<StringId, DependencyStorage>;
+        using PipelineHashMap = std::unordered_map<StringId, Pipeline>;
         using InternalOnRenderCallback = std::function<void(CommandBuffer)>;
         using ExternalImagesHashMap = std::unordered_map<StringId, ExternalImage>;
         using ExternalBuffersHashMap = std::unordered_map<StringId, ExternalBuffer>;
@@ -120,19 +104,19 @@ namespace VulkanAbstractionLayer
         AttachmentCreateOptionsHashMap attachmentsCreateOptions;
         ExternalImagesHashMap externalImages;
         ExternalBuffersHashMap externalBuffers;
-        std::vector<RenderPassBuilder> renderPasses;
+        std::vector<RenderPassReference> renderPassReferences;
         StringId outputName = { };
 
-        RenderPassNative BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions);
+        RenderPassNative BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions);
         DependencyHashMap AcquireRenderPassDependencies();
         InternalOnRenderCallback CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions);
         ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies);
         AttachmentHashMap AllocateAttachments(const ResourceTransitions& transitions, const DependencyHashMap& dependencies);
         void SetupOutputImage(ResourceTransitions& transitions, StringId outputImage);
-        void PreWarmDescriptorSets();
+        PipelineHashMap CreatePipelines();
+        void PreWarmDescriptorSets(const Pipeline& pipelineState);
     public:
-        RenderGraphBuilder& AddRenderPass(RenderPassBuilder&& renderPass);
-        RenderGraphBuilder& AddRenderPass(RenderPassBuilder& renderPass);
+        RenderGraphBuilder& AddRenderPass(StringId name, std::unique_ptr<RenderPass> renderPass);
         RenderGraphBuilder& SetOutputName(StringId name);
         RenderGraphBuilder& AddAttachment(StringId name, Format format);
         RenderGraphBuilder& AddAttachment(StringId name, Format format, uint32_t width, uint32_t height);
