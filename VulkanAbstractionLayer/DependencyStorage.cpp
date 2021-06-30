@@ -26,47 +26,32 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
 #include "DependencyStorage.h"
-#include "CommandBuffer.h"
-#include "StringId.h"
 
 namespace VulkanAbstractionLayer
 {
-    class RenderGraph;
+	void DependencyStorage::AddBuffer(StringId name, BufferUsage::Bits usage)
+	{
+		this->bufferDependencies.push_back({ name, usage });
+	}
 
-    struct RenderPassNative
-    {
-        vk::RenderPass RenderPassHandle;
-        vk::DescriptorSet DescriptorSet;
-        vk::Framebuffer Framebuffer;
-        vk::Pipeline Pipeline;
-        vk::PipelineLayout PipelineLayout;
-        vk::Rect2D RenderArea;
-        std::vector<vk::ClearValue> ClearValues;
-    };
+	void DependencyStorage::AddImage(StringId name, ImageUsage::Bits usage)
+	{
+		this->imageDependencies.push_back({ name, usage });
+	}
 
-    struct RenderPassState
-    {
-        RenderGraph& Graph;
-        CommandBuffer& Commands;
-        const std::vector<StringId>& ColorAttachments;
+	void DependencyStorage::AddAttachment(StringId name, ClearColor clear)
+	{
+		this->attachmentDependencies.push_back({ name, clear, ClearDepthSpencil{ }, AttachmentState::CLEAR_COLOR });
+	}
 
-        const Image& GetOutputColorAttachment(size_t index) const;
-    };
+	void DependencyStorage::AddAttachment(StringId name, ClearDepthSpencil clear)
+	{
+		this->attachmentDependencies.push_back({ name, ClearColor{ }, clear, AttachmentState::CLEAR_DEPTH_SPENCIL });
+	}
 
-    using DependencyState = DependencyStorage&;
-
-    class RenderPass
-    {
-    public:
-        virtual ~RenderPass() = default;
-
-        virtual void SetupDependencies(DependencyState state) { }
-
-        virtual void BeforeRender(RenderPassState state) { }
-        virtual void OnRender(RenderPassState state) { }
-        virtual void AfterRender(RenderPassState state) { }
-    };
+	void DependencyStorage::AddAttachment(StringId name, AttachmentState onLoad)
+	{
+		this->attachmentDependencies.push_back({ name, ClearColor{ }, ClearDepthSpencil{ }, onLoad });
+	}
 }

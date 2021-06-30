@@ -8,6 +8,7 @@
 #include "VulkanAbstractionLayer/ShaderLoader.h"
 #include "VulkanAbstractionLayer/ModelLoader.h"
 #include "VulkanAbstractionLayer/ImageLoader.h"
+#include "VulkanAbstractionLayer/ImGuiRenderPass.h"
 #include "imgui.h"
 
 using namespace VulkanAbstractionLayer;
@@ -50,13 +51,6 @@ struct LightUniformData
     Vector3 Direction;
 };
 
-template<typename T>
-struct UniformData
-{
-    Buffer Buffer;
-    T Data;
-};
-
 struct Mesh
 {
     Buffer VertexBuffer;
@@ -69,14 +63,90 @@ struct RenderGraphResources
     ShaderData OpaquePassVertexShader;
     ShaderData OpaquePassFragmentShader;
     Sampler BaseSampler;
-    UniformData<CameraUniformData> CameraUniform;
-    UniformData<ModelUniformData> ModelUniform;
-    UniformData<LightUniformData> LightUniform;
+    CameraUniformData CameraUniform;
+    ModelUniformData ModelUniform;
+    LightUniformData LightUniform;
+    Buffer CameraUniformBuffer;
+    Buffer ModelUniformBuffer;
+    Buffer LightUniformBuffer;
     Mesh DragonMesh;
     Mesh PlaneMesh;
 };
 
-RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const VulkanContext& context)
+class OpaqueRenderPass : public RenderPass
+{    
+    RenderGraphResources& resources;
+public:
+    OpaqueRenderPass(RenderGraphResources& resources)
+        : resources(resources) { }
+
+    virtual void SetupDependencies(DependencyState dependencies) override
+    {
+        dependencies.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
+        dependencies.AddAttachment("OutputDepth"_id, ClearDepthSpencil{ });
+
+        dependencies.AddBuffer("CameraUniform"_id, BufferUsage::UNIFORM_BUFFER);
+        dependencies.AddBuffer("ModelUniform"_id, BufferUsage::UNIFORM_BUFFER);
+        dependencies.AddBuffer("LightUniform"_id, BufferUsage::UNIFORM_BUFFER);
+    }
+
+    virtual void BeforeRender(RenderPassState state) override
+    {
+        auto MakeBarrier = [](const Buffer& uniformBuffer, vk::AccessFlagBits from, vk::AccessFlagBits to)
+        {
+            vk::BufferMemoryBarrier barrier;
+            barrier
+                .setSrcAccessMask(from)
+                .setDstAccessMask(to)
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setBuffer(uniformBuffer.GetNativeHandle())
+                .setSize(uniformBuffer.GetByteSize())
+                .setOffset(0);
+            return barrier;
+        };
+
+        auto FillUniform = [&state](const auto& uniformData, const auto& uniformBuffer) mutable
+        {
+            auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+
+            auto uniformAllocation = stageBuffer.Submit(&uniformData);
+            state.Commands.CopyBuffer(
+                stageBuffer.GetBuffer(), vk::AccessFlagBits::eHostWrite, uniformAllocation.Offset,
+                uniformBuffer, vk::AccessFlagBits::eUniformRead, 0,
+                vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eVertexShader,
+                uniformAllocation.Size
+            );
+        };
+
+        FillUniform(this->resources.CameraUniform, this->resources.CameraUniformBuffer);
+        FillUniform(this->resources.ModelUniform, this->resources.ModelUniformBuffer);
+        FillUniform(this->resources.LightUniform, this->resources.LightUniformBuffer);
+
+        MakeBarrier(this->resources.CameraUniformBuffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead);
+        MakeBarrier(this->resources.ModelUniformBuffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead);
+        MakeBarrier(this->resources.LightUniformBuffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead);
+    }
+    
+    virtual void OnRender(RenderPassState state) override
+    {
+        auto& output = state.GetOutputColorAttachment(0);
+        state.Commands.SetRenderArea(output);
+
+        auto Draw = [&state](const Mesh& mesh)
+        {
+            size_t vertexCount = mesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
+            size_t instanceCount = mesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
+            state.Commands.BindVertexBuffers(mesh.VertexBuffer, mesh.InstanceBuffer);
+            state.Commands.Draw((uint32_t)vertexCount, (uint32_t)instanceCount);
+        };
+
+        Draw(this->resources.DragonMesh);
+        Draw(this->resources.PlaneMesh);
+    }
+};
+
+RenderGraph CreateRenderGraph(RenderGraphResources& resources, const VulkanContext& context)
 {
     std::vector<DescriptorBinding::ImageRef> imageReferences;
     for (const auto& texture : resources.DragonMesh.Textures)
@@ -103,98 +173,25 @@ RenderGraph CreateRenderGraph(const RenderGraphResources& resources, const Vulka
                     },
                 },
                 DescriptorBinding{ }
-                    .Bind(0, resources.CameraUniform.Buffer, UniformType::UNIFORM_BUFFER)
-                    .Bind(1, resources.ModelUniform.Buffer, UniformType::UNIFORM_BUFFER)
-                    .Bind(2, resources.LightUniform.Buffer, UniformType::UNIFORM_BUFFER)
+                    .Bind(0, resources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
+                    .Bind(1, resources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+                    .Bind(2, resources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
                     .Bind(3, resources.BaseSampler, UniformType::SAMPLER)
                     .Bind(4, imageReferences, UniformType::SAMPLED_IMAGE)
             })
-            .AddWriteOnlyColorAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f })
-            .SetWriteOnlyDepthAttachment("OutputDepth"_id, ClearDepthSpencil{ })
-            .AddBeforeRenderCallback([&resources](RenderState state)
-                {
-                    auto MakeBarrier = [](const Buffer& uniformBuffer, vk::AccessFlagBits from, vk::AccessFlagBits to)
-                    {
-                        vk::BufferMemoryBarrier barrier;
-                        barrier
-                            .setSrcAccessMask(from)
-                            .setDstAccessMask(to)
-                            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                            .setBuffer(uniformBuffer.GetNativeHandle())
-                            .setSize(uniformBuffer.GetByteSize())
-                            .setOffset(0);
-                        return barrier;
-                    };
-
-                    auto FillUniform = [&state](auto& uniform) mutable
-                    {
-                        auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
-
-                        auto uniformAllocation = stageBuffer.Submit(&uniform.Data);
-                        state.Commands.CopyBuffer(
-                            stageBuffer.GetBuffer(), vk::AccessFlagBits::eHostWrite, uniformAllocation.Offset,
-                            uniform.Buffer, vk::AccessFlagBits::eUniformRead, 0,
-                            vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eVertexShader,
-                            uniformAllocation.Size
-                        );
-                    };
-
-                    FillUniform(resources.CameraUniform);
-                    FillUniform(resources.ModelUniform);
-                    FillUniform(resources.LightUniform);
-
-                    state.Commands.GetNativeHandle().pipelineBarrier(
-                        vk::PipelineStageFlagBits::eTransfer,
-                        vk::PipelineStageFlagBits::eVertexShader | vk::PipelineStageFlagBits::eFragmentShader,
-                        { }, // dependency flags
-                        { }, // memory barriers
-                        {
-                            MakeBarrier(resources.CameraUniform.Buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
-                            MakeBarrier(resources.ModelUniform.Buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
-                            MakeBarrier(resources.LightUniform.Buffer, vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eUniformRead),
-                        },
-                        { } // image barriers
-                    );
-                })
-            .AddOnRenderCallback(
-                [&resources](RenderState state)
-                {
-                    auto& output = state.GetOutputColorAttachment(0);
-                    state.Commands.SetRenderArea(output);
-
-                    size_t dragonVertexCount = resources.DragonMesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
-                    size_t dragonInstanceCount = resources.DragonMesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
-                    state.Commands.BindVertexBuffers(resources.DragonMesh.VertexBuffer, resources.DragonMesh.InstanceBuffer);
-                    state.Commands.Draw((uint32_t)dragonVertexCount, (uint32_t)dragonInstanceCount);
-
-                    size_t planeVertexCount = resources.PlaneMesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
-                    size_t planeInstanceCount = resources.PlaneMesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
-                    state.Commands.BindVertexBuffers(resources.PlaneMesh.VertexBuffer, resources.PlaneMesh.InstanceBuffer);
-                    state.Commands.Draw((uint32_t)planeVertexCount, (uint32_t)planeInstanceCount);
-                }
-            )
+            .AddRenderPass(std::make_unique<OpaqueRenderPass>(resources))
         )
         .AddRenderPass(RenderPassBuilder{ "ImGuiPass"_id }
-            .AddWriteOnlyColorAttachment("Output"_id, AttachmentInitialState::LOAD)
-            .AddOnRenderCallback(
-                [](RenderState state)
-                {
-                    ImGuiVulkanContext::RenderFrame(state.Commands.GetNativeHandle());
-                }
-            )
+            .AddRenderPass(std::make_unique<ImGuiRenderPass>("Output"_id))
         )
         .AddAttachment("Output"_id, Format::R8G8B8A8_UNORM)
         .AddAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT)
+        .AddExternalBuffer("CameraUniform"_id, BufferUsage::UNIFORM_BUFFER)
+        .AddExternalBuffer("ModelUniform"_id, BufferUsage::UNIFORM_BUFFER)
+        .AddExternalBuffer("LightUniform"_id, BufferUsage::UNIFORM_BUFFER)
         .SetOutputName("Output"_id);
 
     return renderGraphBuilder.Build();
-}
-
-template<typename T>
-UniformData<T> CreateUniform()
-{
-    return { Buffer(sizeof(T), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY), T{ } };
 }
 
 Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vector<InstanceData>& instances, ArrayView<ImageData> textures)
@@ -433,9 +430,12 @@ int main()
         std::move(vertexShader),
         std::move(fragmentShader),
         std::move(sampler),
-        CreateUniform<CameraUniformData>(),
-        CreateUniform<ModelUniformData>(),
-        CreateUniform<LightUniformData>(),
+        { },
+        { },
+        { },
+        Buffer{ sizeof(RenderGraphResources::CameraUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(RenderGraphResources::ModelUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(RenderGraphResources::LightUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         CreateDragonMesh(globalTextureIndex),
         CreatePlaneMesh(globalTextureIndex),
     };
@@ -454,7 +454,7 @@ int main()
         camera.AspectRatio = size.x / size.y;
     });
     
-    ImGuiVulkanContext::Init(window, renderGraph.GetNodeByName("ImGuiPass"_id).Pass.GetNativeHandle());
+    ImGuiVulkanContext::Init(window, renderGraph.GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
 
     while (!window.ShouldClose())
     {
@@ -504,10 +504,10 @@ int main()
             ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
             ImGui::End();
 
-            renderGraphResources.CameraUniform.Data.Matrix = camera.GetMatrix();
-            renderGraphResources.ModelUniform.Data.Matrix = MakeRotationMatrix(modelRotation);
-            renderGraphResources.LightUniform.Data.Color = lightColor;
-            renderGraphResources.LightUniform.Data.Direction = Normalize(lightDirection);
+            renderGraphResources.CameraUniform.Matrix = camera.GetMatrix();
+            renderGraphResources.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
+            renderGraphResources.LightUniform.Color = lightColor;
+            renderGraphResources.LightUniform.Direction = Normalize(lightDirection);
 
             renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());

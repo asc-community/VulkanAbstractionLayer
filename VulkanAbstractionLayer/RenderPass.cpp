@@ -27,8 +27,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "RenderPass.h"
+#include "RenderGraph.h"
 
 namespace VulkanAbstractionLayer
 {
+    const Image& RenderPassState::GetOutputColorAttachment(size_t index) const
+    {
+        return this->Graph.GetImageByName(this->ColorAttachments[index]);
+    }
+
 
 }

@@ -45,20 +45,20 @@ namespace VulkanAbstractionLayer
         this->handle.end();
     }
 
-    void CommandBuffer::BeginRenderPass(const RenderPass& renderPass)
+    void CommandBuffer::BeginRenderPass(const RenderPassNative& renderPass)
     {
         vk::RenderPassBeginInfo renderPassBeginInfo;
         renderPassBeginInfo
-            .setRenderPass(renderPass.GetNativeHandle())
-            .setRenderArea(renderPass.GetRenderArea())
-            .setFramebuffer(renderPass.GetFramebuffer())
-            .setClearValues(renderPass.GetClearValues());
+            .setRenderPass(renderPass.RenderPassHandle)
+            .setRenderArea(renderPass.RenderArea)
+            .setFramebuffer(renderPass.Framebuffer)
+            .setClearValues(renderPass.ClearValues);
 
         this->handle.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 
-        vk::Pipeline graphicPipeline = renderPass.GetPipeline();
-        vk::PipelineLayout pipelineLayout = renderPass.GetPipelineLayout();
-        vk::DescriptorSet descriptorSet = renderPass.GetDescriptorSet();
+        vk::Pipeline graphicPipeline = renderPass.Pipeline;
+        vk::PipelineLayout pipelineLayout = renderPass.PipelineLayout;
+        vk::DescriptorSet descriptorSet = renderPass.DescriptorSet;
         if ((bool)graphicPipeline) this->handle.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicPipeline);
         if ((bool)descriptorSet) this->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, descriptorSet, { });
     }

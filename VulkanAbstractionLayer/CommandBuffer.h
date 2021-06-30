@@ -34,26 +34,40 @@
 
 namespace VulkanAbstractionLayer
 {
-    class RenderPass;
+    struct RenderPassNative;
     class Image;
     class Buffer;
     
     struct Rect2D
     {
-        int32_t OffsetWidth = { };
-        int32_t OffsetHeight = { };
-        uint32_t Width = { };
-        uint32_t Height = { };
+        int32_t OffsetWidth = 0;
+        int32_t OffsetHeight = 0;
+        uint32_t Width = 0;
+        uint32_t Height = 0;
     };
 
     struct Viewport
     {
-        float OffsetWidth = { };
-        float OffsetHeight = { };
-        float Width = { };
-        float Height = { };
-        float MinDepth = { };
-        float MaxDepth = { };
+        float OffsetWidth = 0.0f;
+        float OffsetHeight = 0.0f;
+        float Width = 0.0f;
+        float Height = 0.0f;
+        float MinDepth = 0.0f;
+        float MaxDepth = 0.0f;
+    };
+
+    struct ClearColor
+    {
+        float R = 0.0f;
+        float G = 0.0f;
+        float B = 0.0f;
+        float A = 1.0f;
+    };
+
+    struct ClearDepthSpencil
+    {
+        float Depth = 1.0f;
+        uint32_t Spencil = 0;
     };
 
     class CommandBuffer
@@ -66,7 +80,7 @@ namespace VulkanAbstractionLayer
         const vk::CommandBuffer& GetNativeHandle() const { return this->handle; }
         void Begin();
         void End();
-        void BeginRenderPass(const RenderPass& renderPass);
+        void BeginRenderPass(const RenderPassNative& renderPass);
         void EndRenderPass();
         void Draw(uint32_t vertexCount, uint32_t instanceCount) { this->Draw(vertexCount, instanceCount, 0, 0); }
         void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);

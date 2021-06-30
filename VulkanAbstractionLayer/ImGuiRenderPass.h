@@ -28,45 +28,27 @@
 
 #pragma once
 
-#include "DependencyStorage.h"
-#include "CommandBuffer.h"
-#include "StringId.h"
+#include "RenderPass.h"
+#include "ImGuiContext.h"
 
 namespace VulkanAbstractionLayer
 {
-    class RenderGraph;
+	class ImGuiRenderPass : public RenderPass
+	{
+		StringId outputImageName;
 
-    struct RenderPassNative
-    {
-        vk::RenderPass RenderPassHandle;
-        vk::DescriptorSet DescriptorSet;
-        vk::Framebuffer Framebuffer;
-        vk::Pipeline Pipeline;
-        vk::PipelineLayout PipelineLayout;
-        vk::Rect2D RenderArea;
-        std::vector<vk::ClearValue> ClearValues;
-    };
+	public:
+		ImGuiRenderPass(StringId outputImageName)
+			: outputImageName(outputImageName) { }
 
-    struct RenderPassState
-    {
-        RenderGraph& Graph;
-        CommandBuffer& Commands;
-        const std::vector<StringId>& ColorAttachments;
+		virtual void SetupDependencies(DependencyState state) override
+		{
+			state.AddAttachment(this->outputImageName, AttachmentState::LOAD_COLOR);
+		}
 
-        const Image& GetOutputColorAttachment(size_t index) const;
-    };
-
-    using DependencyState = DependencyStorage&;
-
-    class RenderPass
-    {
-    public:
-        virtual ~RenderPass() = default;
-
-        virtual void SetupDependencies(DependencyState state) { }
-
-        virtual void BeforeRender(RenderPassState state) { }
-        virtual void OnRender(RenderPassState state) { }
-        virtual void AfterRender(RenderPassState state) { }
-    };
+		virtual void OnRender(RenderPassState state) override
+		{
+			ImGuiVulkanContext::RenderFrame(state.Commands.GetNativeHandle());
+		}
+	};
 }

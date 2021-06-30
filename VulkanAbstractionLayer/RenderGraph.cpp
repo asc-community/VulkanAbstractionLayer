@@ -39,20 +39,15 @@ namespace VulkanAbstractionLayer
 
     void RenderGraph::ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer)
     {
-        RenderState state{ *this, commandBuffer, node.ColorAttachments, node.Pass.GetPipelineLayout() };
+        RenderPassState state{ *this, commandBuffer, node.ColorAttachments };
+            
+        node.PassCustom->BeforeRender(state);
 
-        if((bool)node.BeforeRender)
-            node.BeforeRender(state);
-
-        commandBuffer.BeginRenderPass(node.Pass);
-
-        if ((bool)node.OnRender)
-            node.OnRender(state);
-
+        commandBuffer.BeginRenderPass(node.PassNative);
+        node.PassCustom->OnRender(state);
         commandBuffer.EndRenderPass();
 
-        if ((bool)node.AfterRender)
-            node.AfterRender(state);
+        node.PassCustom->AfterRender(state);
     }
 
     void RenderGraph::Execute(CommandBuffer& commandBuffer)
@@ -90,7 +85,7 @@ namespace VulkanAbstractionLayer
     {
         for (const auto& node : this->nodes)
         {
-            this->onDestroy(node.Pass);
+            this->onDestroy(node.PassNative);
         }
         this->nodes.clear();
         this->images.clear();
@@ -99,10 +94,5 @@ namespace VulkanAbstractionLayer
     const Image& RenderGraph::GetImageByName(StringId name) const
     {
         return this->images.at(name);
-    }
-
-    const Image& RenderState::GetOutputColorAttachment(size_t index) const
-    {
-        return this->Graph.GetImageByName(this->ColorAttachments[index]);
     }
 }

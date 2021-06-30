@@ -28,45 +28,60 @@
 
 #pragma once
 
-#include "DependencyStorage.h"
-#include "CommandBuffer.h"
+#include <vector>
+
 #include "StringId.h"
+#include "Buffer.h"
+#include "Image.h"
+#include "CommandBuffer.h"
 
 namespace VulkanAbstractionLayer
 {
-    class RenderGraph;
-
-    struct RenderPassNative
+    enum class AttachmentState
     {
-        vk::RenderPass RenderPassHandle;
-        vk::DescriptorSet DescriptorSet;
-        vk::Framebuffer Framebuffer;
-        vk::Pipeline Pipeline;
-        vk::PipelineLayout PipelineLayout;
-        vk::Rect2D RenderArea;
-        std::vector<vk::ClearValue> ClearValues;
+        DISCARD_COLOR = 0,
+        DISCARD_DEPTH_SPENCIL,
+        LOAD_COLOR,
+        LOAD_DEPTH_SPENCIL,
+        CLEAR_COLOR,
+        CLEAR_DEPTH_SPENCIL,
     };
 
-    struct RenderPassState
-    {
-        RenderGraph& Graph;
-        CommandBuffer& Commands;
-        const std::vector<StringId>& ColorAttachments;
+	class DependencyStorage
+	{
+		struct BufferDependency
+		{
+			StringId Name;
+            BufferUsage::Bits Usage;
+		};
 
-        const Image& GetOutputColorAttachment(size_t index) const;
-    };
+        struct ImageDependency
+        {
+            StringId Name;
+            ImageUsage::Bits Usage;
+        };
 
-    using DependencyState = DependencyStorage&;
+        struct AttachmentDependency
+        {
+            StringId Name;
+            ClearColor ColorClear;
+            ClearDepthSpencil DepthSpencilClear;
+            AttachmentState OnLoad;
+        };
 
-    class RenderPass
-    {
+        std::vector<BufferDependency> bufferDependencies;
+        std::vector<ImageDependency> imageDependencies;
+        std::vector<AttachmentDependency> attachmentDependencies;
+
     public:
-        virtual ~RenderPass() = default;
+        void AddBuffer(StringId name, BufferUsage::Bits usage);
+        void AddImage(StringId name, ImageUsage::Bits usage);
+        void AddAttachment(StringId name, ClearColor clear);
+        void AddAttachment(StringId name, ClearDepthSpencil clear);
+        void AddAttachment(StringId name, AttachmentState onLoad);
 
-        virtual void SetupDependencies(DependencyState state) { }
-
-        virtual void BeforeRender(RenderPassState state) { }
-        virtual void OnRender(RenderPassState state) { }
-        virtual void AfterRender(RenderPassState state) { }
-    };
+        const auto& GetBufferDependencies() const { return this->bufferDependencies; }
+        const auto& GetImageDependencies() const { return this->imageDependencies; }
+        const auto& GetAttachmentDependencies() const { return this->attachmentDependencies; }
+	};
 }

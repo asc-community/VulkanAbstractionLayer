@@ -37,63 +37,9 @@ namespace VulkanAbstractionLayer
         this->name = name;
     }
 
-    RenderPassBuilder& RenderPassBuilder::AddOnRenderCallback(RenderGraphNode::RenderCallback callback)
+    RenderPassBuilder& RenderPassBuilder::AddRenderPass(std::unique_ptr<RenderPass> renderPass)
     {
-        this->onRenderCallback = std::move(callback);
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::AddBeforeRenderCallback(RenderGraphNode::RenderCallback callback)
-    {
-        this->beforeRenderCallback = std::move(callback);
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::AddAfterRenderCallback(RenderGraphNode::RenderCallback callback)
-    {
-        this->afterRenderCallback = std::move(callback);
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::AddReadOnlyColorAttachment(StringId name)
-    {
-        this->inputColorAttachments.push_back(ReadOnlyColorAttachment{ name });
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::AddWriteOnlyColorAttachment(StringId name)
-    {
-        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name });
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::AddWriteOnlyColorAttachment(StringId name, ClearColor clear)
-    {
-        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, ImageUsage::UNKNOWN, AttachmentInitialState::CLEAR, clear });
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::AddWriteOnlyColorAttachment(StringId name, AttachmentInitialState state)
-    {
-        this->outputColorAttachments.push_back(WriteOnlyColorAttachment{ name, ImageUsage::UNKNOWN, state });
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::SetWriteOnlyDepthAttachment(StringId name)
-    {
-        this->depthAttachment = WriteOnlyDepthAttachment{ name };
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::SetWriteOnlyDepthAttachment(StringId name, ClearDepthSpencil clear)
-    {
-        this->depthAttachment = WriteOnlyDepthAttachment{ name, ImageUsage::UNKNOWN, AttachmentInitialState::CLEAR, clear };
-        return *this;
-    }
-
-    RenderPassBuilder& RenderPassBuilder::SetWriteOnlyDepthAttachment(StringId name, AttachmentInitialState state)
-    {
-        this->depthAttachment = WriteOnlyDepthAttachment{ name, ImageUsage::UNKNOWN, state };
+        this->renderPass = std::move(renderPass);
         return *this;
     }
 
@@ -103,16 +49,54 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
-    std::array LoadOpTable = {
-        vk::AttachmentLoadOp::eClear,
-        vk::AttachmentLoadOp::eDontCare,
-        vk::AttachmentLoadOp::eLoad,
-    };
-
     std::array InputRateTable = {
         vk::VertexInputRate::eVertex,
         vk::VertexInputRate::eInstance,
     };
+
+    vk::AttachmentLoadOp AttachmentStateToLoadOp(AttachmentState state)
+    {
+        switch (state)
+        {
+        case AttachmentState::DISCARD_COLOR:
+            return vk::AttachmentLoadOp::eDontCare;
+        case AttachmentState::DISCARD_DEPTH_SPENCIL:
+            return vk::AttachmentLoadOp::eDontCare;
+        case AttachmentState::LOAD_COLOR:
+            return vk::AttachmentLoadOp::eLoad;
+        case AttachmentState::LOAD_DEPTH_SPENCIL:
+            return vk::AttachmentLoadOp::eLoad;
+        case AttachmentState::CLEAR_COLOR:
+            return vk::AttachmentLoadOp::eClear;
+        case AttachmentState::CLEAR_DEPTH_SPENCIL:
+            return vk::AttachmentLoadOp::eClear;
+        default:
+            assert(false);
+            return vk::AttachmentLoadOp::eDontCare;
+        }
+    }
+
+    ImageUsage::Bits AttachmentStateToImageUsage(AttachmentState state)
+    {
+        switch (state)
+        {
+        case AttachmentState::DISCARD_COLOR:
+            return ImageUsage::COLOR_ATTACHMENT;
+        case AttachmentState::DISCARD_DEPTH_SPENCIL:
+            return ImageUsage::DEPTH_SPENCIL_ATTACHMENT;
+        case AttachmentState::LOAD_COLOR:
+            return ImageUsage::COLOR_ATTACHMENT;
+        case AttachmentState::LOAD_DEPTH_SPENCIL:
+            return ImageUsage::DEPTH_SPENCIL_ATTACHMENT;
+        case AttachmentState::CLEAR_COLOR:
+            return ImageUsage::COLOR_ATTACHMENT;
+        case AttachmentState::CLEAR_DEPTH_SPENCIL:
+            return ImageUsage::DEPTH_SPENCIL_ATTACHMENT;
+        default:
+            assert(false);
+            return ImageUsage::COLOR_ATTACHMENT;
+        }
+    }
 
     vk::ImageLayout ImageUsageToImageLayout(ImageUsage::Bits layout)
     {
@@ -196,7 +180,7 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    RenderPass RenderGraphBuilder::BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments)
+    RenderPassNative RenderGraphBuilder::BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions)
     {
         std::vector<vk::AttachmentDescription> attachmentDescriptions;
         std::vector<vk::AttachmentReference> attachmentReferences;
@@ -204,11 +188,18 @@ namespace VulkanAbstractionLayer
         std::vector<vk::ClearValue> clearValues;
         
         uint32_t renderAreaWidth = 0, renderAreaHeight = 0;
-        
-        for (size_t attachmentIndex = 0; attachmentIndex < renderPassBuilder.outputColorAttachments.size(); attachmentIndex++)
+
+        DependencyStorage dependencies;
+        renderPassBuilder.renderPass->SetupDependencies(dependencies);
+        auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
+        auto& attachmentTransitions = resourceTransitions.ImageTransitions.at(renderPassBuilder.name);
+        std::optional<vk::AttachmentReference> depthSpencilAttachmentReference;
+
+        for (size_t attachmentIndex = 0; attachmentIndex < renderPassAttachments.size(); attachmentIndex++)
         {
-            const WriteOnlyColorAttachment& outputColorAttachment = renderPassBuilder.outputColorAttachments[attachmentIndex];
-            const Image& imageReference = attachments.at(outputColorAttachment.Name);
+            const auto& attachment = renderPassAttachments[attachmentIndex];
+            const auto& imageReference = attachments.at(attachment.Name);
+            const auto& attachmentTransition = attachmentTransitions.at(attachment.Name);
 
             if (renderAreaWidth == 0 && renderAreaHeight == 0)
             {
@@ -220,65 +211,47 @@ namespace VulkanAbstractionLayer
             attachmentDescription
                 .setFormat(ToNative(imageReference.GetFormat()))
                 .setSamples(vk::SampleCountFlagBits::e1)
-                .setLoadOp(LoadOpTable[(size_t)outputColorAttachment.InitialState])
+                .setLoadOp(AttachmentStateToLoadOp(attachment.OnLoad))
                 .setStoreOp(vk::AttachmentStoreOp::eStore)
                 .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
                 .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-                .setInitialLayout(ImageUsageToImageLayout(outputColorAttachment.InitialLayout))
-                .setFinalLayout(vk::ImageLayout::eColorAttachmentOptimal);
+                .setInitialLayout(ImageUsageToImageLayout(attachmentTransition.InitialUsage))
+                .setFinalLayout(ImageUsageToImageLayout(attachmentTransition.FinalUsage));
         
             attachmentDescriptions.push_back(std::move(attachmentDescription));
+            attachmentViews.push_back(imageReference.GetNativeView());
         
             vk::AttachmentReference attachmentReference;
             attachmentReference
                 .setAttachment((uint32_t)attachmentIndex)
-                .setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+                .setLayout(ImageUsageToImageLayout(attachmentTransition.FinalUsage));
         
-            attachmentReferences.push_back(std::move(attachmentReference));
-            attachmentViews.push_back(imageReference.GetNativeView());
-        
-            ClearColor clear = outputColorAttachment.ClearValue;
-            clearValues.push_back(vk::ClearValue{ vk::ClearColorValue{ std::array{ clear.R, clear.G, clear.B, clear.A } } });
-        }
-        
-        const WriteOnlyDepthAttachment& depthAttachment = renderPassBuilder.depthAttachment;
-        vk::AttachmentReference depthAttachmentReference;
-
-        if (depthAttachment.Name != StringId{ })
-        {
-            const Image& depthImageReference = attachments.at(depthAttachment.Name);
-
-            vk::AttachmentDescription depthAttachmentDescription;
-            depthAttachmentDescription
-                .setFormat(ToNative(depthImageReference.GetFormat()))
-                .setSamples(vk::SampleCountFlagBits::e1)
-                .setLoadOp(LoadOpTable[(size_t)depthAttachment.InitialState])
-                .setStoreOp(vk::AttachmentStoreOp::eStore)
-                .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-                .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-                .setInitialLayout(ImageUsageToImageLayout(depthAttachment.InitialLayout))
-                .setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-            attachmentDescriptions.push_back(std::move(depthAttachmentDescription));
-
-            depthAttachmentReference
-                .setAttachment((uint32_t)(attachmentDescriptions.size() - 1))
-                .setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-            attachmentViews.push_back(depthImageReference.GetNativeView());
-
-            ClearDepthSpencil depthClear = depthAttachment.ClearValue;
-            clearValues.push_back(vk::ClearValue{ vk::ClearDepthStencilValue{ depthClear.Depth, depthClear.Spencil } });
+            if (attachmentTransition.FinalUsage == ImageUsage::DEPTH_SPENCIL_ATTACHMENT)
+            {
+                depthSpencilAttachmentReference = std::move(attachmentReference);
+                clearValues.push_back(vk::ClearDepthStencilValue{ 
+                    attachment.DepthSpencilClear.Depth, attachment.DepthSpencilClear.Spencil 
+                });
+            }
+            else
+            {
+                attachmentReferences.push_back(std::move(attachmentReference));
+                clearValues.push_back(vk::ClearColorValue{ 
+                    std::array{ attachment.ColorClear.R, attachment.ColorClear.G, attachment.ColorClear.B, attachment.ColorClear.A } 
+                });
+            }
         }
 
         vk::SubpassDescription subpassDescription;
         subpassDescription
             .setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
             .setColorAttachments(attachmentReferences)
-            .setPDepthStencilAttachment(depthAttachmentReference != vk::AttachmentReference{ } ? &depthAttachmentReference : nullptr);
+            .setPDepthStencilAttachment(depthSpencilAttachmentReference.has_value() ? 
+                std::addressof(depthSpencilAttachmentReference.value()) : nullptr
+            );
         
         // TODO
-        std::array dependencies = {
+        std::array subpassDependencies = {
             vk::SubpassDependency {
                 VK_SUBPASS_EXTERNAL,
                 0,
@@ -303,7 +276,7 @@ namespace VulkanAbstractionLayer
         renderPassCreateInfo
             .setAttachments(attachmentDescriptions)
             .setSubpasses(subpassDescription)
-            .setDependencies(dependencies);
+            .setDependencies(subpassDependencies);
         
         auto renderPass = GetCurrentVulkanContext().GetDevice().createRenderPass(renderPassCreateInfo);
         
@@ -488,52 +461,69 @@ namespace VulkanAbstractionLayer
             graphicPipeline.DescriptorBindings.Write(descriptorSet);
         }
 
-        return RenderPass{ renderPass, descriptorSet, pipeline, pipelineLayout, renderArea, framebuffer, clearValues };
+        return RenderPassNative{ renderPass, descriptorSet, framebuffer, pipeline, pipelineLayout, renderArea, clearValues };
     }
 
-    ImageUsage::Bits RenderGraphBuilder::ResolveImageTransitions(StringId outputName)
+    RenderGraphBuilder::DependencyHashMap RenderGraphBuilder::AcquireRenderPassDependencies()
     {
-        std::unordered_map<StringId, ImageUsage::Bits> layoutTransitions;
-        for (auto& renderPass : this->renderPasses)
+        DependencyHashMap dependencies;
+        for (auto& renderPassBuilder : this->renderPasses)
         {
-            for (auto& inputAttachment : renderPass.inputColorAttachments)
-            {
-                inputAttachment.InitialLayout = layoutTransitions[inputAttachment.Name];
-                layoutTransitions[inputAttachment.Name] = ImageUsage::SHADER_READ;
-            }
-            for (auto& outputAttachment : renderPass.outputColorAttachments)
-            {
-                outputAttachment.InitialLayout = layoutTransitions[outputAttachment.Name];
-                layoutTransitions[outputAttachment.Name] = ImageUsage::COLOR_ATTACHMENT;
-            }
-            renderPass.depthAttachment.InitialLayout = layoutTransitions[renderPass.depthAttachment.Name];
-            layoutTransitions[renderPass.depthAttachment.Name] = ImageUsage::DEPTH_SPENCIL_ATTACHMENT;
+            auto& dependency = dependencies[renderPassBuilder.name];
+            renderPassBuilder.renderPass->SetupDependencies(dependency);
         }
-        return layoutTransitions[outputName];
+        return dependencies;
     }
 
-    RenderGraphBuilder::AttachmentHashMap RenderGraphBuilder::AllocateAttachments()
+    RenderGraphBuilder::ResourceTransitions RenderGraphBuilder::ResolveResourceTransitions(const DependencyHashMap& dependencies)
+    {
+        ResourceTransitions resourceTransitions;
+        std::unordered_map<StringId, ImageUsage::Bits> lastImageUsages = this->externalImagesInitialUsage;
+        std::unordered_map<StringId, BufferUsage::Bits> lastBufferUsages = this->externalBufferInitialUsage;
+
+        for (const auto& renderPassBuilder : this->renderPasses)
+        {
+            auto& renderPassDependencies = dependencies.at(renderPassBuilder.name);
+            auto& bufferTransitions = resourceTransitions.BufferTransitions[renderPassBuilder.name];
+            auto& imageTransitions = resourceTransitions.ImageTransitions[renderPassBuilder.name];
+
+            for (const auto& bufferDependency : renderPassDependencies.GetBufferDependencies())
+            {
+                auto lastBufferUsage = lastBufferUsages.at(bufferDependency.Name);
+                bufferTransitions[bufferDependency.Name].InitialUsage = lastBufferUsage;
+                bufferTransitions[bufferDependency.Name].FinalUsage = bufferDependency.Usage;
+                resourceTransitions.TotalBufferUsages[bufferDependency.Name] |= bufferDependency.Usage;
+                lastBufferUsages[bufferDependency.Name] = bufferDependency.Usage;
+            }
+
+            for (const auto& imageDependency : renderPassDependencies.GetImageDependencies())
+            {
+                auto lastImageUsage = lastImageUsages.at(imageDependency.Name);
+                imageTransitions[imageDependency.Name].InitialUsage = lastImageUsage;
+                imageTransitions[imageDependency.Name].FinalUsage = imageDependency.Usage;
+                resourceTransitions.TotalImageUsages[imageDependency.Name] |= imageDependency.Usage;
+                lastImageUsages[imageDependency.Name] = imageDependency.Usage;
+            }
+
+            for (const auto& attachmentDependency : renderPassDependencies.GetAttachmentDependencies())
+            {
+                auto attachmentDependencyUsage = AttachmentStateToImageUsage(attachmentDependency.OnLoad);
+                auto lastImageUsage = lastImageUsages.at(attachmentDependency.Name);
+                imageTransitions[attachmentDependency.Name].InitialUsage = lastImageUsage;
+                imageTransitions[attachmentDependency.Name].FinalUsage = attachmentDependencyUsage;
+                resourceTransitions.TotalImageUsages[attachmentDependency.Name] |= attachmentDependencyUsage;
+                lastImageUsages[attachmentDependency.Name] = attachmentDependencyUsage;
+            }
+        }
+
+        return resourceTransitions;
+    }
+
+    RenderGraphBuilder::AttachmentHashMap RenderGraphBuilder::AllocateAttachments(const ResourceTransitions& transitions, const DependencyHashMap& dependencies)
     {
         AttachmentHashMap attachments;
 
-        std::unordered_map<StringId, ImageUsage::Value> attachmentUsages;
-        for (const auto& renderPass : this->renderPasses)
-        {
-            for (const auto& colorAttachment : renderPass.inputColorAttachments)
-            {
-                attachmentUsages[colorAttachment.Name] |= ImageUsage::SHADER_READ;
-            }
-            for (const auto& colorAttachment : renderPass.outputColorAttachments)
-            {
-                attachmentUsages[colorAttachment.Name] |= ImageUsage::COLOR_ATTACHMENT;
-            }
-            attachmentUsages[renderPass.depthAttachment.Name] |= ImageUsage::DEPTH_SPENCIL_ATTACHMENT;
-        }
-        attachmentUsages[this->outputName] |= ImageUsage::TRANSFER_SOURCE;
-        // remove empty attachment
-        attachmentUsages.erase(StringId{ });
-
-        for (const auto& [attachmentName, attachmentUsage] : attachmentUsages)
+        for (const auto& [attachmentName, attachmentUsage] : transitions.TotalImageUsages)
         {
             auto& attachmentCreateOptions = this->attachmentsCreateOptions.at(attachmentName);
 
@@ -546,6 +536,11 @@ namespace VulkanAbstractionLayer
             ));
         }
         return attachments;
+    }
+
+    void RenderGraphBuilder::SetupOutputImage(ResourceTransitions& transitions, StringId outputImage)
+    {
+        transitions.TotalImageUsages.at(outputImage) |= ImageUsage::TRANSFER_SOURCE;
     }
 
     RenderGraphBuilder& RenderGraphBuilder::AddRenderPass(RenderPassBuilder&& renderPass)
@@ -577,6 +572,19 @@ namespace VulkanAbstractionLayer
     RenderGraphBuilder& RenderGraphBuilder::AddAttachment(StringId name, Format format, uint32_t width, uint32_t height)
     {
         this->attachmentsCreateOptions.emplace(name, AttachmentCreateOptions{ format, width, height });
+        this->AddExternalImage(name, ImageUsage::UNKNOWN);
+        return *this;
+    }
+
+    RenderGraphBuilder& RenderGraphBuilder::AddExternalImage(StringId name, ImageUsage::Bits initialUsage)
+    {
+        this->externalImagesInitialUsage[name] = initialUsage;
+        return *this;
+    }
+
+    RenderGraphBuilder& RenderGraphBuilder::AddExternalBuffer(StringId name, BufferUsage::Bits initialUsage)
+    {
+        this->externalBufferInitialUsage[name] = initialUsage;
         return *this;
     }
 
@@ -595,45 +603,46 @@ namespace VulkanAbstractionLayer
 
     RenderGraph RenderGraphBuilder::Build()
     {
-        ImageUsage::Bits outputLayout = this->ResolveImageTransitions(this->outputName);
-        AttachmentHashMap attachments = this->AllocateAttachments();
+        auto dependencies = this->AcquireRenderPassDependencies();
+        auto resourceTransitions = this->ResolveResourceTransitions(dependencies);
+        this->SetupOutputImage(resourceTransitions, this->outputName);
+        AttachmentHashMap attachments = this->AllocateAttachments(resourceTransitions, dependencies);
 
         std::vector<RenderGraphNode> nodes;
 
         this->PreWarmDescriptorSets();
 
-        for (auto& renderPass : this->renderPasses)
+        for (auto& renderPassBuilder : this->renderPasses)
         {
             std::vector<StringId> colorAttachments;
-            for (const auto& colorAttachment : renderPass.outputColorAttachments)
-                colorAttachments.push_back(colorAttachment.Name);
+            for (const auto& attachment : dependencies[renderPassBuilder.name].GetAttachmentDependencies())
+                colorAttachments.push_back(attachment.Name);
 
             nodes.push_back(RenderGraphNode{
-                renderPass.name,
-                this->BuildRenderPass(renderPass, attachments),
-                std::move(renderPass.beforeRenderCallback),
-                std::move(renderPass.onRenderCallback),
-                std::move(renderPass.afterRenderCallback),
+                renderPassBuilder.name,
+                this->BuildRenderPass(renderPassBuilder, attachments, resourceTransitions),
+                std::move(renderPassBuilder.renderPass),
                 std::move(colorAttachments)
             });
         }
 
-        auto OnPresent = [outputLayout](CommandBuffer& commandBuffer, const Image& outputImage, const Image& presentImage)
+        auto OnPresent = [](CommandBuffer& commandBuffer, const Image& outputImage, const Image& presentImage)
         {
+            constexpr auto attachmentType = ImageUsage::COLOR_ATTACHMENT;
             commandBuffer.BlitImage(
-                outputImage, ImageUsageToImageLayout(outputLayout), ImageUsageToAccessFlags(outputLayout),
+                outputImage, ImageUsageToImageLayout(attachmentType), ImageUsageToAccessFlags(attachmentType),
                 presentImage, vk::ImageLayout::eUndefined, vk::AccessFlagBits::eMemoryRead,
-                ImageUsageToPipelineStage(outputLayout), vk::Filter::eLinear
+                ImageUsageToPipelineStage(attachmentType), vk::Filter::eLinear
             );
         };
 
-        auto OnDestroy = [](const RenderPass& pass)
+        auto OnDestroy = [](const RenderPassNative& pass)
         {
             auto& device = GetCurrentVulkanContext().GetDevice();
-            if ((bool)pass.GetPipeline())            device.destroyPipeline(pass.GetPipeline());
-            if ((bool)pass.GetPipelineLayout())      device.destroyPipelineLayout(pass.GetPipelineLayout());
-            if ((bool)pass.GetFramebuffer())         device.destroyFramebuffer(pass.GetFramebuffer());
-            if ((bool)pass.GetNativeHandle())        device.destroyRenderPass(pass.GetNativeHandle());
+            if ((bool)pass.Pipeline)            device.destroyPipeline(pass.Pipeline);
+            if ((bool)pass.PipelineLayout)      device.destroyPipelineLayout(pass.PipelineLayout);
+            if ((bool)pass.Framebuffer)         device.destroyFramebuffer(pass.Framebuffer);
+            if ((bool)pass.RenderPassHandle)          device.destroyRenderPass(pass.RenderPassHandle);
         };
 
         return RenderGraph{ std::move(nodes), std::move(attachments), std::move(this->outputName), std::move(OnPresent), std::move(OnDestroy) };

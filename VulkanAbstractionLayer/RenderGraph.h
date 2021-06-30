@@ -38,34 +38,18 @@
 
 namespace VulkanAbstractionLayer
 {
-    class RenderGraph;
-
-    struct RenderState
-    {
-        RenderGraph& Graph;
-        CommandBuffer& Commands;
-        const std::vector<StringId>& ColorAttachments;
-        vk::PipelineLayout PipelineLayout;
-
-        const Image& GetOutputColorAttachment(size_t index) const;
-    };
-
     struct RenderGraphNode
     {
-        using RenderCallback = std::function<void(RenderState)>;
-
         StringId Name;
-        RenderPass Pass;
-        RenderCallback BeforeRender;
-        RenderCallback OnRender;
-        RenderCallback AfterRender;
+        RenderPassNative PassNative;
+        std::unique_ptr<RenderPass> PassCustom;
         std::vector<StringId> ColorAttachments;
     };
 
     class RenderGraph
     {
         using PresentCallback = std::function<void(CommandBuffer&, const Image&, const Image&)>;
-        using DestroyCallback = std::function<void(const RenderPass&)>;
+        using DestroyCallback = std::function<void(const RenderPassNative&)>;
 
         std::vector<RenderGraphNode> nodes;
         std::unordered_map<StringId, Image> images;

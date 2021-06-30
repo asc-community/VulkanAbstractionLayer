@@ -39,49 +39,6 @@
 
 namespace VulkanAbstractionLayer
 {
-    enum class AttachmentInitialState
-    {
-        CLEAR = 0,
-        DISCARD,
-        LOAD,
-    };
-
-    struct ClearColor
-    {
-        float R = 0.0f, G = 0.0f, B = 0.0f, A = 1.0f;
-    };
-
-    struct ClearDepthSpencil
-    {
-        float Depth = 1.0f;
-        uint32_t Spencil = 0;
-    };
-
-    struct Attachment
-    {
-        StringId Name = { };
-        ImageUsage::Bits InitialLayout = ImageUsage::UNKNOWN;
-    };
-
-    struct WriteOnlyAttachment : Attachment
-    {
-        AttachmentInitialState InitialState = AttachmentInitialState::DISCARD;
-    };
-
-    struct ReadOnlyAttachment : Attachment { };
-
-    struct ReadOnlyColorAttachment : ReadOnlyAttachment { };
-
-    struct WriteOnlyColorAttachment : WriteOnlyAttachment
-    {
-        ClearColor ClearValue;
-    };
-
-    struct WriteOnlyDepthAttachment : WriteOnlyAttachment
-    {
-        ClearDepthSpencil ClearValue;
-    };
-
     struct GraphicPipeline
     {
         GraphicShader Shader;
@@ -92,28 +49,14 @@ namespace VulkanAbstractionLayer
     class RenderPassBuilder
     {
         StringId name = { };
-        RenderGraphNode::RenderCallback beforeRenderCallback;
-        RenderGraphNode::RenderCallback onRenderCallback;
-        RenderGraphNode::RenderCallback afterRenderCallback;
-        std::vector<ReadOnlyColorAttachment> inputColorAttachments;
-        std::vector<WriteOnlyColorAttachment> outputColorAttachments;
-        WriteOnlyDepthAttachment depthAttachment;
+        std::unique_ptr<RenderPass> renderPass;
         std::optional<GraphicPipeline> graphicPipeline;
     public:
         RenderPassBuilder(StringId name);
         RenderPassBuilder(RenderPassBuilder&&) = default;
         RenderPassBuilder& operator=(RenderPassBuilder&&) = default;
 
-        RenderPassBuilder& AddBeforeRenderCallback(RenderGraphNode::RenderCallback callback);
-        RenderPassBuilder& AddOnRenderCallback(RenderGraphNode::RenderCallback callback);
-        RenderPassBuilder& AddAfterRenderCallback(RenderGraphNode::RenderCallback callback);
-        RenderPassBuilder& AddReadOnlyColorAttachment(StringId name);
-        RenderPassBuilder& AddWriteOnlyColorAttachment(StringId name);
-        RenderPassBuilder& AddWriteOnlyColorAttachment(StringId name, ClearColor clear);
-        RenderPassBuilder& AddWriteOnlyColorAttachment(StringId name, AttachmentInitialState state);
-        RenderPassBuilder& SetWriteOnlyDepthAttachment(StringId name);
-        RenderPassBuilder& SetWriteOnlyDepthAttachment(StringId name, ClearDepthSpencil clear);
-        RenderPassBuilder& SetWriteOnlyDepthAttachment(StringId name, AttachmentInitialState state);
+        RenderPassBuilder& AddRenderPass(std::unique_ptr<RenderPass> renderPass);
         RenderPassBuilder& SetPipeline(GraphicPipeline pipeline);
 
         friend class RenderGraphBuilder;
@@ -128,23 +71,59 @@ namespace VulkanAbstractionLayer
             uint32_t Height;
         };
 
+        struct ImageTransition
+        {
+            ImageUsage::Bits InitialUsage;
+            ImageUsage::Bits FinalUsage;
+        };
+
+        struct BufferTransition
+        {
+            BufferUsage::Value InitialUsage;
+            BufferUsage::Value FinalUsage;
+        };
+
+        struct ResourceTransitions
+        {
+            using ImageTransitionHashMap = std::unordered_map<StringId, ImageTransition>;
+            using BufferTransitionHashMap = std::unordered_map<StringId, BufferTransition>;
+
+            using PerRenderPassImageTransitionHashMap = std::unordered_map<StringId, ImageTransitionHashMap>;
+            using PerRenderPassBufferTransitionHashMap = std::unordered_map<StringId, BufferTransitionHashMap>;
+
+            PerRenderPassImageTransitionHashMap ImageTransitions;
+            PerRenderPassBufferTransitionHashMap BufferTransitions;
+
+            std::unordered_map<StringId, ImageUsage::Value> TotalImageUsages;
+            std::unordered_map<StringId, BufferUsage::Value> TotalBufferUsages;
+        };
+
         using AttachmentHashMap = std::unordered_map<StringId, Image>;
         using AttachmentCreateOptionsHashMap = std::unordered_map<StringId, AttachmentCreateOptions>;
+        using DependencyHashMap = std::unordered_map<StringId, DependencyStorage>;
+        using ExternalImagesInitialUsage = std::unordered_map<StringId, ImageUsage::Bits>;
+        using ExternalBuffersInitialUsage = std::unordered_map<StringId, BufferUsage::Bits>;
 
         AttachmentCreateOptionsHashMap attachmentsCreateOptions;
+        ExternalImagesInitialUsage externalImagesInitialUsage;
+        ExternalBuffersInitialUsage externalBufferInitialUsage;
         std::vector<RenderPassBuilder> renderPasses;
         StringId outputName = { };
 
-        RenderPass BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments);
-        ImageUsage::Bits ResolveImageTransitions(StringId outputName);
+        RenderPassNative BuildRenderPass(const RenderPassBuilder& renderPassBuilder, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions);
+        DependencyHashMap AcquireRenderPassDependencies();
+        ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies);
+        AttachmentHashMap AllocateAttachments(const ResourceTransitions& transitions, const DependencyHashMap& dependencies);
+        void SetupOutputImage(ResourceTransitions& transitions, StringId outputImage);
         void PreWarmDescriptorSets();
-        AttachmentHashMap AllocateAttachments();
     public:
         RenderGraphBuilder& AddRenderPass(RenderPassBuilder&& renderPass);
         RenderGraphBuilder& AddRenderPass(RenderPassBuilder& renderPass);
         RenderGraphBuilder& SetOutputName(StringId name);
         RenderGraphBuilder& AddAttachment(StringId name, Format format);
         RenderGraphBuilder& AddAttachment(StringId name, Format format, uint32_t width, uint32_t height);
+        RenderGraphBuilder& AddExternalImage(StringId name, ImageUsage::Bits initialUsage);
+        RenderGraphBuilder& AddExternalBuffer(StringId name, BufferUsage::Bits initialUsage);
         RenderGraph Build();
     };
 }
