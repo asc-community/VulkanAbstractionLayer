@@ -90,14 +90,8 @@ public:
         auto FillUniform = [&state](const auto& uniformData, const auto& uniformBuffer) mutable
         {
             auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
-
             auto uniformAllocation = stageBuffer.Submit(&uniformData);
-            state.Commands.CopyBuffer(
-                stageBuffer.GetBuffer(), vk::AccessFlagBits::eNoneKHR, uniformAllocation.Offset,
-                uniformBuffer, vk::AccessFlagBits::eUniformRead, 0,
-                vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eVertexShader,
-                uniformAllocation.Size
-            );
+            state.Commands.CopyBuffer(stageBuffer.GetBuffer(), uniformAllocation.Offset, uniformBuffer, 0, uniformAllocation.Size);
         };
 
         FillUniform(this->resources.CameraUniform, this->resources.CameraUniformBuffer);
