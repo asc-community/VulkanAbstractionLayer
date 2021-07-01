@@ -43,12 +43,14 @@ namespace VulkanAbstractionLayer
 {
     struct WindowSurface;
 
+    inline void DefaultVulkanContextCallback(const std::string&) { }
+
     struct VulkanContextCreateOptions
     {
         int VulkanApiMajorVersion = 1;
         int VulkanApiMinorVersion = 0;
-        void (*ErrorCallback)(const char*) = nullptr;
-        void (*InfoCallback)(const char*) = nullptr;
+        std::function<void(const std::string&)> ErrorCallback = DefaultVulkanContextCallback;
+        std::function<void(const std::string&)> InfoCallback = DefaultVulkanContextCallback;
         std::vector<const char*> Extensions;
         std::vector<const char*> Layers;
         const char* ApplicationName = "VulkanAbstractionLayer";
@@ -67,8 +69,8 @@ namespace VulkanAbstractionLayer
     struct ContextInitializeOptions
     {
         DeviceType PreferredDeviceType = DeviceType::DISCRETE_GPU;
-        void (*ErrorCallback)(const char*) = nullptr;
-        void (*InfoCallback)(const char*) = nullptr;
+        std::function<void(const std::string&)> ErrorCallback = DefaultVulkanContextCallback;
+        std::function<void(const std::string&)> InfoCallback = DefaultVulkanContextCallback;
         std::vector<const char*> DeviceExtensions;
         size_t VirtualFrameCount = 3;
         size_t MaxStageBufferSize = 64 * 1024 * 1024;

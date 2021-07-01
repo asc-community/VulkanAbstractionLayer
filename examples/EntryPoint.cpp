@@ -13,17 +13,17 @@
 
 using namespace VulkanAbstractionLayer;
 
-void VulkanInfoCallback(const char* message)
+void VulkanInfoCallback(const std::string& message)
 {
     std::cout << "[INFO Vulkan]: " << message << std::endl;
 }
 
-void VulkanErrorCallback(const char* message)
+void VulkanErrorCallback(const std::string& message)
 {
     std::cout << "[ERROR Vulkan]: " << message << std::endl;
 }
 
-void WindowErrorCallback(const char* message)
+void WindowErrorCallback(const std::string& message)
 {
     std::cerr << "[ERROR Window]: " << message << std::endl;
 }

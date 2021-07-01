@@ -49,14 +49,12 @@ namespace VulkanAbstractionLayer
 
     void CheckRequestedLayers(const VulkanContextCreateOptions& options)
     {
-        if (options.InfoCallback)
-            options.InfoCallback("enumerating requested layers:");
+        options.InfoCallback("enumerating requested layers:");
 
         auto layers = vk::enumerateInstanceLayerProperties();
         for (const char* layerName : options.Layers)
         {
-            if (options.InfoCallback)
-                options.InfoCallback(layerName);
+            options.InfoCallback(layerName);
 
             auto layerIt = std::find_if(layers.begin(), layers.end(),
                 [layerName](const vk::LayerProperties& layer)
@@ -66,8 +64,7 @@ namespace VulkanAbstractionLayer
 
             if (layerIt == layers.end())
             {
-                if (options.ErrorCallback)
-                    options.ErrorCallback(("cannot enable requested layer: " + std::string(layerName)).c_str());
+                options.ErrorCallback(("cannot enable requested layer: " + std::string(layerName)).c_str());
                 return;
             }
         }
@@ -75,14 +72,12 @@ namespace VulkanAbstractionLayer
 
     void CheckRequestedExtensions(const VulkanContextCreateOptions& options)
     {
-        if (options.InfoCallback)
-            options.InfoCallback("enumerating requested extensions:");
+        options.InfoCallback("enumerating requested extensions:");
 
         auto extensions = vk::enumerateInstanceExtensionProperties();
         for (const char* extensionName : options.Extensions)
         {
-            if (options.InfoCallback)
-                options.InfoCallback(extensionName);
+            options.InfoCallback(extensionName);
 
             auto layerIt = std::find_if(extensions.begin(), extensions.end(),
                 [extensionName](const vk::ExtensionProperties& extension)
@@ -139,8 +134,7 @@ namespace VulkanAbstractionLayer
         this->instance = vk::createInstance(instanceCreateInfo);
         this->apiVersion = applicationInfo.apiVersion;
 
-        if (options.InfoCallback)
-            options.InfoCallback("created vulkan instance object");
+        options.InfoCallback("created vulkan instance object");
     }
 
     VulkanContext::~VulkanContext()
@@ -175,13 +169,11 @@ namespace VulkanAbstractionLayer
 
         if (!(bool)this->surface)
         {
-            if (options.ErrorCallback)
-                options.ErrorCallback("failed to initialize surface");
+            options.ErrorCallback("failed to initialize surface");
             return;
         }
 
-        if (options.InfoCallback)
-            options.InfoCallback("enumerating physical devices:");
+        options.InfoCallback("enumerating physical devices:");
         
         // enumerate physical devices
         auto physicalDevices = this->instance.enumeratePhysicalDevices();
@@ -189,21 +181,18 @@ namespace VulkanAbstractionLayer
         {
             auto properties = device.getProperties();
 
-            if (options.InfoCallback)
-                options.InfoCallback(properties.deviceName);
+            options.InfoCallback(properties.deviceName);
 
             if (properties.apiVersion < this->apiVersion)
             {
-                if (options.InfoCallback)
-                    options.InfoCallback("skipping device as its Vulkan API version is less than required");
+                options.InfoCallback("skipping device as its Vulkan API version is less than required");
                 continue;
             }
 
             auto queueFamilyIndex = DetermineQueueFamilyIndex(this->instance, device, this->surface);
             if (!queueFamilyIndex.has_value())
             {
-                if (options.InfoCallback)
-                    options.InfoCallback("skipping device as its queue families does not satisfy the requirements");
+                options.InfoCallback("skipping device as its queue families does not satisfy the requirements");
                 continue;
             }
 
@@ -216,16 +205,12 @@ namespace VulkanAbstractionLayer
 
         if (!(bool)this->physicalDevice)
         {
-            if (options.ErrorCallback)
-                options.ErrorCallback("failed to find appropriate physical device");
+            options.ErrorCallback("failed to find appropriate physical device");
             return;
         }
         else
         {
-            if (options.InfoCallback)
-            {
-                options.InfoCallback((std::string("selected physical device: ") + this->physicalDeviceProperties.deviceName.data()).c_str());
-            }
+            options.InfoCallback((std::string("selected physical device: ") + this->physicalDeviceProperties.deviceName.data()).c_str());
         }
 
         // collect surface present info
@@ -250,12 +235,9 @@ namespace VulkanAbstractionLayer
                 this->surfaceFormat = format;
         }
 
-        if (options.InfoCallback)
-        {
-            options.InfoCallback(("selected surface present mode: " + vk::to_string(this->surfacePresentMode)).c_str());
-            options.InfoCallback(("selected surface format: " + vk::to_string(this->surfaceFormat.format)).c_str());
-            options.InfoCallback(("present image count: " + std::to_string(this->presentImageCount)).c_str());
-        }
+        options.InfoCallback("selected surface present mode: " + vk::to_string(this->surfacePresentMode));
+        options.InfoCallback("selected surface format: " + vk::to_string(this->surfaceFormat.format));
+        options.InfoCallback("present image count: " + std::to_string(this->presentImageCount));
 
         // logical device and device queue
 
@@ -280,8 +262,7 @@ namespace VulkanAbstractionLayer
         this->device = this->physicalDevice.createDevice(deviceCreateInfo);
         this->deviceQueue = this->device.getQueue(this->queueFamilyIndex, 0);
 
-        if (options.InfoCallback)
-            options.InfoCallback("created logical device and device queues");
+        options.InfoCallback("created logical device and device queues");
 
         VmaAllocatorCreateInfo allocatorInfo = {};
         allocatorInfo.vulkanApiVersion = this->apiVersion;
@@ -290,17 +271,14 @@ namespace VulkanAbstractionLayer
         allocatorInfo.instance = this->instance;
         vmaCreateAllocator(&allocatorInfo, &this->allocator);
 
-        if (options.InfoCallback)
-            options.InfoCallback("created vulkan memory allocator");
+        options.InfoCallback("created vulkan memory allocator");
 
         glslang::InitializeProcess();
-        if (options.InfoCallback)
-            options.InfoCallback("initialized glslang compiler");
+        options.InfoCallback("initialized glslang compiler");
 
         this->RecreateSwapchain(surfaceCapabilities.maxImageExtent.width, surfaceCapabilities.maxImageExtent.height);
 
-        if (options.InfoCallback)
-            options.InfoCallback("created swapchain");
+        options.InfoCallback("created swapchain");
 
         this->imageAvailableSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
         this->renderingFinishedSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
@@ -312,8 +290,7 @@ namespace VulkanAbstractionLayer
 
         this->commandPool = this->device.createCommandPool(commandPoolCreateInfo);
 
-        if (options.InfoCallback)
-            options.InfoCallback("created command buffer pool");
+        options.InfoCallback("created command buffer pool");
 
         this->descriptorCache.Init();
         this->virtualFrames.Init(options.VirtualFrameCount, options.MaxStageBufferSize);
