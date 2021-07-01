@@ -138,7 +138,9 @@ public:
         for (const auto& texture : this->resources.PlaneMesh.Textures)
             imageReferences.push_back(std::ref(texture));
 
-        pipeline.DeclareImages(imageReferences, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImages(imageReferences, ImageUsage::SHADER_READ);
+        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
+        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DescriptorBindings
             .Bind(0, this->resources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
@@ -156,6 +158,14 @@ public:
         state.AddBuffer(this->resources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         state.AddBuffer(this->resources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         state.AddBuffer(this->resources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+
+        std::vector<ImageReference> imageReferences;
+        for (const auto& texture : this->resources.DragonMesh.Textures)
+            imageReferences.push_back(std::ref(texture));
+        for (const auto& texture : this->resources.PlaneMesh.Textures)
+            imageReferences.push_back(std::ref(texture));
+        for (const auto& imageReference : imageReferences)
+            state.AddImage(imageReference, ImageUsage::SHADER_READ);
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -183,8 +193,6 @@ RenderGraph CreateRenderGraph(RenderGraphResources& resources, const VulkanConte
         .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
         .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
-        .AddAttachment("Output"_id, Format::R8G8B8A8_UNORM)
-        .AddAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT)
         .SetOutputName("Output"_id);
 
     return renderGraphBuilder.Build();

@@ -189,6 +189,8 @@ namespace VulkanAbstractionLayer
             return vk::AccessFlagBits::eTransferRead;
         case ImageUsage::TRANSFER_DISTINATION:
             return vk::AccessFlagBits::eTransferWrite;
+        case ImageUsage::SHADER_READ:
+            return vk::AccessFlagBits::eShaderRead;
         case ImageUsage::STORAGE:
             return vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite; // TODO: what if storage is not read or write?
         case ImageUsage::COLOR_ATTACHMENT:
@@ -679,21 +681,27 @@ namespace VulkanAbstractionLayer
         return resourceTransitions;
     }
 
-    RenderGraphBuilder::AttachmentHashMap RenderGraphBuilder::AllocateAttachments(const ResourceTransitions& transitions, const DependencyHashMap& dependencies)
+    RenderGraphBuilder::AttachmentHashMap RenderGraphBuilder::AllocateAttachments(const PipelineHashMap& pipelines, const ResourceTransitions& transitions, const DependencyHashMap& dependencies)
     {
         AttachmentHashMap attachments;
 
-        for(const auto& [attachmentName, attachmentCreateOption] : this->attachmentsCreateOptions)
-        {
-            auto attachmentUsage = transitions.TotalImageUsages.at(AttachmentNameToImageHandle(attachmentName));
+        auto [surfaceWidth, surfaceHeight] = GetCurrentVulkanContext().GetSurfaceExtent();
 
-            attachments.emplace(attachmentName, Image(
-                attachmentCreateOption.Width,
-                attachmentCreateOption.Height,
-                attachmentCreateOption.LayoutFormat,
-                attachmentUsage,
-                MemoryUsage::GPU_ONLY
-            ));
+        for (const auto& [renderPassName, pipeline] : pipelines)
+        {
+            auto& attachmentDeclarations = pipeline.GetAttachmentDeclarations();
+            for (const auto& attachment : attachmentDeclarations)
+            {
+                auto attachmentUsage = transitions.TotalImageUsages.at(AttachmentNameToImageHandle(attachment.Name));
+
+                attachments.emplace(attachment.Name, Image(
+                    attachment.ImageWidth == 0 ? surfaceWidth : attachment.ImageWidth,
+                    attachment.ImageHeight == 0 ? surfaceHeight : attachment.ImageHeight,
+                    attachment.ImageFormat,
+                    attachmentUsage,
+                    MemoryUsage::GPU_ONLY
+                ));
+            }
         }
         return attachments;
     }
@@ -715,20 +723,6 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
-    RenderGraphBuilder& RenderGraphBuilder::AddAttachment(StringId name, Format format)
-    {
-        auto& vulkanContext = GetCurrentVulkanContext();
-        auto [width, height] = vulkanContext.GetSurfaceExtent();
-        return this->AddAttachment(name, format, width, height);
-    }
-
-    RenderGraphBuilder& RenderGraphBuilder::AddAttachment(StringId name, Format format, uint32_t width, uint32_t height)
-    {
-        this->attachmentsCreateOptions.emplace(name, AttachmentCreateOptions{ format, width, height });
-        this->externalImages.emplace(AttachmentNameToImageHandle(name), ImageUsage::UNKNOWN);
-        return *this;
-    }
-
     void RenderGraphBuilder::SetupExternalResources(const Pipeline& pipelineState)
     {
         auto& bufferDeclarations = pipelineState.GetBufferDeclarations();
@@ -743,6 +737,14 @@ namespace VulkanAbstractionLayer
         {
             assert(this->externalImages.find(imageDeclaration.ImageNativeHandle) == this->externalImages.end());
             this->externalImages[imageDeclaration.ImageNativeHandle] = imageDeclaration.InitialUsage;
+        }
+
+        auto& attachmentDeclarations = pipelineState.GetAttachmentDeclarations();
+        for (const auto& attachmentDeclaration : attachmentDeclarations)
+        {
+            auto attachmentNativeHandle = AttachmentNameToImageHandle(attachmentDeclaration.Name);
+            assert(this->externalImages.find(attachmentNativeHandle) == this->externalImages.end());
+            this->externalImages[attachmentNativeHandle] = ImageUsage::UNKNOWN;
         }
     }
 
@@ -775,7 +777,7 @@ namespace VulkanAbstractionLayer
         PipelineHashMap pipelines = this->CreatePipelines();
         ResourceTransitions resourceTransitions = this->ResolveResourceTransitions(dependencies);
         this->SetupOutputImage(resourceTransitions, this->outputName);
-        AttachmentHashMap attachments = this->AllocateAttachments(resourceTransitions, dependencies);
+        AttachmentHashMap attachments = this->AllocateAttachments(pipelines, resourceTransitions, dependencies);
 
         std::vector<RenderGraphNode> nodes;
 

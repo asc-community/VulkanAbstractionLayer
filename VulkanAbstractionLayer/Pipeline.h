@@ -30,6 +30,7 @@
 
 #include "GraphicShader.h"
 #include "DescriptorBinding.h"
+#include "StringId.h"
 #include <optional>
 
 namespace VulkanAbstractionLayer
@@ -48,20 +49,33 @@ namespace VulkanAbstractionLayer
             ImageUsage::Bits InitialUsage;
         };
 
+        struct AttachmentDeclaration
+        {
+            StringId Name;
+            Format ImageFormat;
+            uint32_t ImageWidth;
+            uint32_t ImageHeight;
+        };
+
         std::vector<BufferDeclaration> bufferDeclarations;
         std::vector<ImageDeclaration> imageDeclarations;
+        std::vector<AttachmentDeclaration> attachmentDeclarations;
     public:
         std::optional<GraphicShader> Shader;
         std::vector<VertexBinding> VertexBindings;
         DescriptorBinding DescriptorBindings;
 
-        Pipeline& DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage);
-        Pipeline& DeclareImage(const Image& image, ImageUsage::Bits oldUsage);
+        void DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage);
+        void DeclareImage(const Image& image, ImageUsage::Bits oldUsage);
 
-        Pipeline& DeclareBuffers(const std::vector<BufferReference>& buffers, BufferUsage::Bits oldUsage);
-        Pipeline& DeclareImages(const std::vector<ImageReference>& images, ImageUsage::Bits oldUsage);
+        void DeclareBuffers(const std::vector<BufferReference>& buffers, BufferUsage::Bits oldUsage);
+        void DeclareImages(const std::vector<ImageReference>& images, ImageUsage::Bits oldUsage);
+
+        void DeclareAttachment(StringId name, Format format);
+        void DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height);
 
         const auto& GetBufferDeclarations() const { return this->bufferDeclarations; }
         const auto& GetImageDeclarations() const { return this->imageDeclarations; }
+        const auto& GetAttachmentDeclarations() const { return this->attachmentDeclarations; }
     };
 }

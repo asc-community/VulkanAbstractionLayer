@@ -1,3 +1,4 @@
+#include "Pipeline.h"
 // Copyright(c) 2021, #Momo
 // All rights reserved.
 // 
@@ -30,31 +31,37 @@
 
 namespace VulkanAbstractionLayer
 {
-	Pipeline& Pipeline::DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage)
+	void Pipeline::DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage)
 	{
 		this->bufferDeclarations.push_back({ (void*)buffer.GetNativeHandle(), oldUsage });
-		return *this;
 	}
 
-	Pipeline& Pipeline::DeclareImage(const Image& image, ImageUsage::Bits oldUsage)
+	void Pipeline::DeclareImage(const Image& image, ImageUsage::Bits oldUsage)
 	{
 		this->imageDeclarations.push_back({ (void*)image.GetNativeHandle(), oldUsage });
-		return *this;
 	}
 
-	Pipeline& Pipeline::DeclareBuffers(const std::vector<BufferReference>& buffers, BufferUsage::Bits oldUsage)
+	void Pipeline::DeclareBuffers(const std::vector<BufferReference>& buffers, BufferUsage::Bits oldUsage)
 	{
 		this->bufferDeclarations.reserve(this->bufferDeclarations.size() + buffers.size());
 		for (auto bufferReference : buffers)
 			this->DeclareBuffer(bufferReference.get(), oldUsage);
-		return *this;
 	}
 
-	Pipeline& Pipeline::DeclareImages(const std::vector<ImageReference>& images, ImageUsage::Bits oldUsage)
+	void Pipeline::DeclareImages(const std::vector<ImageReference>& images, ImageUsage::Bits oldUsage)
 	{
 		this->imageDeclarations.reserve(this->imageDeclarations.size() + images.size());
 		for (auto imageReference : images)
 			this->DeclareImage(imageReference.get(), oldUsage);
-		return *this;
+	}
+
+	void Pipeline::DeclareAttachment(StringId name, Format format)
+	{
+		this->attachmentDeclarations.push_back({ name, format, 0, 0 });
+	}
+
+	void Pipeline::DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height)
+	{
+		this->attachmentDeclarations.push_back({ name, format, width, height });
 	}
 }
