@@ -82,7 +82,7 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::vector<BufferRef>& buffers, UniformType type)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::vector<BufferReference>& buffers, UniformType type)
 	{
 		size_t index = 0;
 		for (const auto& buffer : buffers)
@@ -98,7 +98,7 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::vector<ImageRef>& images, UniformType type)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::vector<ImageReference>& images, UniformType type)
 	{
 		size_t index = 0;
 		for (const auto& image : images)
@@ -114,7 +114,7 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::vector<SamplerRef>& samplers, UniformType type)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::vector<SamplerReference>& samplers, UniformType type)
 	{
 		size_t index = 0;
 		for (const auto& sampler : samplers)

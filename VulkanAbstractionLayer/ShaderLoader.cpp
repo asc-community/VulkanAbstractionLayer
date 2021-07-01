@@ -28,6 +28,7 @@
 
 #include "ShaderLoader.h"
 #include "VectorMath.h"
+#include "VulkanContext.h"
 
 #include <ShaderLang.h>
 #include <GlslangToSpv.h>
@@ -221,7 +222,7 @@ namespace VulkanAbstractionLayer
         return ShaderLoader::LoadFromMemory(std::move(bytecode));
     }
 
-    ShaderData ShaderLoader::LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion)
+    ShaderData ShaderLoader::LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language)
     {
         std::ifstream file(filepath);
         std::string source{ std::istreambuf_iterator(file), std::istreambuf_iterator<char>() };
@@ -232,7 +233,7 @@ namespace VulkanAbstractionLayer
         glslang::TShader shader{ ShaderTypeTable[(size_t)type] };
         shader.setStrings(&rawSource, 1);
         shader.setEnvInput(ShaderLanguageTable[(size_t)language], ShaderTypeTable[(size_t)type], glslang::EShClient::EShClientVulkan, 460);
-        shader.setEnvClient(glslang::EShClient::EShClientVulkan, (glslang::EShTargetClientVersion)vulkanVersion);
+        shader.setEnvClient(glslang::EShClient::EShClientVulkan, (glslang::EShTargetClientVersion)GetCurrentVulkanContext().GetAPIVersion());
         shader.setEnvTarget(glslang::EShTargetLanguage::EShTargetSpv, glslang::EShTargetLanguageVersion::EShTargetSpv_1_5);
         bool isParsed = shader.parse(&ResourceLimits, 100, false, EShMessages::EShMsgDefault);
         if (!isParsed) return ShaderData{ };

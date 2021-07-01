@@ -49,7 +49,7 @@ namespace VulkanAbstractionLayer
     class ShaderLoader
     {
     public:
-        static ShaderData LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion);
+        static ShaderData LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language);
         static ShaderData LoadFromBinary(const std::string& filepath);
         static ShaderData LoadFromMemory(std::vector<uint32_t> bytecode);
     };

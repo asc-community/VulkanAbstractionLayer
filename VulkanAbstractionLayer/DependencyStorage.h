@@ -28,46 +28,60 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
 #include <vector>
 
+#include "StringId.h"
 #include "Buffer.h"
 #include "Image.h"
-#include "Sampler.h"
-#include "ShaderReflection.h"
+#include "CommandBuffer.h"
 
 namespace VulkanAbstractionLayer
 {
-	using BufferReference = std::reference_wrapper<const Buffer>;
-	using ImageReference = std::reference_wrapper<const Image>;
-	using SamplerReference = std::reference_wrapper<const Sampler>;
+    enum class AttachmentState
+    {
+        DISCARD_COLOR = 0,
+        DISCARD_DEPTH_SPENCIL,
+        LOAD_COLOR,
+        LOAD_DEPTH_SPENCIL,
+        CLEAR_COLOR,
+        CLEAR_DEPTH_SPENCIL,
+    };
 
-	class DescriptorBinding
+	class DependencyStorage
 	{
-		struct DescriptorWriteInfo
+		struct BufferDependency
 		{
-			UniformType Type;
-			uint32_t Binding;
-			uint32_t FirstIndex;
-			uint32_t Count;
+            void* BufferNativeHandle;
+            BufferUsage::Bits Usage;
 		};
 
-		std::vector<DescriptorWriteInfo> descriptorWrites;
-		std::vector<vk::DescriptorBufferInfo> descriptorBufferInfos;
-		std::vector<vk::DescriptorImageInfo> descriptorImageInfos;
+        struct ImageDependency
+        {
+            void* ImageNativeHandle;
+            ImageUsage::Bits Usage;
+        };
 
-		size_t AllocateBinding(const Buffer& buffer);
-		size_t AllocateBinding(const Image& image);
-		size_t AllocateBinding(const Sampler& sampler);
-	public:
-		DescriptorBinding& Bind(uint32_t binding, const Buffer& buffer, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const Image& image, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const Sampler& sampler, UniformType type);
+        struct AttachmentDependency
+        {
+            StringId Name;
+            ClearColor ColorClear;
+            ClearDepthSpencil DepthSpencilClear;
+            AttachmentState OnLoad;
+        };
 
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<BufferReference>& buffers, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<ImageReference>& images, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<SamplerReference>& samplers, UniformType type);
+        std::vector<BufferDependency> bufferDependencies;
+        std::vector<ImageDependency> imageDependencies;
+        std::vector<AttachmentDependency> attachmentDependencies;
 
-		void Write(const vk::DescriptorSet& descriptorSet) const;
+    public:
+        void AddBuffer(const Buffer& buffer, BufferUsage::Bits usage);
+        void AddImage(const Image& image, ImageUsage::Bits usage);
+        void AddAttachment(StringId name, ClearColor clear);
+        void AddAttachment(StringId name, ClearDepthSpencil clear);
+        void AddAttachment(StringId name, AttachmentState onLoad);
+
+        const auto& GetBufferDependencies() const { return this->bufferDependencies; }
+        const auto& GetImageDependencies() const { return this->imageDependencies; }
+        const auto& GetAttachmentDependencies() const { return this->attachmentDependencies; }
 	};
 }

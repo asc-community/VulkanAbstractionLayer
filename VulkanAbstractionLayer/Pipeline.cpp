@@ -1,3 +1,4 @@
+#include "Pipeline.h"
 // Copyright(c) 2021, #Momo
 // All rights reserved.
 // 
@@ -26,48 +27,41 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include <vulkan/vulkan.hpp>
-#include <vector>
-
-#include "Buffer.h"
-#include "Image.h"
-#include "Sampler.h"
-#include "ShaderReflection.h"
+#include "Pipeline.h"
 
 namespace VulkanAbstractionLayer
 {
-	using BufferReference = std::reference_wrapper<const Buffer>;
-	using ImageReference = std::reference_wrapper<const Image>;
-	using SamplerReference = std::reference_wrapper<const Sampler>;
-
-	class DescriptorBinding
+	void Pipeline::DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage)
 	{
-		struct DescriptorWriteInfo
-		{
-			UniformType Type;
-			uint32_t Binding;
-			uint32_t FirstIndex;
-			uint32_t Count;
-		};
+		this->bufferDeclarations.push_back({ (void*)buffer.GetNativeHandle(), oldUsage });
+	}
 
-		std::vector<DescriptorWriteInfo> descriptorWrites;
-		std::vector<vk::DescriptorBufferInfo> descriptorBufferInfos;
-		std::vector<vk::DescriptorImageInfo> descriptorImageInfos;
+	void Pipeline::DeclareImage(const Image& image, ImageUsage::Bits oldUsage)
+	{
+		this->imageDeclarations.push_back({ (void*)image.GetNativeHandle(), oldUsage });
+	}
 
-		size_t AllocateBinding(const Buffer& buffer);
-		size_t AllocateBinding(const Image& image);
-		size_t AllocateBinding(const Sampler& sampler);
-	public:
-		DescriptorBinding& Bind(uint32_t binding, const Buffer& buffer, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const Image& image, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const Sampler& sampler, UniformType type);
+	void Pipeline::DeclareBuffers(const std::vector<BufferReference>& buffers, BufferUsage::Bits oldUsage)
+	{
+		this->bufferDeclarations.reserve(this->bufferDeclarations.size() + buffers.size());
+		for (auto bufferReference : buffers)
+			this->DeclareBuffer(bufferReference.get(), oldUsage);
+	}
 
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<BufferReference>& buffers, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<ImageReference>& images, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<SamplerReference>& samplers, UniformType type);
+	void Pipeline::DeclareImages(const std::vector<ImageReference>& images, ImageUsage::Bits oldUsage)
+	{
+		this->imageDeclarations.reserve(this->imageDeclarations.size() + images.size());
+		for (auto imageReference : images)
+			this->DeclareImage(imageReference.get(), oldUsage);
+	}
 
-		void Write(const vk::DescriptorSet& descriptorSet) const;
-	};
+	void Pipeline::DeclareAttachment(StringId name, Format format)
+	{
+		this->attachmentDeclarations.push_back({ name, format, 0, 0 });
+	}
+
+	void Pipeline::DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height)
+	{
+		this->attachmentDeclarations.push_back({ name, format, width, height });
+	}
 }

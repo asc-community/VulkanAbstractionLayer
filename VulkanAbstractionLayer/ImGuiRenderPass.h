@@ -28,46 +28,27 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
-#include <vector>
-
-#include "Buffer.h"
-#include "Image.h"
-#include "Sampler.h"
-#include "ShaderReflection.h"
+#include "RenderPass.h"
+#include "ImGuiContext.h"
 
 namespace VulkanAbstractionLayer
 {
-	using BufferReference = std::reference_wrapper<const Buffer>;
-	using ImageReference = std::reference_wrapper<const Image>;
-	using SamplerReference = std::reference_wrapper<const Sampler>;
-
-	class DescriptorBinding
+	class ImGuiRenderPass : public RenderPass
 	{
-		struct DescriptorWriteInfo
-		{
-			UniformType Type;
-			uint32_t Binding;
-			uint32_t FirstIndex;
-			uint32_t Count;
-		};
+		StringId outputImageName;
 
-		std::vector<DescriptorWriteInfo> descriptorWrites;
-		std::vector<vk::DescriptorBufferInfo> descriptorBufferInfos;
-		std::vector<vk::DescriptorImageInfo> descriptorImageInfos;
-
-		size_t AllocateBinding(const Buffer& buffer);
-		size_t AllocateBinding(const Image& image);
-		size_t AllocateBinding(const Sampler& sampler);
 	public:
-		DescriptorBinding& Bind(uint32_t binding, const Buffer& buffer, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const Image& image, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const Sampler& sampler, UniformType type);
+		ImGuiRenderPass(StringId outputImageName)
+			: outputImageName(outputImageName) { }
 
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<BufferReference>& buffers, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<ImageReference>& images, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<SamplerReference>& samplers, UniformType type);
+		virtual void SetupDependencies(DependencyState state) override
+		{
+			state.AddAttachment(this->outputImageName, AttachmentState::LOAD_COLOR);
+		}
 
-		void Write(const vk::DescriptorSet& descriptorSet) const;
+		virtual void OnRender(RenderPassState state) override
+		{
+			ImGuiVulkanContext::RenderFrame(state.Commands.GetNativeHandle());
+		}
 	};
 }

@@ -32,31 +32,47 @@
 
 namespace VulkanAbstractionLayer
 {
-    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, DestroyCallback onDestroy)
-        : nodes(std::move(nodes)), images(std::move(images)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onDestroy(std::move(onDestroy))
+    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, CreateCallback onCreate, DestroyCallback onDestroy)
+        : nodes(std::move(nodes)), images(std::move(images)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onCreate(std::move(onCreate)), onDestroy(std::move(onDestroy))
     {
+
+    }
+
+    void RenderGraph::InitializeOnFirstFrame(CommandBuffer& commandBuffer)
+    {
+        if ((bool)this->onCreate)
+        {
+            this->onCreate(commandBuffer);
+            this->onCreate = { }; // destroy resources, avoid calling onCreate again
+        }
     }
 
     void RenderGraph::ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer)
     {
-        RenderState state{ *this, commandBuffer, node.ColorAttachments, node.Pass.GetPipelineLayout() };
+        RenderPassState state{ *this, commandBuffer, node.ColorAttachments };
+            
+        node.PassCustom->BeforeRender(state);
 
-        if((bool)node.BeforeRender)
-            node.BeforeRender(state);
+        node.PassNative.OnRenderCallback(commandBuffer.GetNativeHandle());
 
-        commandBuffer.BeginRenderPass(node.Pass);
+        if ((bool)node.PassNative.RenderPassHandle) // has render pass
+        {
+            commandBuffer.BeginRenderPass(node.PassNative);
+            node.PassCustom->OnRender(state);
+            commandBuffer.EndRenderPass();
+        }
+        else
+        {
+            node.PassCustom->OnRender(state);
+        }
 
-        if ((bool)node.OnRender)
-            node.OnRender(state);
-
-        commandBuffer.EndRenderPass();
-
-        if ((bool)node.AfterRender)
-            node.AfterRender(state);
+        node.PassCustom->AfterRender(state);
     }
 
     void RenderGraph::Execute(CommandBuffer& commandBuffer)
     {
+        this->InitializeOnFirstFrame(commandBuffer);
+
         for (const auto& node : this->nodes)
         {
             CommandBuffer command{ commandBuffer };
@@ -90,7 +106,7 @@ namespace VulkanAbstractionLayer
     {
         for (const auto& node : this->nodes)
         {
-            this->onDestroy(node.Pass);
+            this->onDestroy(node.PassNative);
         }
         this->nodes.clear();
         this->images.clear();
@@ -99,10 +115,5 @@ namespace VulkanAbstractionLayer
     const Image& RenderGraph::GetImageByName(StringId name) const
     {
         return this->images.at(name);
-    }
-
-    const Image& RenderState::GetOutputColorAttachment(size_t index) const
-    {
-        return this->Graph.GetImageByName(this->ColorAttachments[index]);
     }
 }
