@@ -40,6 +40,7 @@ namespace VulkanAbstractionLayer
 
         enum Bits : Value
         {
+            UNKNOWN = (Value)vk::BufferUsageFlags{ },
             TRANSFER_SOURCE = (Value)vk::BufferUsageFlagBits::eTransferSrc,
             TRANSFER_DESTINATION = (Value)vk::BufferUsageFlagBits::eTransferDst,
             UNIFORM_TEXEL_BUFFER = (Value)vk::BufferUsageFlagBits::eUniformTexelBuffer,

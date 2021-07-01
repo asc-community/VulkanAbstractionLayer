@@ -36,9 +36,32 @@ namespace VulkanAbstractionLayer
 {
     class Pipeline
     {
+        struct BufferDeclaration
+        {
+            void* BufferNativeHandle;
+            BufferUsage::Bits InitialUsage;
+        };
+
+        struct ImageDeclaration
+        {
+            void* ImageNativeHandle;
+            ImageUsage::Bits InitialUsage;
+        };
+
+        std::vector<BufferDeclaration> bufferDeclarations;
+        std::vector<ImageDeclaration> imageDeclarations;
     public:
         std::optional<GraphicShader> Shader;
         std::vector<VertexBinding> VertexBindings;
         DescriptorBinding DescriptorBindings;
+
+        Pipeline& DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage);
+        Pipeline& DeclareImage(const Image& image, ImageUsage::Bits oldUsage);
+
+        Pipeline& DeclareBuffers(const std::vector<BufferReference>& buffers, BufferUsage::Bits oldUsage);
+        Pipeline& DeclareImages(const std::vector<ImageReference>& images, ImageUsage::Bits oldUsage);
+
+        const auto& GetBufferDeclarations() const { return this->bufferDeclarations; }
+        const auto& GetImageDeclarations() const { return this->imageDeclarations; }
     };
 }

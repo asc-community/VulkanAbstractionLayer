@@ -78,11 +78,18 @@ public:
     UniformSubmitRenderPass(RenderGraphResources& resources)
         : resources(resources) { }
 
+    virtual void SetupPipeline(PipelineState state) override
+    {
+        state.DeclareBuffer(this->resources.CameraUniformBuffer, BufferUsage::UNKNOWN);
+        state.DeclareBuffer(this->resources.ModelUniformBuffer, BufferUsage::UNKNOWN);
+        state.DeclareBuffer(this->resources.LightUniformBuffer, BufferUsage::UNKNOWN);
+    }
+
     virtual void SetupDependencies(DependencyState state) override
     {
-        state.AddBuffer("CameraUniform"_id, BufferUsage::TRANSFER_DESTINATION);
-        state.AddBuffer("ModelUniform"_id, BufferUsage::TRANSFER_DESTINATION);
-        state.AddBuffer("LightUniform"_id, BufferUsage::TRANSFER_DESTINATION);
+        state.AddBuffer(this->resources.CameraUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        state.AddBuffer(this->resources.ModelUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        state.AddBuffer(this->resources.LightUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -125,11 +132,13 @@ public:
             },
         };
 
-        std::vector<DescriptorBinding::ImageRef> imageReferences;
+        std::vector<ImageReference> imageReferences;
         for (const auto& texture : this->resources.DragonMesh.Textures)
             imageReferences.push_back(std::ref(texture));
         for (const auto& texture : this->resources.PlaneMesh.Textures)
             imageReferences.push_back(std::ref(texture));
+
+        pipeline.DeclareImages(imageReferences, ImageUsage::TRANSFER_DISTINATION);
 
         pipeline.DescriptorBindings
             .Bind(0, this->resources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
@@ -144,9 +153,9 @@ public:
         state.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
         state.AddAttachment("OutputDepth"_id, ClearDepthSpencil{ });
 
-        state.AddBuffer("CameraUniform"_id, BufferUsage::UNIFORM_BUFFER);
-        state.AddBuffer("ModelUniform"_id, BufferUsage::UNIFORM_BUFFER);
-        state.AddBuffer("LightUniform"_id, BufferUsage::UNIFORM_BUFFER);
+        state.AddBuffer(this->resources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+        state.AddBuffer(this->resources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+        state.AddBuffer(this->resources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -176,9 +185,6 @@ RenderGraph CreateRenderGraph(RenderGraphResources& resources, const VulkanConte
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .AddAttachment("Output"_id, Format::R8G8B8A8_UNORM)
         .AddAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT)
-        .AddExternalBuffer("CameraUniform"_id, resources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER)
-        .AddExternalBuffer("ModelUniform"_id, resources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER)
-        .AddExternalBuffer("LightUniform"_id, resources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER)
         .SetOutputName("Output"_id);
 
     return renderGraphBuilder.Build();
@@ -200,18 +206,8 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
     result.InstanceBuffer.Init(instanceAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
     result.VertexBuffer.Init(vertexAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
 
-    commandBuffer.CopyBuffer(
-        stageBuffer.GetBuffer(), vk::AccessFlagBits::eHostWrite, instanceAllocation.Offset,
-        result.InstanceBuffer, vk::AccessFlags{ }, 0,
-        vk::PipelineStageFlagBits::eHost,
-        instanceAllocation.Size
-    );
-    commandBuffer.CopyBuffer(
-        stageBuffer.GetBuffer(), vk::AccessFlagBits::eTransferRead, vertexAllocation.Offset,
-        result.VertexBuffer, vk::AccessFlags{ }, 0,
-        vk::PipelineStageFlagBits::eTransfer,
-        vertexAllocation.Size
-    );
+    commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), instanceAllocation.Offset, result.InstanceBuffer, 0, instanceAllocation.Size);
+    commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), vertexAllocation.Offset, result.VertexBuffer, 0, vertexAllocation.Size);
 
     for (const auto& texture : textures)
     {

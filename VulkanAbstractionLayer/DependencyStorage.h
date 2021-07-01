@@ -51,13 +51,13 @@ namespace VulkanAbstractionLayer
 	{
 		struct BufferDependency
 		{
-			StringId Name;
+            void* BufferNativeHandle;
             BufferUsage::Bits Usage;
 		};
 
         struct ImageDependency
         {
-            StringId Name;
+            void* ImageNativeHandle;
             ImageUsage::Bits Usage;
         };
 
@@ -74,8 +74,8 @@ namespace VulkanAbstractionLayer
         std::vector<AttachmentDependency> attachmentDependencies;
 
     public:
-        void AddBuffer(StringId name, BufferUsage::Bits usage);
-        void AddImage(StringId name, ImageUsage::Bits usage);
+        void AddBuffer(const Buffer& buffer, BufferUsage::Bits usage);
+        void AddImage(const Image& image, ImageUsage::Bits usage);
         void AddAttachment(StringId name, ClearColor clear);
         void AddAttachment(StringId name, ClearDepthSpencil clear);
         void AddAttachment(StringId name, AttachmentState onLoad);

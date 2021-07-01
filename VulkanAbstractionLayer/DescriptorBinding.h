@@ -38,6 +38,10 @@
 
 namespace VulkanAbstractionLayer
 {
+	using BufferReference = std::reference_wrapper<const Buffer>;
+	using ImageReference = std::reference_wrapper<const Image>;
+	using SamplerReference = std::reference_wrapper<const Sampler>;
+
 	class DescriptorBinding
 	{
 		struct DescriptorWriteInfo
@@ -56,17 +60,13 @@ namespace VulkanAbstractionLayer
 		size_t AllocateBinding(const Image& image);
 		size_t AllocateBinding(const Sampler& sampler);
 	public:
-		using BufferRef = std::reference_wrapper<const Buffer>;
-		using ImageRef = std::reference_wrapper<const Image>;
-		using SamplerRef = std::reference_wrapper<const Sampler>;
-
 		DescriptorBinding& Bind(uint32_t binding, const Buffer& buffer, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, const Image& image, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, const Sampler& sampler, UniformType type);
 
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<BufferRef>& buffers, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<ImageRef>& images, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<SamplerRef>& samplers, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, const std::vector<BufferReference>& buffers, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, const std::vector<ImageReference>& images, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, const std::vector<SamplerReference>& samplers, UniformType type);
 
 		void Write(const vk::DescriptorSet& descriptorSet) const;
 	};
