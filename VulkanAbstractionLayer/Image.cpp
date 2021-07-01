@@ -81,6 +81,62 @@ namespace VulkanAbstractionLayer
         }
     }
 
+    vk::AccessFlags ImageUsageToAccessFlags(ImageUsage::Bits layout)
+    {
+        switch (layout)
+        {
+        case ImageUsage::UNKNOWN:
+            return vk::AccessFlags{ };
+        case ImageUsage::TRANSFER_SOURCE:
+            return vk::AccessFlagBits::eTransferRead;
+        case ImageUsage::TRANSFER_DISTINATION:
+            return vk::AccessFlagBits::eTransferWrite;
+        case ImageUsage::SHADER_READ:
+            return vk::AccessFlagBits::eShaderRead;
+        case ImageUsage::STORAGE:
+            return vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite; // TODO: what if storage is not read or write?
+        case ImageUsage::COLOR_ATTACHMENT:
+            return vk::AccessFlagBits::eColorAttachmentWrite;
+        case ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+            return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        case ImageUsage::INPUT_ATTACHMENT:
+            return vk::AccessFlagBits::eInputAttachmentRead;
+        case ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return vk::AccessFlagBits::eFragmentShadingRateAttachmentReadKHR;
+        default:
+            assert(false);
+            return vk::AccessFlags{ };
+        }
+    }
+
+    vk::PipelineStageFlags ImageUsageToPipelineStage(ImageUsage::Bits layout)
+    {
+        switch (layout)
+        {
+        case VulkanAbstractionLayer::ImageUsage::UNKNOWN:
+            return vk::PipelineStageFlagBits::eTopOfPipe;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_SOURCE:
+            return vk::PipelineStageFlagBits::eTransfer;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION:
+            return vk::PipelineStageFlagBits::eTransfer;
+        case VulkanAbstractionLayer::ImageUsage::SHADER_READ:
+            return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
+        case VulkanAbstractionLayer::ImageUsage::STORAGE:
+            return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
+        case VulkanAbstractionLayer::ImageUsage::COLOR_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        case VulkanAbstractionLayer::ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eEarlyFragmentTests; // TODO: whats for late fragment test?
+        case VulkanAbstractionLayer::ImageUsage::INPUT_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eFragmentShader; // TODO: check if at least works
+        case VulkanAbstractionLayer::ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eFragmentShadingRateAttachmentKHR;
+        default:
+            assert(false);
+            return vk::PipelineStageFlags{ };
+        }
+    }
+
     vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image)
     {
         auto subresourceRange = GetDefaultImageSubresourceRange(image);

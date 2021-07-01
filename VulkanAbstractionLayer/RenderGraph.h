@@ -49,16 +49,19 @@ namespace VulkanAbstractionLayer
     class RenderGraph
     {
         using PresentCallback = std::function<void(CommandBuffer&, const Image&, const Image&)>;
+        using CreateCallback = std::function<void(CommandBuffer&)>;
         using DestroyCallback = std::function<void(const RenderPassNative&)>;
 
         std::vector<RenderGraphNode> nodes;
         std::unordered_map<StringId, Image> images;
         StringId outputName;
         PresentCallback onPresent;
+        CreateCallback onCreate;
         DestroyCallback onDestroy;
 
+        void InitializeOnFirstFrame(CommandBuffer& commandBuffer);
     public:
-        RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, DestroyCallback onDestroy);
+        RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, CreateCallback onCreate, DestroyCallback onDestroy);
         ~RenderGraph();
         RenderGraph(RenderGraph&&) = default;
         RenderGraph& operator=(RenderGraph&& other) noexcept;

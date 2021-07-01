@@ -55,6 +55,8 @@ namespace VulkanAbstractionLayer
 
     vk::ImageAspectFlags ImageFormatToImageAspect(Format format);
     vk::ImageLayout ImageUsageToImageLayout(ImageUsage::Bits usage);
+    vk::AccessFlags ImageUsageToAccessFlags(ImageUsage::Bits usage);
+    vk::PipelineStageFlags ImageUsageToPipelineStage(ImageUsage::Bits usage);
 
     class Image
     {

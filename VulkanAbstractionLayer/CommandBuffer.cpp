@@ -131,14 +131,17 @@ namespace VulkanAbstractionLayer
         this->SetScissor(Rect2D{ 0, 0, image.GetWidth(), image.GetHeight() });
     }
 
-    void CommandBuffer::CopyImage(const Image& source, ImageUsage::Bits sourceUsage, vk::AccessFlags sourceFlags, const Image& distance, ImageUsage::Bits distanceUsage, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags)
+    void CommandBuffer::CopyImage(const Image& source, ImageUsage::Bits sourceUsage, const Image& distance, ImageUsage::Bits distanceUsage)
     {
         auto sourceRange = GetDefaultImageSubresourceRange(source);
         auto distanceRange = GetDefaultImageSubresourceRange(distance);
 
+        std::array<vk::ImageMemoryBarrier, 2> barriers;
+        size_t barrierCount = 0;
+
         vk::ImageMemoryBarrier toTransferSrcBarrier;
         toTransferSrcBarrier
-            .setSrcAccessMask(sourceFlags)
+            .setSrcAccessMask(ImageUsageToAccessFlags(sourceUsage))
             .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
             .setOldLayout(ImageUsageToImageLayout(sourceUsage))
             .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
@@ -149,7 +152,7 @@ namespace VulkanAbstractionLayer
 
         vk::ImageMemoryBarrier toTransferDstBarrier;
         toTransferDstBarrier
-            .setSrcAccessMask(distanceFlags)
+            .setSrcAccessMask(ImageUsageToAccessFlags(distanceUsage))
             .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
             .setOldLayout(ImageUsageToImageLayout(distanceUsage))
             .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
@@ -158,21 +161,23 @@ namespace VulkanAbstractionLayer
             .setImage(distance.GetNativeHandle())
             .setSubresourceRange(distanceRange);
 
-        std::array preCopyBarriers = { toTransferSrcBarrier, toTransferDstBarrier };
-        this->handle.pipelineBarrier(
-            pipelineFlags,
-            vk::PipelineStageFlagBits::eTransfer,
-            { }, // dependency flags
-            { }, // memory barriers
-            { }, // buffer barriers
-            preCopyBarriers
-        );
+        if (sourceUsage != ImageUsage::TRANSFER_SOURCE)
+            barriers[barrierCount++] = toTransferSrcBarrier;
+        if (distanceUsage != ImageUsage::TRANSFER_DISTINATION)
+            barriers[barrierCount++] = toTransferDstBarrier;
+        
+        if (barrierCount > 0)
+        {
+            this->handle.pipelineBarrier(
+                ImageUsageToPipelineStage(sourceUsage) | ImageUsageToPipelineStage(distanceUsage),
+                vk::PipelineStageFlagBits::eTransfer,
+                { }, // dependency flags
+                0, nullptr, // memory barriers
+                0, nullptr, // buffer barriers
+                barrierCount, barriers.data()
+            );
+        }
 
-        this->CopyImage(source, distance);
-    }
-
-    void CommandBuffer::CopyImage(const Image& source, const Image& distance)
-    {
         auto sourceLayers = GetDefaultImageSubresourceLayers(source);
         auto distanceLayers = GetDefaultImageSubresourceLayers(distance);
 
@@ -187,60 +192,38 @@ namespace VulkanAbstractionLayer
         this->handle.copyImage(source.GetNativeHandle(), vk::ImageLayout::eTransferSrcOptimal, distance.GetNativeHandle(), vk::ImageLayout::eTransferDstOptimal, imageCopyInfo);
     }
 
-    void CommandBuffer::CopyBufferToImage(const Buffer& source, vk::AccessFlags sourceFlags, const Image& distance, ImageUsage::Bits distanceUsage, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags)
+    void CommandBuffer::CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, const Buffer& distance)
     {
-        this->CopyBufferToImage(source, sourceFlags, 0, distance, distanceUsage, distanceFlags, pipelineFlags, source.GetByteSize());
+        this->CopyImageToBuffer(source, sourceUsage, distance, 0, distance.GetByteSize());
     }
 
-    void CommandBuffer::CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags)
+    void CommandBuffer::CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, const Buffer& distance, size_t distanceOffset, size_t byteSize)
     {
-        this->CopyImageToBuffer(source, sourceUsage, sourceFlags, distance, distanceFlags, 0, pipelineFlags, distance.GetByteSize());
-    }
+        if (sourceUsage != ImageUsage::TRANSFER_SOURCE)
+        {
+            auto sourceRange = GetDefaultImageSubresourceRange(source);
 
-    void CommandBuffer::CopyImageToBuffer(const Image& source, const Buffer& distance)
-    {
-        this->CopyImageToBuffer(source, distance, 0, distance.GetByteSize());
-    }
-
-    void CommandBuffer::CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, size_t distanceOffset, vk::PipelineStageFlags pipelineFlags, size_t byteSize)
-    {
-        auto sourceRange = GetDefaultImageSubresourceRange(source);
-
-        vk::ImageMemoryBarrier toTransferSrcBarrier;
-        toTransferSrcBarrier
-            .setSrcAccessMask(distanceFlags)
-            .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
-            .setOldLayout(ImageUsageToImageLayout(sourceUsage))
-            .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setImage(source.GetNativeHandle())
-            .setSubresourceRange(sourceRange);
-
-        vk::BufferMemoryBarrier toTransferDstBarrier;
-        toTransferDstBarrier
-            .setSrcAccessMask(sourceFlags)
-            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setBuffer(distance.GetNativeHandle())
-            .setSize(byteSize)
-            .setOffset(distanceOffset);
-
-        this->handle.pipelineBarrier(
-            pipelineFlags,
-            vk::PipelineStageFlagBits::eTransfer,
-            { }, // dependency flags
-            { }, // memory barriers
-            toTransferDstBarrier,
+            vk::ImageMemoryBarrier toTransferSrcBarrier;
             toTransferSrcBarrier
-        );
+                .setSrcAccessMask(ImageUsageToAccessFlags(sourceUsage))
+                .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
+                .setOldLayout(ImageUsageToImageLayout(sourceUsage))
+                .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setImage(source.GetNativeHandle())
+                .setSubresourceRange(sourceRange);
 
-        this->CopyImageToBuffer(source, distance, distanceOffset, byteSize);
-    }
+            this->handle.pipelineBarrier(
+                ImageUsageToPipelineStage(sourceUsage),
+                vk::PipelineStageFlagBits::eTransfer,
+                { }, // dependency flags
+                { }, // memory barriers
+                { }, // buffer barriers
+                toTransferSrcBarrier
+            );
+        }
 
-    void CommandBuffer::CopyImageToBuffer(const Image& source, const Buffer& distance, size_t distanceOffset, size_t byteSize)
-    {
         auto sourceLayers = GetDefaultImageSubresourceLayers(source);
 
         vk::BufferImageCopy imageToBufferCopyInfo;
@@ -255,45 +238,33 @@ namespace VulkanAbstractionLayer
         this->handle.copyImageToBuffer(source.GetNativeHandle(), vk::ImageLayout::eTransferSrcOptimal, distance.GetNativeHandle(), imageToBufferCopyInfo);
     }
 
-    void CommandBuffer::CopyBufferToImage(const Buffer& source, vk::AccessFlags sourceFlags, size_t sourceOffset, const Image& distance, ImageUsage::Bits distanceUsage, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags, size_t byteSize)
+    void CommandBuffer::CopyBufferToImage(const Buffer& source, size_t sourceOffset, const Image& distance, ImageUsage::Bits distanceUsage, size_t byteSize)
     {
-        auto distanceRange = GetDefaultImageSubresourceRange(distance);
+        if (distanceUsage != ImageUsage::TRANSFER_DISTINATION)
+        {
+            auto distanceRange = GetDefaultImageSubresourceRange(distance);
 
-        vk::BufferMemoryBarrier toTransferSrcBarrier;
-        toTransferSrcBarrier
-            .setSrcAccessMask(sourceFlags)
-            .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setBuffer(source.GetNativeHandle())
-            .setSize(byteSize)
-            .setOffset(sourceOffset);
-
-        vk::ImageMemoryBarrier toTransferDstBarrier;
-        toTransferDstBarrier
-            .setSrcAccessMask(distanceFlags)
-            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
-            .setOldLayout(ImageUsageToImageLayout(distanceUsage))
-            .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setImage(distance.GetNativeHandle())
-            .setSubresourceRange(distanceRange);
-
-        this->handle.pipelineBarrier(
-            pipelineFlags,
-            vk::PipelineStageFlagBits::eTransfer,
-            { }, // dependency flags
-            { }, // memory barriers
-            toTransferSrcBarrier,
+            vk::ImageMemoryBarrier toTransferDstBarrier;
             toTransferDstBarrier
-        );
+                .setSrcAccessMask(ImageUsageToAccessFlags(distanceUsage))
+                .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
+                .setOldLayout(ImageUsageToImageLayout(distanceUsage))
+                .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setImage(distance.GetNativeHandle())
+                .setSubresourceRange(distanceRange);
 
-        this->CopyBufferToImage(source, sourceOffset, distance, byteSize);
-    }
+            this->handle.pipelineBarrier(
+                ImageUsageToPipelineStage(distanceUsage),
+                vk::PipelineStageFlagBits::eTransfer,
+                { }, // dependency flags
+                { }, // memory barriers
+                { }, // buffer barriers
+                toTransferDstBarrier
+            );
+        }
 
-    void CommandBuffer::CopyBufferToImage(const Buffer& source, size_t sourceOffset, const Image& distance, size_t byteSize)
-    {
         auto distanceLayers = GetDefaultImageSubresourceLayers(distance);
 
         vk::BufferImageCopy bufferToImageCopyInfo;
@@ -306,46 +277,6 @@ namespace VulkanAbstractionLayer
             .setImageExtent(vk::Extent3D{ distance.GetWidth(), distance.GetHeight(), 1 });
 
         this->handle.copyBufferToImage(source.GetNativeHandle(), distance.GetNativeHandle(), vk::ImageLayout::eTransferDstOptimal, bufferToImageCopyInfo);
-    }
-
-    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags)
-    {
-        this->CopyBuffer(source, sourceFlags, 0, distance, distanceFlags, 0, pipelineFlags, distance.GetByteSize());
-    }
-
-    void CommandBuffer::CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, size_t sourceOffset, const Buffer& distance, vk::AccessFlags distanceFlags, size_t distanceOffset, vk::PipelineStageFlags pipelineFlags, size_t byteSize)
-    {
-        vk::BufferMemoryBarrier toTransferSrcBarrier;
-        toTransferSrcBarrier
-            .setSrcAccessMask(sourceFlags)
-            .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setBuffer(source.GetNativeHandle())
-            .setSize(byteSize)
-            .setOffset(sourceOffset);
-
-        vk::BufferMemoryBarrier toTransferDstBarrier;
-        toTransferDstBarrier
-            .setSrcAccessMask(distanceFlags)
-            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setBuffer(distance.GetNativeHandle())
-            .setSize(byteSize)
-            .setOffset(distanceOffset);
-
-        std::array preCopyBarriers = { toTransferSrcBarrier, toTransferDstBarrier };
-        this->handle.pipelineBarrier(
-            pipelineFlags,
-            vk::PipelineStageFlagBits::eTransfer,
-            { }, // dependency flags
-            { }, // memory barriers
-            preCopyBarriers,
-            { } // image barriers
-        );
-
-        this->CopyBuffer(source, sourceOffset, distance, distanceOffset, byteSize);
     }
 
     void CommandBuffer::CopyBuffer(const Buffer& source, const Buffer& distance)
@@ -367,14 +298,17 @@ namespace VulkanAbstractionLayer
         this->handle.copyBuffer(source.GetNativeHandle(), distance.GetNativeHandle(), bufferCopyInfo);
     }
 
-    void CommandBuffer::BlitImage(const Image& source, ImageUsage::Bits sourceUsage, vk::AccessFlags sourceFlags, const Image& distance, ImageUsage::Bits distanceUsage, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags, BlitFilter filter)
+    void CommandBuffer::BlitImage(const Image& source, ImageUsage::Bits sourceUsage, const Image& distance, ImageUsage::Bits distanceUsage, BlitFilter filter)
     {
         auto sourceRange = GetDefaultImageSubresourceRange(source);
         auto distanceRange = GetDefaultImageSubresourceRange(distance);
 
+        std::array<vk::ImageMemoryBarrier, 2> barriers;
+        size_t barrierCount = 0;
+
         vk::ImageMemoryBarrier toTransferSrcBarrier;
         toTransferSrcBarrier
-            .setSrcAccessMask(sourceFlags)
+            .setSrcAccessMask(ImageUsageToAccessFlags(sourceUsage))
             .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
             .setOldLayout(ImageUsageToImageLayout(sourceUsage))
             .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
@@ -385,7 +319,7 @@ namespace VulkanAbstractionLayer
 
         vk::ImageMemoryBarrier toTransferDstBarrier;
         toTransferDstBarrier
-            .setSrcAccessMask(distanceFlags)
+            .setSrcAccessMask(ImageUsageToAccessFlags(distanceUsage))
             .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
             .setOldLayout(ImageUsageToImageLayout(distanceUsage))
             .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
@@ -394,21 +328,23 @@ namespace VulkanAbstractionLayer
             .setImage(distance.GetNativeHandle())
             .setSubresourceRange(distanceRange);
 
-        std::array preCopyBarriers = { toTransferSrcBarrier, toTransferDstBarrier };
-        this->handle.pipelineBarrier(
-            pipelineFlags,
-            vk::PipelineStageFlagBits::eTransfer,
-            { }, // dependency flags
-            { }, // memory barriers
-            { }, // buffer barriers
-            preCopyBarriers
-        );   
+        if (sourceUsage != ImageUsage::TRANSFER_SOURCE)
+            barriers[barrierCount++] = toTransferSrcBarrier;
+        if (distanceUsage != ImageUsage::TRANSFER_DISTINATION)
+            barriers[barrierCount++] = toTransferDstBarrier;
 
-        this->BlitImage(source, distance, filter);
-    }
+        if (barrierCount > 0)
+        {
+            this->handle.pipelineBarrier(
+                ImageUsageToPipelineStage(sourceUsage) | ImageUsageToPipelineStage(distanceUsage),
+                vk::PipelineStageFlagBits::eTransfer,
+                { }, // dependency flags
+                0, nullptr, // memory barriers
+                0, nullptr, // buffer barriers
+                barrierCount, barriers.data()
+            );
+        }
 
-    void CommandBuffer::BlitImage(const Image& source, const Image& distance, BlitFilter filter)
-    {
         auto sourceLayers = GetDefaultImageSubresourceLayers(source);
         auto distanceLayers = GetDefaultImageSubresourceLayers(distance);
 

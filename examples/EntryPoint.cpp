@@ -138,7 +138,7 @@ public:
         for (const auto& texture : this->resources.PlaneMesh.Textures)
             imageReferences.push_back(std::ref(texture));
 
-        pipeline.DeclareImages(imageReferences, ImageUsage::SHADER_READ);
+        pipeline.DeclareImages(imageReferences, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
         pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
 
@@ -230,47 +230,8 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
 
         auto textureAllocation = stageBuffer.Submit(texture.ByteData, texture.GetByteSize());
 
-        commandBuffer.CopyBufferToImage(
-            stageBuffer.GetBuffer(), vk::AccessFlagBits::eTransferRead, textureAllocation.Offset,
-            image, ImageUsage::UNKNOWN, vk::AccessFlags{ },
-            vk::PipelineStageFlagBits::eTransfer,
-            textureAllocation.Size
-        );
+        commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), textureAllocation.Offset, image, ImageUsage::UNKNOWN, textureAllocation.Size);
     }
-
-    vk::ImageSubresourceRange subresourceRange{
-        vk::ImageAspectFlagBits::eColor,
-        0, // base mip level
-        1, // level count
-        0, // base layer
-        1  // layer count
-    };
-
-    std::vector<vk::ImageMemoryBarrier> imageBarriers;
-    imageBarriers.reserve(result.Textures.size());
-    for (const auto& texture : result.Textures)
-    {
-        vk::ImageMemoryBarrier imageLayoutToShaderRead;
-        imageLayoutToShaderRead
-            .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
-            .setDstAccessMask(vk::AccessFlagBits::eShaderRead)
-            .setOldLayout(vk::ImageLayout::eTransferDstOptimal)
-            .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setImage(texture.GetNativeHandle())
-            .setSubresourceRange(subresourceRange);
-
-        imageBarriers.push_back(imageLayoutToShaderRead);
-    }
-    commandBuffer.GetNativeHandle().pipelineBarrier(
-        vk::PipelineStageFlagBits::eTransfer,
-        vk::PipelineStageFlagBits::eFragmentShader,
-        { },
-        { },
-        { },
-        imageBarriers
-    );
 
     stageBuffer.Flush();
     commandBuffer.End();

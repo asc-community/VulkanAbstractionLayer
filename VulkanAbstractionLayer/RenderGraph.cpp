@@ -32,9 +32,19 @@
 
 namespace VulkanAbstractionLayer
 {
-    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, DestroyCallback onDestroy)
-        : nodes(std::move(nodes)), images(std::move(images)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onDestroy(std::move(onDestroy))
+    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, CreateCallback onCreate, DestroyCallback onDestroy)
+        : nodes(std::move(nodes)), images(std::move(images)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onCreate(std::move(onCreate)), onDestroy(std::move(onDestroy))
     {
+
+    }
+
+    void RenderGraph::InitializeOnFirstFrame(CommandBuffer& commandBuffer)
+    {
+        if ((bool)this->onCreate)
+        {
+            this->onCreate(commandBuffer);
+            this->onCreate = { }; // destroy resources, avoid calling onCreate again
+        }
     }
 
     void RenderGraph::ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer)
@@ -61,6 +71,8 @@ namespace VulkanAbstractionLayer
 
     void RenderGraph::Execute(CommandBuffer& commandBuffer)
     {
+        this->InitializeOnFirstFrame(commandBuffer);
+
         for (const auto& node : this->nodes)
         {
             CommandBuffer command{ commandBuffer };

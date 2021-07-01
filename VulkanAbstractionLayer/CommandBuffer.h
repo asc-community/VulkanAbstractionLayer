@@ -97,26 +97,18 @@ namespace VulkanAbstractionLayer
         void SetScissor(const Rect2D& scissor);
         void SetRenderArea(const Image& image);
         
-        void CopyImage(const Image& source, ImageUsage::Bits sourceUsage, vk::AccessFlags sourceFlags, const Image& distance, ImageUsage::Bits distanceUsage, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags);
-        void CopyImage(const Image& source, const Image& distance);
+        void CopyImage(const Image& source, ImageUsage::Bits sourceUsage, const Image& distance, ImageUsage::Bits distanceUsage);
         
-        void CopyBufferToImage(const Buffer& source, vk::AccessFlags sourceFlags, const Image& distance, ImageUsage::Bits distanceUsage, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags);
-        void CopyBufferToImage(const Buffer& source, const Image& distance);
-        void CopyBufferToImage(const Buffer& source, vk::AccessFlags sourceFlags, size_t sourceOffset, const Image& distance, ImageUsage::Bits distanceUsage, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags, size_t byteSize);
-        void CopyBufferToImage(const Buffer& source, size_t sourceOffset, const Image& distance, size_t byteSize);
+        void CopyBufferToImage(const Buffer& source, const Image& distance, ImageUsage::Bits distanceUsage);
+        void CopyBufferToImage(const Buffer& source, size_t sourceOffset, const Image& distance, ImageUsage::Bits distanceUsage, size_t byteSize);
         
-        void CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags);
-        void CopyImageToBuffer(const Image& source, const Buffer& distance);
-        void CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, size_t distanceOffset, vk::PipelineStageFlags pipelineFlags, size_t byteSize);
-        void CopyImageToBuffer(const Image& source, const Buffer& distance, size_t distanceOffset, size_t byteSize);
+        void CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, const Buffer& distance);
+        void CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, const Buffer& distance, size_t distanceOffset, size_t byteSize);
         
-        void CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, const Buffer& distance, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags);
         void CopyBuffer(const Buffer& source, const Buffer& distance);
-        void CopyBuffer(const Buffer& source, vk::AccessFlags sourceFlags, size_t sourceOffset, const Buffer& distance, vk::AccessFlags distanceFlags, size_t distanceOffset, vk::PipelineStageFlags pipelineFlags, size_t byteSize);
-        void CopyBuffer(const Buffer& source, size_t sourceOffset, const Buffer& distance, size_t distanceOffset, size_t byteSize);
+        void CopyBuffer(const Buffer& source, size_t sourceOffset, const Buffer& distance,size_t distanceOffset, size_t byteSize);
         
-        void BlitImage(const Image& source, ImageUsage::Bits sourceUsage, vk::AccessFlags sourceFlags, const Image& distance, ImageUsage::Bits distanceUsage, vk::AccessFlags distanceFlags, vk::PipelineStageFlags pipelineFlags, BlitFilter filter);
-        void BlitImage(const Image& source, const Image& distance, BlitFilter filter);
+        void BlitImage(const Image& source, ImageUsage::Bits sourceUsage, const Image& distance, ImageUsage::Bits distanceUsage, BlitFilter filter);
     
         template<typename... Buffers>
         void BindVertexBuffers(const Buffers&... vertexBuffers)
