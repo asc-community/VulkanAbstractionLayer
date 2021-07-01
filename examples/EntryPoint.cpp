@@ -28,29 +28,6 @@ void WindowErrorCallback(const char* message)
     std::cerr << "[ERROR Window]: " << message << std::endl;
 }
 
-struct InstanceData
-{
-    Vector3 Position;
-    uint32_t AlbedoTextureIndex;
-};
-
-struct CameraUniformData
-{
-    Matrix4x4 Matrix;
-};
-
-struct ModelUniformData
-{
-    Matrix3x4 Matrix;
-};
-
-struct LightUniformData
-{
-    Vector3 Color;
-    float Padding_1;
-    Vector3 Direction;
-};
-
 struct Mesh
 {
     Buffer VertexBuffer;
@@ -58,145 +35,18 @@ struct Mesh
     std::vector<Image> Textures;
 };
 
-struct RenderGraphResources
+struct InstanceData
 {
-    Sampler BaseSampler;
-    CameraUniformData CameraUniform;
-    ModelUniformData ModelUniform;
-    LightUniformData LightUniform;
+    Vector3 Position;
+    uint32_t AlbedoTextureIndex;
+};
+
+struct SharedResources
+{
     Buffer CameraUniformBuffer;
     Buffer ModelUniformBuffer;
     Buffer LightUniformBuffer;
-    Mesh DragonMesh;
-    Mesh PlaneMesh;
 };
-
-class UniformSubmitRenderPass : public RenderPass
-{
-    RenderGraphResources& resources;
-public:
-    UniformSubmitRenderPass(RenderGraphResources& resources)
-        : resources(resources) { }
-
-    virtual void SetupPipeline(PipelineState state) override
-    {
-        state.DeclareBuffer(this->resources.CameraUniformBuffer, BufferUsage::UNKNOWN);
-        state.DeclareBuffer(this->resources.ModelUniformBuffer, BufferUsage::UNKNOWN);
-        state.DeclareBuffer(this->resources.LightUniformBuffer, BufferUsage::UNKNOWN);
-    }
-
-    virtual void SetupDependencies(DependencyState state) override
-    {
-        state.AddBuffer(this->resources.CameraUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
-        state.AddBuffer(this->resources.ModelUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
-        state.AddBuffer(this->resources.LightUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
-    }
-
-    virtual void OnRender(RenderPassState state) override
-    {
-        auto FillUniform = [&state](const auto& uniformData, const auto& uniformBuffer) mutable
-        {
-            auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
-            auto uniformAllocation = stageBuffer.Submit(&uniformData);
-            state.Commands.CopyBuffer(stageBuffer.GetBuffer(), uniformAllocation.Offset, uniformBuffer, 0, uniformAllocation.Size);
-        };
-
-        FillUniform(this->resources.CameraUniform, this->resources.CameraUniformBuffer);
-        FillUniform(this->resources.ModelUniform, this->resources.ModelUniformBuffer);
-        FillUniform(this->resources.LightUniform, this->resources.LightUniformBuffer);
-    }
-};
-
-class OpaqueRenderPass : public RenderPass
-{    
-    RenderGraphResources& resources;
-public:
-    OpaqueRenderPass(RenderGraphResources& resources)
-        : resources(resources) { }
-
-    virtual void SetupPipeline(PipelineState pipeline) override
-    {
-        pipeline.Shader = GraphicShader{
-            ShaderLoader::LoadFromSource("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
-            ShaderLoader::LoadFromSource("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL),
-        };
-
-        pipeline.VertexBindings = {
-            VertexBinding{
-                VertexBinding::Rate::PER_VERTEX,
-                3,
-            },
-            VertexBinding{
-                VertexBinding::Rate::PER_INSTANCE,
-                2,
-            },
-        };
-
-        std::vector<ImageReference> imageReferences;
-        for (const auto& texture : this->resources.DragonMesh.Textures)
-            imageReferences.push_back(std::ref(texture));
-        for (const auto& texture : this->resources.PlaneMesh.Textures)
-            imageReferences.push_back(std::ref(texture));
-
-        pipeline.DeclareImages(imageReferences, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
-        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
-
-        pipeline.DescriptorBindings
-            .Bind(0, this->resources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->resources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->resources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(3, this->resources.BaseSampler, UniformType::SAMPLER)
-            .Bind(4, imageReferences, UniformType::SAMPLED_IMAGE);
-    }
-
-    virtual void SetupDependencies(DependencyState state) override
-    {
-        state.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
-        state.AddAttachment("OutputDepth"_id, ClearDepthSpencil{ });
-
-        state.AddBuffer(this->resources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        state.AddBuffer(this->resources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        state.AddBuffer(this->resources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-
-        std::vector<ImageReference> imageReferences;
-        for (const auto& texture : this->resources.DragonMesh.Textures)
-            imageReferences.push_back(std::ref(texture));
-        for (const auto& texture : this->resources.PlaneMesh.Textures)
-            imageReferences.push_back(std::ref(texture));
-        for (const auto& imageReference : imageReferences)
-            state.AddImage(imageReference, ImageUsage::SHADER_READ);
-    }
-    
-    virtual void OnRender(RenderPassState state) override
-    {
-        auto& output = state.GetOutputColorAttachment(0);
-        state.Commands.SetRenderArea(output);
-
-        auto Draw = [&state](const Mesh& mesh)
-        {
-            size_t vertexCount = mesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
-            size_t instanceCount = mesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
-            state.Commands.BindVertexBuffers(mesh.VertexBuffer, mesh.InstanceBuffer);
-            state.Commands.Draw((uint32_t)vertexCount, (uint32_t)instanceCount);
-        };
-
-        Draw(this->resources.DragonMesh);
-        Draw(this->resources.PlaneMesh);
-    }
-};
-
-RenderGraph CreateRenderGraph(RenderGraphResources& resources, const VulkanContext& context)
-{
-    RenderGraphBuilder renderGraphBuilder;
-    renderGraphBuilder
-        .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
-        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
-        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
-        .SetOutputName("Output"_id);
-
-    return renderGraphBuilder.Build();
-}
 
 Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vector<InstanceData>& instances, ArrayView<ImageData> textures)
 {
@@ -221,9 +71,9 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
     {
         auto& image = result.Textures.emplace_back();
         image.Init(
-            texture.Width, 
-            texture.Height, 
-            Format::R8G8B8A8_UNORM, 
+            texture.Width,
+            texture.Height,
+            Format::R8G8B8A8_UNORM,
             ImageUsage::TRANSFER_DISTINATION | ImageUsage::SHADER_READ,
             MemoryUsage::GPU_ONLY
         );
@@ -291,6 +141,153 @@ Mesh CreateDragonMesh(uint32_t& globalTextureIndex)
     };
 
     return CreateMesh(vertices, instances, textures);
+}
+
+class UniformSubmitRenderPass : public RenderPass
+{
+    SharedResources& sharedResources;
+
+public:
+    struct CameraUniformData
+    {
+        Matrix4x4 Matrix;
+    } CameraUniform;
+
+    struct ModelUniformData
+    {
+        Matrix3x4 Matrix;
+    } ModelUniform;
+
+    struct LightUniformData
+    {
+        Vector3 Color;
+        float Padding_1;
+        Vector3 Direction;
+    } LightUniform;
+
+    UniformSubmitRenderPass(SharedResources& sharedResources)
+        : sharedResources(sharedResources)
+    {
+
+    }
+
+    virtual void SetupPipeline(PipelineState pipeline) override
+    {
+        pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNKNOWN);
+        pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNKNOWN);
+        pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNKNOWN);
+    }
+
+    virtual void SetupDependencies(DependencyState depedencies) override
+    {
+        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+    }
+
+    virtual void OnRender(RenderPassState state) override
+    {
+        auto FillUniform = [&state](const auto& uniformData, const auto& uniformBuffer) mutable
+        {
+            auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+            auto uniformAllocation = stageBuffer.Submit(&uniformData);
+            state.Commands.CopyBuffer(stageBuffer.GetBuffer(), uniformAllocation.Offset, uniformBuffer, 0, uniformAllocation.Size);
+        };
+
+        FillUniform(this->CameraUniform, this->sharedResources.CameraUniformBuffer);
+        FillUniform(this->ModelUniform, this->sharedResources.ModelUniformBuffer);
+        FillUniform(this->LightUniform, this->sharedResources.LightUniformBuffer);
+    }
+};
+
+class OpaqueRenderPass : public RenderPass
+{    
+    SharedResources& sharedResources;
+    std::vector<Mesh> meshes;
+    std::vector<ImageReference> textures;
+    Sampler textureSampler;
+public:
+    OpaqueRenderPass(SharedResources& sharedResources)
+        : sharedResources(sharedResources)
+    {
+        uint32_t textureCount = 0;
+        this->meshes.push_back(CreateDragonMesh(textureCount));
+        this->meshes.push_back(CreatePlaneMesh(textureCount));
+
+        for (const auto& mesh : this->meshes)
+            for (const auto& texture : mesh.Textures)
+                this->textures.push_back(std::ref(texture));
+
+        this->textureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
+    }
+
+    virtual void SetupPipeline(PipelineState pipeline) override
+    {
+        pipeline.Shader = GraphicShader{
+            ShaderLoader::LoadFromSource("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSource("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL),
+        };
+
+        pipeline.VertexBindings = {
+            VertexBinding{
+                VertexBinding::Rate::PER_VERTEX,
+                3,
+            },
+            VertexBinding{
+                VertexBinding::Rate::PER_INSTANCE,
+                2,
+            },
+        };
+
+        pipeline.DeclareImages(this->textures, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
+        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
+
+        pipeline.DescriptorBindings
+            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(3, this->textureSampler, UniformType::SAMPLER)
+            .Bind(4, this->textures, UniformType::SAMPLED_IMAGE);
+    }
+
+    virtual void SetupDependencies(DependencyState depedencies) override
+    {
+        depedencies.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
+        depedencies.AddAttachment("OutputDepth"_id, ClearDepthSpencil{ });
+
+        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+        depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+
+        depedencies.AddImages(this->textures, ImageUsage::SHADER_READ);
+    }
+    
+    virtual void OnRender(RenderPassState state) override
+    {
+        auto& output = state.GetOutputColorAttachment(0);
+        state.Commands.SetRenderArea(output);
+
+        for (const auto& mesh : this->meshes)
+        {
+            size_t vertexCount = mesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
+            size_t instanceCount = mesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
+            state.Commands.BindVertexBuffers(mesh.VertexBuffer, mesh.InstanceBuffer);
+            state.Commands.Draw((uint32_t)vertexCount, (uint32_t)instanceCount);
+        }
+    }
+};
+
+RenderGraph CreateRenderGraph(SharedResources& resources)
+{
+    RenderGraphBuilder renderGraphBuilder;
+    renderGraphBuilder
+        .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
+        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
+        .SetOutputName("Output"_id);
+
+    return renderGraphBuilder.Build();
 }
 
 struct Camera
@@ -375,23 +372,13 @@ int main()
 
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
-    Sampler sampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MinFilter::LINEAR);
-
-    uint32_t globalTextureIndex = 0;
-
-    RenderGraphResources renderGraphResources{
-        std::move(sampler),
-        { },
-        { },
-        { },
-        Buffer{ sizeof(RenderGraphResources::CameraUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(RenderGraphResources::ModelUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(RenderGraphResources::LightUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        CreateDragonMesh(globalTextureIndex),
-        CreatePlaneMesh(globalTextureIndex),
+    SharedResources renderGraphResources{
+        Buffer{ sizeof(UniformSubmitRenderPass::CameraUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(UniformSubmitRenderPass::ModelUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(UniformSubmitRenderPass::LightUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
     };
 
-    RenderGraph renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
+    RenderGraph renderGraph = CreateRenderGraph(renderGraphResources);
 
     Camera camera;
     Vector3 modelRotation{ -HalfPi, Pi, 0.0f };
@@ -401,7 +388,7 @@ int main()
     window.OnResize([&Vulkan, &renderGraphResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
-        renderGraph = CreateRenderGraph(renderGraphResources, Vulkan);
+        renderGraph = CreateRenderGraph(renderGraphResources);
         camera.AspectRatio = size.x / size.y;
     });
     
@@ -455,10 +442,11 @@ int main()
             ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
             ImGui::End();
 
-            renderGraphResources.CameraUniform.Matrix = camera.GetMatrix();
-            renderGraphResources.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
-            renderGraphResources.LightUniform.Color = lightColor;
-            renderGraphResources.LightUniform.Direction = Normalize(lightDirection);
+            auto& uniformSubmitPass = renderGraph.GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);
+            uniformSubmitPass.CameraUniform.Matrix = camera.GetMatrix();
+            uniformSubmitPass.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
+            uniformSubmitPass.LightUniform.Color = lightColor;
+            uniformSubmitPass.LightUniform.Direction = Normalize(lightDirection);
 
             renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());

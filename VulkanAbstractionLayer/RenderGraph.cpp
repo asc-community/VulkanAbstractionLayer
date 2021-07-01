@@ -92,6 +92,13 @@ namespace VulkanAbstractionLayer
         return *it;
     }
 
+    RenderGraphNode& RenderGraph::GetNodeByName(StringId name)
+    {
+        auto it = std::find_if(this->nodes.begin(), this->nodes.end(), [name](const RenderGraphNode& node) { return node.Name == name; });
+        assert(it != this->nodes.end());
+        return *it;
+    }
+
     RenderGraph& RenderGraph::operator=(RenderGraph&& other) noexcept
     {
         if (this != std::addressof(other))

@@ -70,6 +70,23 @@ namespace VulkanAbstractionLayer
         void Execute(CommandBuffer& commandBuffer);
         void Present(CommandBuffer& commandBuffer, const Image& presentImage);
         const RenderGraphNode& GetNodeByName(StringId name) const;
+        RenderGraphNode& GetNodeByName(StringId name);
         const Image& GetImageByName(StringId name) const;
+
+        template<typename T>
+        T& GetRenderPassByName(StringId name)
+        {
+            auto& node = this->GetNodeByName(name);
+            assert(dynamic_cast<T*>(node.PassCustom.get()) != nullptr);
+            return *static_cast<T*>(node.PassCustom.get());
+        }
+
+        template<typename T>
+        const T& GetRenderPassByName(StringId name) const
+        {
+            const auto& node = this->GetNodeByName(name);
+            assert(dynamic_cast<const T*>(node.PassCustom.get()) != nullptr);
+            return *static_cast<const T*>(node.PassCustom.get());
+        }
     };
 }

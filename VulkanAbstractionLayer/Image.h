@@ -87,4 +87,6 @@ namespace VulkanAbstractionLayer
 
     vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image);
     vk::ImageSubresourceRange GetDefaultImageSubresourceRange(const Image& image);
+
+    using ImageReference = std::reference_wrapper<const Image>;
 }

@@ -90,4 +90,6 @@ namespace VulkanAbstractionLayer
         void CopyData(const uint8_t* data, size_t byteSize, size_t offset);
         void CopyDataWithFlush(const uint8_t* data, size_t byteSize, size_t offset);
     };
+
+    using BufferReference = std::reference_wrapper<const Buffer>;
 }

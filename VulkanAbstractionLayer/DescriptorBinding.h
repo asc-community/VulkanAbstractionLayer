@@ -28,20 +28,14 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
-#include <vector>
-
 #include "Buffer.h"
 #include "Image.h"
 #include "Sampler.h"
 #include "ShaderReflection.h"
+#include "ArrayUtils.h"
 
 namespace VulkanAbstractionLayer
 {
-	using BufferReference = std::reference_wrapper<const Buffer>;
-	using ImageReference = std::reference_wrapper<const Image>;
-	using SamplerReference = std::reference_wrapper<const Sampler>;
-
 	class DescriptorBinding
 	{
 		struct DescriptorWriteInfo
@@ -64,9 +58,9 @@ namespace VulkanAbstractionLayer
 		DescriptorBinding& Bind(uint32_t binding, const Image& image, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, const Sampler& sampler, UniformType type);
 
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<BufferReference>& buffers, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<ImageReference>& images, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const std::vector<SamplerReference>& samplers, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, ArrayView<BufferReference> buffers, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, ArrayView<SamplerReference> samplers, UniformType type);
 
 		void Write(const vk::DescriptorSet& descriptorSet) const;
 	};

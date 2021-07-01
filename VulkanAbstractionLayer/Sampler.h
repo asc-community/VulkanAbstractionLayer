@@ -65,4 +65,6 @@ namespace VulkanAbstractionLayer
 
         const vk::Sampler& GetNativeHandle() const;
     };
+
+    using SamplerReference = std::reference_wrapper<const Sampler>;
 }
