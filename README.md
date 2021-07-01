@@ -66,5 +66,101 @@ int main()
 }
 ```
 
+## Render Graph
+Describe RenderPass (can be abstract, not necessary containing actual shader):
+```cpp
+class SomeRenderPass : public RenderPass
+{    
+public:
+    OpaqueRenderPass()
+    {
+        // initialization code
+    }
+
+    virtual void SetupPipeline(PipelineState pipeline) override
+    {
+        // load shader
+        pipeline.Shader = GraphicShader{
+            ShaderLoader::LoadFromSource("vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSource("fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL),
+        };
+
+        // describe bindings per vertex buffer
+        pipeline.VertexBindings = {
+            VertexBinding{
+                VertexBinding::Rate::PER_VERTEX,
+                3,
+            },
+            VertexBinding{
+                VertexBinding::Rate::PER_INSTANCE,
+                2,
+            },
+        };
+
+        // declare used graph resources (buffers, images, attachments) with their initial state
+        pipeline.DeclareBuffer(uniformBuffer, BufferUsage::UNKNOWN);
+        pipeline.DeclareImages(textures, ImageUsage::TRANSFER_DESTIONATION);
+        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
+        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
+
+        // describe descriptor bindings per descriptor set
+        pipeline.DescriptorBindings
+            .Bind(0, uniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, textureSampler, UniformType::SAMPLER)
+            .Bind(2, textures, UniformType::SAMPLED_IMAGE);
+    }
+
+    virtual void SetupDependencies(DependencyState depedencies) override
+    {
+        // describe used resources in render pass
+        depedencies.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
+        depedencies.AddAttachment("OutputDepth"_id, ClearDepthSpencil{ });
+
+        depedencies.AddBuffer(uniformBuffer, BufferUsage::UNIFORM_BUFFER);
+        depedencies.AddImages(textures, ImageUsage::SHADER_READ);
+    }
+    
+    virtual void OnRender(RenderPassState state) override
+    {
+        auto& output = state.GetOutputColorAttachment(0);
+        state.Commands.SetRenderArea(output);
+
+        // draw some stuff
+    }
+};
+```
+
+Build render graph from render passes:
+```cpp
+// some passes like ImGuiRenderPass are supported out of box
+
+RenderGraphBuilder renderGraphBuilder;
+    renderGraphBuilder
+        .AddRenderPass("SomePass"_id, std::make_unique<SomeRenderPass>(sharedResources))
+        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
+        .SetOutputName("Output"_id);
+
+RenderGraph renderGraph = renderGraphBuilder.Build();
+```
+
+Execute render graph each frame:
+```cpp
+auto& Vulkan = GetCurrentVulkanContext();
+
+while (!window.ShouldClose())
+{
+    window.PollEvents();
+    if (Vulkan.IsRenderingEnabled())
+    {
+        Vulkan.StartFrame();
+
+        renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
+        renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());
+
+        Vulkan.EndFrame();
+    }
+}
+```
+
 ## Some Examples
 ![instanced-dragons](preview/instanced-dragons.png)
