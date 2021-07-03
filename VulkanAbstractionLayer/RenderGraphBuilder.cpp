@@ -44,6 +44,12 @@ namespace VulkanAbstractionLayer
         return (StringId)nameExtended;
     }
 
+    StringId IsAttachmentName(void* imageHandle)
+    {
+        uintptr_t nameExtended = (uintptr_t)imageHandle;
+        return (nameExtended - (StringId)nameExtended) == 0;
+    }
+
     vk::VertexInputRate VertexBindingRateToVertexInputRate(VertexBinding::Rate rate)
     {
         switch (rate)
@@ -314,7 +320,7 @@ namespace VulkanAbstractionLayer
         return InternalCallback{ std::move(callback) };
     }
 
-    RenderGraphBuilder::InternalCallback RenderGraphBuilder::CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions)
+    RenderGraphBuilder::InternalCallback RenderGraphBuilder::CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments)
     {
         auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
         auto& bufferTransitions = resourceTransitions.BufferTransitions.at(renderPassName);
@@ -342,12 +348,17 @@ namespace VulkanAbstractionLayer
             {
                 return AttachmentNameToImageHandle(attachment.Name) == handle;
             });
+
             if (isAttachment != renderPassAttachments.end()) continue;
+
+            VkImage imageNativeHandle = (VkImage)imageHandle;
+            if (IsAttachmentName(imageHandle) && attachments.find(ImageHandleToAttachmentName(imageHandle)) != attachments.end())
+                imageNativeHandle = attachments.at(ImageHandleToAttachmentName(imageHandle)).GetNativeHandle();
 
             if (imageTransition.InitialUsage == imageTransition.FinalUsage)
                 continue;
 
-            imageBarriers.push_back(CreateImageMemoryBarrier((VkImage)imageHandle, imageTransition.InitialUsage, imageTransition.FinalUsage, imageFormat));
+            imageBarriers.push_back(CreateImageMemoryBarrier(imageNativeHandle, imageTransition.InitialUsage, imageTransition.FinalUsage, imageFormat));
             pipelineSourceFlags |= ImageUsageToPipelineStage(imageTransition.InitialUsage);
             pipelineDistanceFlags |= ImageUsageToPipelineStage(imageTransition.FinalUsage);
         }
@@ -648,12 +659,6 @@ namespace VulkanAbstractionLayer
             }
         }
 
-        renderPassNative.OnRenderCallback = 
-            [callback = this->CreateInternalOnRenderCallback(renderPassReference.Name, dependencies, resourceTransitions)](vk::CommandBuffer cmd)
-            {
-                return callback(CommandBuffer{ cmd });
-            };
-
         return renderPassNative;
     }
 
@@ -870,8 +875,9 @@ namespace VulkanAbstractionLayer
 
             nodes.push_back(RenderGraphNode{
                 renderPassReference.Name,
-                this->BuildRenderPass(renderPassReference, pipelines, attachments, resourceTransitions),
+                std::move(renderPass),
                 std::move(renderPassReference.Pass),
+                this->CreateInternalOnRenderCallback(renderPassReference.Name, dependencies.at(renderPassReference.Name), resourceTransitions, attachments),
             });
         }
 

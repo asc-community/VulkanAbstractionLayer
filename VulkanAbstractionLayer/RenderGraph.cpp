@@ -53,7 +53,7 @@ namespace VulkanAbstractionLayer
             
         node.PassCustom->BeforeRender(state);
 
-        node.PassNative.OnRenderCallback(commandBuffer.GetNativeHandle());
+        node.PipelineBarrierCallback(commandBuffer);
 
         if ((bool)node.PassNative.RenderPassHandle) // has render pass
         {
