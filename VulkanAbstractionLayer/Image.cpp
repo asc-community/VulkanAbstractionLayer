@@ -167,18 +167,25 @@ namespace VulkanAbstractionLayer
             {
                 DeallocateImage(this->handle, this->allocation);
             }
-            GetCurrentVulkanContext().GetDevice().destroyImageView(this->view);
+
+            GetCurrentVulkanContext().GetDevice().destroyImageView(this->imageViews.NativeView);
+            if ((bool)this->imageViews.DepthOnlyView) 
+                GetCurrentVulkanContext().GetDevice().destroyImageView(this->imageViews.DepthOnlyView);
+            if ((bool)this->imageViews.StencilOnlyView)
+                GetCurrentVulkanContext().GetDevice().destroyImageView(this->imageViews.StencilOnlyView);
+
             this->handle = vk::Image{ };
-            this->view = vk::ImageView{ };
+            this->imageViews = { };
             this->extent = vk::Extent2D{ 0u, 0u };
         }
     }
 
-    void Image::InitView(const vk::Image& image, Format format)
+    void Image::InitViews(const vk::Image& image, Format format)
     {
         this->handle = image;
         this->format = format;
 
+        auto& Vulkan = GetCurrentVulkanContext();
         auto subresourceRange = GetDefaultImageSubresourceRange(*this);
 
         vk::ImageViewCreateInfo imageViewCreateInfo;
@@ -194,7 +201,23 @@ namespace VulkanAbstractionLayer
             })
             .setSubresourceRange(subresourceRange);
 
-        this->view = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+        this->imageViews.NativeView = Vulkan.GetDevice().createImageView(imageViewCreateInfo);
+
+        auto depthSubresourceRange = GetDefaultImageSubresourceRange(*this);
+        depthSubresourceRange.aspectMask &= vk::ImageAspectFlagBits::eDepth;
+        if (depthSubresourceRange.aspectMask != vk::ImageAspectFlags{ })
+        {
+            imageViewCreateInfo.setSubresourceRange(depthSubresourceRange);
+            this->imageViews.DepthOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+        }
+
+        auto stencilSubresourceRange = GetDefaultImageSubresourceRange(*this);
+        stencilSubresourceRange.aspectMask &= vk::ImageAspectFlagBits::eStencil;
+        if (stencilSubresourceRange.aspectMask != vk::ImageAspectFlags{ })
+        {
+            imageViewCreateInfo.setSubresourceRange(stencilSubresourceRange);
+            this->imageViews.StencilOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+        }
     }
 
     Image::Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage)
@@ -206,19 +229,19 @@ namespace VulkanAbstractionLayer
     {
         this->extent = vk::Extent2D{ width, height };
         this->allocation = { }; // image is external resource
-        this->InitView(image, format);
+        this->InitViews(image, format);
     }
 
     Image::Image(Image&& other) noexcept
     {
         this->handle = other.handle;
-        this->view = other.view;
+        this->imageViews = other.imageViews;
         this->extent = other.extent;
         this->format = other.format;
         this->allocation = other.allocation;
 
         other.handle = vk::Image{ };
-        other.view = vk::ImageView{ };
+        other.imageViews = { };
         other.extent = vk::Extent2D{ 0u, 0u };
         other.format = Format::UNDEFINED;
         other.allocation = { };
@@ -229,13 +252,13 @@ namespace VulkanAbstractionLayer
         this->Destroy();
 
         this->handle = other.handle;
-        this->view = other.view;
+        this->imageViews = other.imageViews;
         this->extent = other.extent;
         this->format = other.format;
         this->allocation = other.allocation;
 
         other.handle = vk::Image{ };
-        other.view = vk::ImageView{ };
+        other.imageViews = { };
         other.extent = vk::Extent2D{ 0u, 0u };
         other.format = Format::UNDEFINED;
         other.allocation = { };
@@ -265,6 +288,22 @@ namespace VulkanAbstractionLayer
         
         this->allocation = AllocateImage(imageCreateInfo, memoryUsage, &this->handle);
         this->extent = vk::Extent2D{ (uint32_t)width, (uint32_t)height };
-        this->InitView(this->handle, format);
+        this->InitViews(this->handle, format);
+    }
+
+    vk::ImageView Image::GetNativeView(ImageView view) const
+    {
+        switch (view)
+        {
+        case VulkanAbstractionLayer::ImageView::NATIVE:
+            return this->imageViews.NativeView;
+        case VulkanAbstractionLayer::ImageView::DEPTH:
+            return this->imageViews.DepthOnlyView;
+        case VulkanAbstractionLayer::ImageView::STENCIL:
+            return this->imageViews.StencilOnlyView;
+        default:
+            assert(false);
+            return this->imageViews.NativeView;
+        }
     }
 }

@@ -65,7 +65,7 @@ namespace VulkanAbstractionLayer
         {
             StringId Name;
             ClearColor ColorClear;
-            ClearDepthSpencil DepthSpencilClear;
+            ClearDepthStencil DepthSpencilClear;
             AttachmentState OnLoad;
         };
 
@@ -81,7 +81,7 @@ namespace VulkanAbstractionLayer
         void AddImages(ArrayView<ImageReference> images, ImageUsage::Bits usage);
         void AddImages(ArrayView<StringId> images, ImageUsage::Bits usage);
         void AddAttachment(StringId name, ClearColor clear);
-        void AddAttachment(StringId name, ClearDepthSpencil clear);
+        void AddAttachment(StringId name, ClearDepthStencil clear);
         void AddAttachment(StringId name, AttachmentState onLoad);
 
         const auto& GetBufferDependencies() const { return this->bufferDependencies; }

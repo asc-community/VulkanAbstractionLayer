@@ -67,16 +67,16 @@ namespace VulkanAbstractionLayer
 
 	void DependencyStorage::AddAttachment(StringId name, ClearColor clear)
 	{
-		this->attachmentDependencies.push_back({ name, clear, ClearDepthSpencil{ }, AttachmentState::CLEAR_COLOR });
+		this->attachmentDependencies.push_back({ name, clear, ClearDepthStencil{ }, AttachmentState::CLEAR_COLOR });
 	}
 
-	void DependencyStorage::AddAttachment(StringId name, ClearDepthSpencil clear)
+	void DependencyStorage::AddAttachment(StringId name, ClearDepthStencil clear)
 	{
 		this->attachmentDependencies.push_back({ name, ClearColor{ }, clear, AttachmentState::CLEAR_DEPTH_SPENCIL });
 	}
 
 	void DependencyStorage::AddAttachment(StringId name, AttachmentState onLoad)
 	{
-		this->attachmentDependencies.push_back({ name, ClearColor{ }, ClearDepthSpencil{ }, onLoad });
+		this->attachmentDependencies.push_back({ name, ClearColor{ }, ClearDepthStencil{ }, onLoad });
 	}
 }

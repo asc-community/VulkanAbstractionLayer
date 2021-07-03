@@ -64,10 +64,10 @@ namespace VulkanAbstractionLayer
         float A = 1.0f;
     };
 
-    struct ClearDepthSpencil
+    struct ClearDepthStencil
     {
         float Depth = 1.0f;
-        uint32_t Spencil = 0;
+        uint32_t Stencil = 0;
     };
 
     enum class BlitFilter

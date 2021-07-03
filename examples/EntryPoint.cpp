@@ -239,7 +239,7 @@ public:
 
     virtual void SetupDependencies(DependencyState dependencies) override
     {
-        dependencies.AddAttachment("ShadowDepth"_id, ClearDepthSpencil{ });
+        dependencies.AddAttachment("ShadowDepth"_id, ClearDepthStencil{ });
         dependencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         dependencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
     }
@@ -298,13 +298,13 @@ public:
             .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(3, this->textureSampler, UniformType::SAMPLER)
             .Bind(4, this->sharedResources.MeshTextures, UniformType::SAMPLED_IMAGE)
-            .Bind(5, "ShadowDepth"_id, UniformType::SAMPLED_IMAGE);
+            .Bind(5, "ShadowDepth"_id, UniformType::SAMPLED_IMAGE, ImageView::DEPTH);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
         depedencies.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
-        depedencies.AddAttachment("OutputDepth"_id, ClearDepthSpencil{ });
+        depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
 
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);

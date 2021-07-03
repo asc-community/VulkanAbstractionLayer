@@ -41,13 +41,13 @@ namespace VulkanAbstractionLayer
 		return this->descriptorBufferInfos.size() - 1;
 	}
 
-	size_t DescriptorBinding::AllocateBinding(const Image& image)
+	size_t DescriptorBinding::AllocateBinding(const Image& image, ImageView view)
 	{
 		this->descriptorImageInfos.push_back(vk::DescriptorImageInfo{
 			{ },
-			image.GetNativeView(),
+			image.GetNativeView(view),
 			vk::ImageLayout::eShaderReadOnlyOptimal
-		});
+			});
 		return this->descriptorImageInfos.size() - 1;
 	}
 
@@ -70,8 +70,7 @@ namespace VulkanAbstractionLayer
 
 	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, UniformType type)
 	{
-		size_t index = this->AllocateBinding(image);
-		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
+		this->Bind(binding, image, type, ImageView::NATIVE);
 		return *this;
 	}
 
@@ -82,9 +81,16 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, StringId attachment, UniformType type)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, UniformType type, ImageView view)
 	{
-		this->descriptorAttachmentInfos.push_back({ attachment, binding, type });
+		size_t index = this->AllocateBinding(image, view);
+		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
+		return *this;
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, StringId attachment, UniformType type, ImageView view)
+	{
+		this->descriptorAttachmentInfos.push_back({ attachment, binding, type, view });
 		return *this;
 	}
 
@@ -108,7 +114,7 @@ namespace VulkanAbstractionLayer
 	{
 		for (const auto& attachmentInfo : this->descriptorAttachmentInfos)
 		{
-			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name), attachmentInfo.Type);
+			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name), attachmentInfo.Type, attachmentInfo.View);
 		}
 		this->descriptorAttachmentInfos.clear();
 	}
@@ -117,7 +123,7 @@ namespace VulkanAbstractionLayer
 	{
 		for (const auto& attachmentInfo : this->descriptorAttachmentInfos)
 		{
-			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name).get(), attachmentInfo.Type);
+			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name).get(), attachmentInfo.Type, attachmentInfo.View);
 		}
 		this->descriptorAttachmentInfos.clear();
 	}
@@ -126,7 +132,7 @@ namespace VulkanAbstractionLayer
 	{
 		size_t index = 0;
 		for (const auto& image : images)
-			index = this->AllocateBinding(image.get());
+			index = this->AllocateBinding(image.get(), ImageView::NATIVE);
 
 		this->descriptorWrites.push_back({
 			type,

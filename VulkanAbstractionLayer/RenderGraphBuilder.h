@@ -82,12 +82,23 @@ namespace VulkanAbstractionLayer
             std::unordered_map<void*, RenderPassNameId> LastImageUsages;
         };
 
+        struct ExternalImage
+        {
+            ImageUsage::Bits InitialUsage;
+            Format ImageFormat;
+        };
+
+        struct ExternalBuffer
+        {
+            BufferUsage::Bits InitialUsage;
+        };
+
         using AttachmentHashMap = std::unordered_map<StringId, Image>;
         using DependencyHashMap = std::unordered_map<StringId, DependencyStorage>;
         using PipelineHashMap = std::unordered_map<StringId, Pipeline>;
         using InternalCallback = std::function<void(CommandBuffer)>;
-        using ExternalImagesHashMap = std::unordered_map<void*, ImageUsage::Bits>;
-        using ExternalBuffersHashMap = std::unordered_map<void*, BufferUsage::Bits>;
+        using ExternalImagesHashMap = std::unordered_map<void*, ExternalImage>;
+        using ExternalBuffersHashMap = std::unordered_map<void*, ExternalBuffer>;
 
         ExternalImagesHashMap externalImages;
         ExternalBuffersHashMap externalBuffers;
