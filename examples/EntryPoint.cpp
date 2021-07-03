@@ -329,7 +329,7 @@ public:
     }
 };
 
-RenderGraph CreateRenderGraph(SharedResources& resources)
+auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value options)
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
@@ -337,6 +337,7 @@ RenderGraph CreateRenderGraph(SharedResources& resources)
         .AddRenderPass("ShadowPass"_id, std::make_unique<ShadowRenderPass>(resources))
         .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
+        .SetOptions(options)
         .SetOutputName("Output"_id);
 
     return renderGraphBuilder.Build();
@@ -439,7 +440,7 @@ int main()
         for (const auto& texture : mesh.Textures)
             sharedResources.MeshTextures.push_back(std::ref(texture));
 
-    RenderGraph renderGraph = CreateRenderGraph(sharedResources);
+    std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 
     Camera camera;
     Vector3 modelRotation{ -HalfPi, Pi, 0.0f };
@@ -449,11 +450,11 @@ int main()
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
-        renderGraph = CreateRenderGraph(sharedResources);
+        renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::ON_SWAPCHAIN_RESIZE);
         camera.AspectRatio = size.x / size.y;
     });
     
-    ImGuiVulkanContext::Init(window, renderGraph.GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
+    ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
 
     while (!window.ShouldClose())
     {
@@ -503,14 +504,14 @@ int main()
             ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
             ImGui::End();
 
-            auto& uniformSubmitPass = renderGraph.GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);
+            auto& uniformSubmitPass = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);
             uniformSubmitPass.CameraUniform.Matrix = camera.GetMatrix();
             uniformSubmitPass.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
             uniformSubmitPass.LightUniform.Color = lightColor;
             uniformSubmitPass.LightUniform.Direction = Normalize(lightDirection);
 
-            renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
-            renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());
+            renderGraph->Execute(Vulkan.GetCurrentCommandBuffer());
+            renderGraph->Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());
 
             ImGuiVulkanContext::EndFrame();
             Vulkan.EndFrame();

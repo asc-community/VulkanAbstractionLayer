@@ -39,6 +39,16 @@
 
 namespace VulkanAbstractionLayer
 {
+    struct RenderGraphOptions
+    {
+        using Value = uint32_t;
+
+        enum Bits
+        {
+            ON_SWAPCHAIN_RESIZE = 1 << 0,
+        };
+    };
+
     class RenderGraphBuilder
     {
         struct RenderPassReference
@@ -104,11 +114,12 @@ namespace VulkanAbstractionLayer
         ExternalBuffersHashMap externalBuffers;
         std::vector<RenderPassReference> renderPassReferences;
         StringId outputName = { };
+        RenderGraphOptions::Value options = { };
 
         RenderPassNative BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions);
         DependencyHashMap AcquireRenderPassDependencies();
         InternalCallback CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
-        InternalCallback CreateInternalOnCreateCallback(const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
+        InternalCallback CreateOnCreatePipelineCallback(const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
         ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies);
         AttachmentHashMap AllocateAttachments(const PipelineHashMap& pipelines, const ResourceTransitions& transitions, const DependencyHashMap& dependencies);
         void WriteDescriptorSets(StringId renderPassName, const RenderPassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments);
@@ -120,6 +131,7 @@ namespace VulkanAbstractionLayer
     public:
         RenderGraphBuilder& AddRenderPass(StringId name, std::unique_ptr<RenderPass> renderPass);
         RenderGraphBuilder& SetOutputName(StringId name);
-        RenderGraph Build();
+        RenderGraphBuilder& SetOptions(RenderGraphOptions::Value options);
+        std::unique_ptr<RenderGraph> Build();
     };
 }
