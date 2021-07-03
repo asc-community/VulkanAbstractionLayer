@@ -82,6 +82,12 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, StringId attachment, UniformType type)
+	{
+		this->descriptorAttachmentInfos.push_back({ attachment, binding, type });
+		return *this;
+	}
+
 	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<BufferReference> buffers, UniformType type)
 	{
 		size_t index = 0;
@@ -96,6 +102,24 @@ namespace VulkanAbstractionLayer
 		});
 
 		return *this;
+	}
+
+	void DescriptorBinding::ResolveAttachments(const std::unordered_map<StringId, Image>& mappings)
+	{
+		for (const auto& attachmentInfo : this->descriptorAttachmentInfos)
+		{
+			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name), attachmentInfo.Type);
+		}
+		this->descriptorAttachmentInfos.clear();
+	}
+
+	void DescriptorBinding::ResolveAttachments(const std::unordered_map<StringId, ImageReference>& mappings)
+	{
+		for (const auto& attachmentInfo : this->descriptorAttachmentInfos)
+		{
+			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name).get(), attachmentInfo.Type);
+		}
+		this->descriptorAttachmentInfos.clear();
 	}
 
 	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type)

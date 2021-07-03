@@ -58,6 +58,7 @@ namespace VulkanAbstractionLayer
         };
         vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
         descriptorPoolCreateInfo
+            .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
             .setPoolSizes(descriptorPoolSizes)
             .setMaxSets(1024 * (uint32_t)descriptorPoolSizes.size());
 
@@ -164,6 +165,7 @@ namespace VulkanAbstractionLayer
             this->FreeDescriptorSet(it->SetInfo.Set);
             this->DestroyDescriptorSetLayout(it->SetInfo.SetLayout);
         }
+        this->cache.erase(removeIt, this->cache.end());
 
         auto descriptorSetLayout = this->CreateDescriptorSetLayout(specification);
         auto descriptorSet = this->AllocateDescriptorSet(descriptorSetLayout);

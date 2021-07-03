@@ -15,9 +15,13 @@ layout(set = 0, binding = 2) uniform uLightBuffer
 layout(set = 0, binding = 3) uniform sampler uImageSampler;
 layout(set = 0, binding = 4) uniform texture2D uTextures[4096];
 
+layout(set = 0, binding = 5) uniform texture2D uShadowTexture;
+
 void main() 
 {
     vec3 lightColor = uLightColorPadding.rgb;
+    float shadowFactor = texture(sampler2D(uShadowTexture, uImageSampler), vTexCoord).r;
+
     vec3 albedoColor = texture(sampler2D(uTextures[vAlbedoTextureIndex], uImageSampler), vTexCoord).rgb;
     float diffuseFactor = max(dot(uLightDirection, vNormal), 0.0);
     oColor = vec4(lightColor * albedoColor * diffuseFactor, 1.0);

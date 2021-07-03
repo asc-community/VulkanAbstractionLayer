@@ -77,7 +77,9 @@ namespace VulkanAbstractionLayer
         void AddBuffer(const Buffer& buffer, BufferUsage::Bits usage);
         void AddBuffers(ArrayView<BufferReference> buffers, BufferUsage::Bits usage);
         void AddImage(const Image& image, ImageUsage::Bits usage);
+        void AddImage(StringId name, ImageUsage::Bits usage);
         void AddImages(ArrayView<ImageReference> images, ImageUsage::Bits usage);
+        void AddImages(ArrayView<StringId> images, ImageUsage::Bits usage);
         void AddAttachment(StringId name, ClearColor clear);
         void AddAttachment(StringId name, ClearDepthSpencil clear);
         void AddAttachment(StringId name, AttachmentState onLoad);

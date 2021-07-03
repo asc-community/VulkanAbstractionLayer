@@ -43,14 +43,15 @@ namespace VulkanAbstractionLayer
 
         BytecodeSPIRV Bytecode;
         Attributes InputAttributes;
-        Uniforms UniformBlocks;
+        Uniforms DescriptorSets;
     };
 
     class ShaderLoader
     {
     public:
-        static ShaderData LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language);
-        static ShaderData LoadFromBinary(const std::string& filepath);
-        static ShaderData LoadFromMemory(std::vector<uint32_t> bytecode);
+        static ShaderData LoadFromSourceFile(const std::string& filepath, ShaderType type, ShaderLanguage language);
+        static ShaderData LoadFromBinaryFile(const std::string& filepath);
+        static ShaderData LoadFromBinary(std::vector<uint32_t> bytecode);
+        static ShaderData LoadFromSource(const std::string& code, ShaderType type, ShaderLanguage language);
     };
 }

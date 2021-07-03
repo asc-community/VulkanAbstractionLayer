@@ -651,8 +651,6 @@ namespace VulkanAbstractionLayer
                     .setBasePipelineIndex(0);
 
                 renderPassNative.Pipeline = GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
-
-                renderPassPipeline.DescriptorBindings.Write(renderPassNative.DescriptorSet);
             }
         }
 
@@ -777,6 +775,13 @@ namespace VulkanAbstractionLayer
         return attachments;
     }
 
+    void RenderGraphBuilder::WriteDescriptorSets(StringId renderPassName, const RenderPassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments)
+    {
+        auto& pipeline = pipelines.at(renderPassName);
+        pipeline.DescriptorBindings.ResolveAttachments(attachments);
+        pipeline.DescriptorBindings.Write(renderPass.DescriptorSet);
+    }
+
     void RenderGraphBuilder::SetupOutputImage(ResourceTransitions& transitions, StringId outputImage)
     {
         transitions.TotalImageUsages.at(AttachmentNameToImageHandle(outputImage)) |= ImageUsage::TRANSFER_SOURCE;
@@ -866,15 +871,13 @@ namespace VulkanAbstractionLayer
 
         for (auto& renderPassReference : this->renderPassReferences)
         {
-            std::vector<StringId> colorAttachments;
-            for (const auto& attachment : dependencies[renderPassReference.Name].GetAttachmentDependencies())
-                colorAttachments.push_back(attachment.Name);
+            auto renderPass = this->BuildRenderPass(renderPassReference, pipelines, attachments, resourceTransitions);
+            this->WriteDescriptorSets(renderPassReference.Name, renderPass, pipelines, attachments);
 
             nodes.push_back(RenderGraphNode{
                 renderPassReference.Name,
                 this->BuildRenderPass(renderPassReference, pipelines, attachments, resourceTransitions),
                 std::move(renderPassReference.Pass),
-                std::move(colorAttachments)
             });
         }
 

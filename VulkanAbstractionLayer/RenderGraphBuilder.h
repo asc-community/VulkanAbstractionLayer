@@ -100,6 +100,7 @@ namespace VulkanAbstractionLayer
         InternalCallback CreateInternalOnCreateCallback(const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
         ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies);
         AttachmentHashMap AllocateAttachments(const PipelineHashMap& pipelines, const ResourceTransitions& transitions, const DependencyHashMap& dependencies);
+        void WriteDescriptorSets(StringId renderPassName, const RenderPassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments);
         void SetupOutputImage(ResourceTransitions& transitions, StringId outputImage);
         PipelineHashMap CreatePipelines();
         void PreWarmDescriptorSets(const Pipeline& pipelineState);

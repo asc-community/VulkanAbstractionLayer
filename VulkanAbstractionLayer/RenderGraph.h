@@ -43,7 +43,6 @@ namespace VulkanAbstractionLayer
         StringId Name;
         RenderPassNative PassNative;
         std::unique_ptr<RenderPass> PassCustom;
-        std::vector<StringId> ColorAttachments;
     };
 
     class RenderGraph
@@ -53,7 +52,7 @@ namespace VulkanAbstractionLayer
         using DestroyCallback = std::function<void(const RenderPassNative&)>;
 
         std::vector<RenderGraphNode> nodes;
-        std::unordered_map<StringId, Image> images;
+        std::unordered_map<StringId, Image> attachments;
         StringId outputName;
         PresentCallback onPresent;
         CreateCallback onCreate;
@@ -61,7 +60,7 @@ namespace VulkanAbstractionLayer
 
         void InitializeOnFirstFrame(CommandBuffer& commandBuffer);
     public:
-        RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, CreateCallback onCreate, DestroyCallback onDestroy);
+        RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> attachments, StringId outputName, PresentCallback onPresent, CreateCallback onCreate, DestroyCallback onDestroy);
         ~RenderGraph();
         RenderGraph(RenderGraph&&) = default;
         RenderGraph& operator=(RenderGraph&& other) noexcept;
@@ -71,7 +70,7 @@ namespace VulkanAbstractionLayer
         void Present(CommandBuffer& commandBuffer, const Image& presentImage);
         const RenderGraphNode& GetNodeByName(StringId name) const;
         RenderGraphNode& GetNodeByName(StringId name);
-        const Image& GetImageByName(StringId name) const;
+        const Image& GetAttachmentByName(StringId name) const;
 
         template<typename T>
         T& GetRenderPassByName(StringId name)

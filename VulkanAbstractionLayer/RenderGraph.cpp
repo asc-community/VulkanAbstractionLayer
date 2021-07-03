@@ -32,8 +32,8 @@
 
 namespace VulkanAbstractionLayer
 {
-    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, CreateCallback onCreate, DestroyCallback onDestroy)
-        : nodes(std::move(nodes)), images(std::move(images)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onCreate(std::move(onCreate)), onDestroy(std::move(onDestroy))
+    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> attachments, StringId outputName, PresentCallback onPresent, CreateCallback onCreate, DestroyCallback onDestroy)
+        : nodes(std::move(nodes)), attachments(std::move(attachments)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onCreate(std::move(onCreate)), onDestroy(std::move(onDestroy))
     {
 
     }
@@ -49,7 +49,7 @@ namespace VulkanAbstractionLayer
 
     void RenderGraph::ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer)
     {
-        RenderPassState state{ *this, commandBuffer, node.ColorAttachments };
+        RenderPassState state{ *this, commandBuffer };
             
         node.PassCustom->BeforeRender(state);
 
@@ -82,7 +82,7 @@ namespace VulkanAbstractionLayer
 
     void RenderGraph::Present(CommandBuffer& commandBuffer, const Image& presentImage)
     {
-        this->onPresent(commandBuffer, this->images.at(this->outputName), presentImage);
+        this->onPresent(commandBuffer, this->attachments.at(this->outputName), presentImage);
     }
 
     const RenderGraphNode& RenderGraph::GetNodeByName(StringId name) const
@@ -116,11 +116,11 @@ namespace VulkanAbstractionLayer
             this->onDestroy(node.PassNative);
         }
         this->nodes.clear();
-        this->images.clear();
+        this->attachments.clear();
     }
 
-    const Image& RenderGraph::GetImageByName(StringId name) const
+    const Image& RenderGraph::GetAttachmentByName(StringId name) const
     {
-        return this->images.at(name);
+        return this->attachments.at(name);
     }
 }
