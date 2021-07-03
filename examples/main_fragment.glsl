@@ -19,10 +19,13 @@ layout(set = 0, binding = 5) uniform texture2D uShadowTexture;
 
 void main() 
 {
+    const float near = 0.001f;
+    const float far = 10000.0f;
     vec3 lightColor = uLightColorPadding.rgb;
-    float shadowFactor = texture(sampler2D(uShadowTexture, uImageSampler), vTexCoord).r;
-
-    vec3 albedoColor = texture(sampler2D(uTextures[vAlbedoTextureIndex], uImageSampler), vTexCoord).rgb;
-    float diffuseFactor = max(dot(uLightDirection, vNormal), 0.0);
-    oColor = vec4(lightColor * albedoColor * diffuseFactor, 1.0);
+    float shadowFactor = texture(sampler2D(uShadowTexture, uImageSampler), gl_FragCoord.xy / vec2(1280, 720)).r;
+    oColor = vec4(vec3(1.0 - (far - shadowFactor * (far - near)) / (near * far)), 1.0);
+    
+    // vec3 albedoColor = texture(sampler2D(uTextures[vAlbedoTextureIndex], uImageSampler), vTexCoord).rgb;
+    // float diffuseFactor = max(dot(uLightDirection, vNormal), 0.0);
+    // oColor = vec4(lightColor * albedoColor * diffuseFactor, 1.0);
 }
