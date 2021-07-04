@@ -153,6 +153,7 @@ public:
     struct CameraUniformData
     {
         Matrix4x4 Matrix;
+        Vector3 Position;
     } CameraUniform;
 
     struct ModelUniformData
@@ -164,7 +165,7 @@ public:
     {
         Matrix4x4 Projection;
         Vector3 Color;
-        float Padding_1;
+        float AmbientIntensity;
         Vector3 Direction;
     } LightUniform;
 
@@ -448,10 +449,10 @@ int main()
 
     Camera camera;
     Vector3 modelRotation{ -HalfPi, Pi, 0.0f };
-    Vector3 lightColor{ 1.0f, 1.0f, 1.0f };
-    Vector3 lightDirection{ 0.0f, 1.0f, 0.0f };
-    float lightBounds = 100.0f;
-    Vector3 lightPosition{ 0.0f, 0.0f, 0.0f };
+    Vector3 lightColor{ 0.7f, 0.7f, 0.7f };
+    Vector3 lightDirection{ -0.3f, 1.0f, -0.6f };
+    float lightBounds = 150.0f;
+    float lightAmbientIntensity = 0.3f;
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
@@ -509,20 +510,22 @@ int main()
             ImGui::ColorEdit3("color", &lightColor[0], ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
             ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
             ImGui::DragFloat("bounds", &lightBounds, 0.1f);
-            ImGui::DragFloat3("position", &lightPosition[0], 0.01f);
+            ImGui::DragFloat("ambient intensity", &lightAmbientIntensity, 0.01f);
             ImGui::End();
 
-            Vector3 low = lightPosition - lightBounds;
-            Vector3 high = lightPosition + lightBounds;
+            Vector3 low { -lightBounds, -lightBounds, -lightBounds };
+            Vector3 high{ lightBounds, lightBounds, lightBounds };
 
             auto& uniformSubmitPass = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);
             uniformSubmitPass.CameraUniform.Matrix = camera.GetMatrix();
+            uniformSubmitPass.CameraUniform.Position = camera.Position;
             uniformSubmitPass.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
             uniformSubmitPass.LightUniform.Color = lightColor;
+            uniformSubmitPass.LightUniform.AmbientIntensity = lightAmbientIntensity;
             uniformSubmitPass.LightUniform.Direction = Normalize(lightDirection);
-            uniformSubmitPass.LightUniform.Projection = 
+            uniformSubmitPass.LightUniform.Projection =
                 MakeOrthographicMatrix(low.x, high.x, low.y, high.y, low.z, high.z) *
-                MakeLookAtMatrix(Vector3{ 0.0f, 0.0f, 0.0f }, lightDirection, Vector3{ 0.001f, 1.0f, 0.001f });
+                MakeLookAtMatrix(camera.Position, -lightDirection, Vector3{ 0.001f, 1.0f, 0.001f });
 
             renderGraph->Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph->Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());

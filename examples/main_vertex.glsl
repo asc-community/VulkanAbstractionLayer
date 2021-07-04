@@ -19,6 +19,7 @@ layout(location = 3) out flat uint vAlbedoTextureIndex;
 layout(set = 0, binding = 0) uniform uCameraBuffer
 {
     mat4 uViewProjection;
+    vec3 uCameraPosition;
 };
 
 layout(set = 0, binding = 1) uniform uModelBuffer
