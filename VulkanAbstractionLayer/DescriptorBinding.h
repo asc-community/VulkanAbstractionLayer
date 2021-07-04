@@ -31,6 +31,7 @@
 #include "Buffer.h"
 #include "Image.h"
 #include "Sampler.h"
+#include "StringId.h"
 #include "ShaderReflection.h"
 #include "ArrayUtils.h"
 
@@ -46,21 +47,35 @@ namespace VulkanAbstractionLayer
 			uint32_t Count;
 		};
 
+		struct AttachmentResolveInfo
+		{
+			StringId Name;
+			uint32_t Binding;
+			UniformType Type;
+			ImageView View;
+		};
+
 		std::vector<DescriptorWriteInfo> descriptorWrites;
 		std::vector<vk::DescriptorBufferInfo> descriptorBufferInfos;
 		std::vector<vk::DescriptorImageInfo> descriptorImageInfos;
+		std::vector<AttachmentResolveInfo> descriptorAttachmentInfos;
 
 		size_t AllocateBinding(const Buffer& buffer);
-		size_t AllocateBinding(const Image& image);
+		size_t AllocateBinding(const Image& image, ImageView view);
 		size_t AllocateBinding(const Sampler& sampler);
 	public:
 		DescriptorBinding& Bind(uint32_t binding, const Buffer& buffer, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, const Image& image, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, const Sampler& sampler, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, const Image& image, UniformType type, ImageView view);
 
 		DescriptorBinding& Bind(uint32_t binding, ArrayView<BufferReference> buffers, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, ArrayView<SamplerReference> samplers, UniformType type);
+
+		DescriptorBinding& Bind(uint32_t binding, StringId attachment, UniformType type, ImageView view);
+		void ResolveAttachments(const std::unordered_map<StringId, Image>& mappings);
+		void ResolveAttachments(const std::unordered_map<StringId, ImageReference>& mappings);
 
 		void Write(const vk::DescriptorSet& descriptorSet) const;
 	};

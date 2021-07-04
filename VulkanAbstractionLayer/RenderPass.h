@@ -46,16 +46,14 @@ namespace VulkanAbstractionLayer
         vk::PipelineLayout PipelineLayout;
         vk::Rect2D RenderArea;
         std::vector<vk::ClearValue> ClearValues;
-        std::function<void(vk::CommandBuffer)> OnRenderCallback;
     };
 
     struct RenderPassState
     {
         RenderGraph& Graph;
         CommandBuffer& Commands;
-        const std::vector<StringId>& ColorAttachments;
 
-        const Image& GetOutputColorAttachment(size_t index) const;
+        const Image& GetAttachment(StringId name);
     };
 
     using DependencyState = DependencyStorage&;

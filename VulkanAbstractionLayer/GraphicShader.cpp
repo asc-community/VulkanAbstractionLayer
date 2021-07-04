@@ -61,9 +61,10 @@ namespace VulkanAbstractionLayer
         this->fragmentShader = vulkan.GetDevice().createShaderModule(fragmentShaderInfo);
 
         this->vertexAttributes = vertex.InputAttributes;
+        // TODO: support multiple descriptor sets
         this->shaderUniforms = std::vector{
-            ShaderUniforms{ vertex.UniformBlocks[0], ShaderType::VERTEX },
-            ShaderUniforms{ fragment.UniformBlocks[0], ShaderType::FRAGMENT },
+            ShaderUniforms{ vertex.DescriptorSets[0], ShaderType::VERTEX },
+            ShaderUniforms{ fragment.DescriptorSets[0], ShaderType::FRAGMENT },
         };
     }
 

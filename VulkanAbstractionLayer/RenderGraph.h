@@ -43,35 +43,34 @@ namespace VulkanAbstractionLayer
         StringId Name;
         RenderPassNative PassNative;
         std::unique_ptr<RenderPass> PassCustom;
-        std::vector<StringId> ColorAttachments;
+        std::function<void(CommandBuffer&)> PipelineBarrierCallback;
     };
 
     class RenderGraph
     {
         using PresentCallback = std::function<void(CommandBuffer&, const Image&, const Image&)>;
         using CreateCallback = std::function<void(CommandBuffer&)>;
-        using DestroyCallback = std::function<void(const RenderPassNative&)>;
+        using DestroyCallback = std::function<void(CommandBuffer&)>;
 
         std::vector<RenderGraphNode> nodes;
-        std::unordered_map<StringId, Image> images;
+        std::unordered_map<StringId, Image> attachments;
         StringId outputName;
         PresentCallback onPresent;
         CreateCallback onCreate;
-        DestroyCallback onDestroy;
 
         void InitializeOnFirstFrame(CommandBuffer& commandBuffer);
     public:
-        RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, CreateCallback onCreate, DestroyCallback onDestroy);
+        RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> attachments, StringId outputName, PresentCallback onPresent, CreateCallback onCreate);
         ~RenderGraph();
         RenderGraph(RenderGraph&&) = default;
-        RenderGraph& operator=(RenderGraph&& other) noexcept;
+        RenderGraph& operator=(RenderGraph&& other) = delete;
 
         void ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer);
         void Execute(CommandBuffer& commandBuffer);
         void Present(CommandBuffer& commandBuffer, const Image& presentImage);
         const RenderGraphNode& GetNodeByName(StringId name) const;
         RenderGraphNode& GetNodeByName(StringId name);
-        const Image& GetImageByName(StringId name) const;
+        const Image& GetAttachmentByName(StringId name) const;
 
         template<typename T>
         T& GetRenderPassByName(StringId name)

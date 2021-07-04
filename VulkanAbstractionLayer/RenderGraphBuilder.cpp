@@ -44,6 +44,12 @@ namespace VulkanAbstractionLayer
         return (StringId)nameExtended;
     }
 
+    StringId IsAttachmentName(void* imageHandle)
+    {
+        uintptr_t nameExtended = (uintptr_t)imageHandle;
+        return (nameExtended - (StringId)nameExtended) == 0;
+    }
+
     vk::VertexInputRate VertexBindingRateToVertexInputRate(VertexBinding::Rate rate)
     {
         switch (rate)
@@ -99,17 +105,6 @@ namespace VulkanAbstractionLayer
         default:
             assert(false);
             return ImageUsage::COLOR_ATTACHMENT;
-        }
-    }
-
-    vk::ImageAspectFlags ImageUsageToImageAspect(ImageUsage::Bits layout)
-    {
-        switch (layout)
-        {
-        case ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
-            return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
-        default:
-            return vk::ImageAspectFlagBits::eColor;
         }
     }
 
@@ -225,11 +220,11 @@ namespace VulkanAbstractionLayer
         return isOldWrite || isNewWrite; // two reads do not need barriers
     }
 
-    vk::ImageMemoryBarrier CreateImageMemoryBarrier(VkImage image, ImageUsage::Bits oldUsage, ImageUsage::Bits newUsage)
+    vk::ImageMemoryBarrier CreateImageMemoryBarrier(VkImage image, ImageUsage::Bits oldUsage, ImageUsage::Bits newUsage, Format format)
     {
         vk::ImageSubresourceRange subresourceRange;
         subresourceRange
-            .setAspectMask(ImageUsageToImageAspect(newUsage))
+            .setAspectMask(ImageFormatToImageAspect(format))
             .setBaseArrayLayer(0)
             .setBaseMipLevel(0)
             .setLayerCount(1)
@@ -264,56 +259,48 @@ namespace VulkanAbstractionLayer
         return bufferBarrier;
     }
 
-    RenderGraphBuilder::InternalCallback RenderGraphBuilder::CreateInternalOnCreateCallback(const ResourceTransitions& transitions, const AttachmentHashMap& attachments)
+    RenderGraphBuilder::InternalCallback RenderGraphBuilder::CreateOnCreatePipelineCallback(const ResourceTransitions& transitions, const AttachmentHashMap& attachments)
     {
         vk::PipelineStageFlags pipelineSourceFlags = { };
         vk::PipelineStageFlags pipelineDistanceFlags = { };
 
-        std::vector<vk::BufferMemoryBarrier> bufferBarriers;
-        for (const auto& [bufferNativeHandle, renderPassName] : transitions.FirstBufferUsages)
-        {
-            auto declaredBufferUsage = this->externalBuffers.at(bufferNativeHandle);
-            auto initialBufferUsage = transitions.BufferTransitions.at(renderPassName).at(bufferNativeHandle).FinalUsage;
-
-            if (!BufferHasDataDependency(declaredBufferUsage, initialBufferUsage))
-                continue;
-            if (declaredBufferUsage == BufferUsage::UNKNOWN)
-                continue;
-
-            bufferBarriers.push_back(CreateBufferMemoryBarrier((VkBuffer)bufferNativeHandle, declaredBufferUsage, initialBufferUsage));
-            pipelineSourceFlags |= BufferUsageToPipelineStage(declaredBufferUsage);
-            pipelineDistanceFlags |= BufferUsageToPipelineStage(initialBufferUsage);
-        }
-
         std::vector<vk::ImageMemoryBarrier> imageBarriers;
         for (const auto& [imageNativeHandle, renderPassName] : transitions.FirstImageUsages)
         {
-            auto declaredImageUsage = this->externalImages.at(imageNativeHandle);
-            auto initialImageUsage = transitions.ImageTransitions.at(renderPassName).at(imageNativeHandle).FinalUsage;
+            auto externalImage = this->externalImages.at(imageNativeHandle);
+            auto inPassImageUsage = transitions.ImageTransitions.at(renderPassName).at(imageNativeHandle).FinalUsage;
 
             VkImage imageHandle = (VkImage)imageNativeHandle;
             auto attachmentIt = attachments.find(ImageHandleToAttachmentName(imageNativeHandle));
-            if (attachmentIt != attachments.end()) imageHandle = attachmentIt->second.GetNativeHandle();
+            if (IsAttachmentName(imageHandle) && attachmentIt != attachments.end())
+            {
+                inPassImageUsage = transitions.ImageTransitions.at(renderPassName).at(imageNativeHandle).InitialUsage;
+                imageHandle = attachmentIt->second.GetNativeHandle();
+            }
+            else if (this->options & RenderGraphOptions::ON_SWAPCHAIN_RESIZE)
+            {
+                continue; // do not insert barriers on resize if image is not recreated by render graph
+            }
             
-            if (declaredImageUsage == initialImageUsage)
+            if (externalImage.InitialUsage == inPassImageUsage)
                 continue;
 
-            imageBarriers.push_back(CreateImageMemoryBarrier(imageHandle, declaredImageUsage, initialImageUsage));
-            pipelineSourceFlags |= ImageUsageToPipelineStage(declaredImageUsage);
-            pipelineDistanceFlags |= ImageUsageToPipelineStage(initialImageUsage);
+            imageBarriers.push_back(CreateImageMemoryBarrier(imageHandle, externalImage.InitialUsage, inPassImageUsage, externalImage.ImageFormat));
+            pipelineSourceFlags |= ImageUsageToPipelineStage(externalImage.InitialUsage);
+            pipelineDistanceFlags |= ImageUsageToPipelineStage(inPassImageUsage);
         }
 
-        auto callback = [bufferBarriers = std::move(bufferBarriers), imageBarriers = std::move(imageBarriers),
-                         pipelineSrcFlags = pipelineSourceFlags, pipelineDstFlags = pipelineDistanceFlags](CommandBuffer commandBuffer)
+        auto callback = 
+            [imageBarriers = std::move(imageBarriers), pipelineSrcFlags = pipelineSourceFlags, pipelineDstFlags = pipelineDistanceFlags](CommandBuffer commands)
         {
-            if (!bufferBarriers.empty() || !imageBarriers.empty())
+            if (!imageBarriers.empty())
             {
-                commandBuffer.GetNativeHandle().pipelineBarrier(
+                commands.GetNativeHandle().pipelineBarrier(
                     pipelineSrcFlags,
                     pipelineDstFlags,
                     { }, // dependencies
                     { }, // memory barriers
-                    bufferBarriers,
+                    { }, // buffer barriers
                     imageBarriers
                 );
             }
@@ -321,7 +308,7 @@ namespace VulkanAbstractionLayer
         return InternalCallback{ std::move(callback) };
     }
 
-    RenderGraphBuilder::InternalCallback RenderGraphBuilder::CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions)
+    RenderGraphBuilder::InternalCallback RenderGraphBuilder::CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments)
     {
         auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
         auto& bufferTransitions = resourceTransitions.BufferTransitions.at(renderPassName);
@@ -344,16 +331,22 @@ namespace VulkanAbstractionLayer
         std::vector<vk::ImageMemoryBarrier> imageBarriers;
         for (const auto& [imageHandle, imageTransition] : imageTransitions)
         {
+            auto imageFormat = this->externalImages.at(imageHandle).ImageFormat;
             auto isAttachment = std::find_if(renderPassAttachments.begin(), renderPassAttachments.end(), [handle = imageHandle](const auto& attachment)
             {
                 return AttachmentNameToImageHandle(attachment.Name) == handle;
             });
+
             if (isAttachment != renderPassAttachments.end()) continue;
+
+            VkImage imageNativeHandle = (VkImage)imageHandle;
+            if (IsAttachmentName(imageHandle) && attachments.find(ImageHandleToAttachmentName(imageHandle)) != attachments.end())
+                imageNativeHandle = attachments.at(ImageHandleToAttachmentName(imageHandle)).GetNativeHandle();
 
             if (imageTransition.InitialUsage == imageTransition.FinalUsage)
                 continue;
 
-            imageBarriers.push_back(CreateImageMemoryBarrier((VkImage)imageHandle, imageTransition.InitialUsage, imageTransition.FinalUsage));
+            imageBarriers.push_back(CreateImageMemoryBarrier(imageNativeHandle, imageTransition.InitialUsage, imageTransition.FinalUsage, imageFormat));
             pipelineSourceFlags |= ImageUsageToPipelineStage(imageTransition.InitialUsage);
             pipelineDistanceFlags |= ImageUsageToPipelineStage(imageTransition.FinalUsage);
         }
@@ -392,7 +385,7 @@ namespace VulkanAbstractionLayer
         auto& renderPassPipeline = pipelines.at(renderPassReference.Name);
         auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
         auto& attachmentTransitions = resourceTransitions.ImageTransitions.at(renderPassReference.Name);
-        std::optional<vk::AttachmentReference> depthSpencilAttachmentReference;
+        std::optional<vk::AttachmentReference> depthStencilAttachmentReference;
 
         if (!renderPassAttachments.empty()) // should render pass be created?
         {
@@ -420,7 +413,7 @@ namespace VulkanAbstractionLayer
                     .setFinalLayout(ImageUsageToImageLayout(attachmentTransition.FinalUsage));
 
                 attachmentDescriptions.push_back(std::move(attachmentDescription));
-                attachmentViews.push_back(imageReference.GetNativeView());
+                attachmentViews.push_back(imageReference.GetNativeView(ImageView::NATIVE));
 
                 vk::AttachmentReference attachmentReference;
                 attachmentReference
@@ -429,9 +422,9 @@ namespace VulkanAbstractionLayer
 
                 if (attachmentTransition.FinalUsage == ImageUsage::DEPTH_SPENCIL_ATTACHMENT)
                 {
-                    depthSpencilAttachmentReference = std::move(attachmentReference);
+                    depthStencilAttachmentReference = std::move(attachmentReference);
                     renderPassNative.ClearValues.push_back(vk::ClearDepthStencilValue{
-                        attachment.DepthSpencilClear.Depth, attachment.DepthSpencilClear.Spencil
+                        attachment.DepthSpencilClear.Depth, attachment.DepthSpencilClear.Stencil
                     });
                 }
                 else
@@ -447,8 +440,8 @@ namespace VulkanAbstractionLayer
             subpassDescription
                 .setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
                 .setColorAttachments(attachmentReferences)
-                .setPDepthStencilAttachment(depthSpencilAttachmentReference.has_value() ?
-                    std::addressof(depthSpencilAttachmentReference.value()) : nullptr
+                .setPDepthStencilAttachment(depthStencilAttachmentReference.has_value() ?
+                    std::addressof(depthStencilAttachmentReference.value()) : nullptr
                 );
 
             // TODO
@@ -651,16 +644,8 @@ namespace VulkanAbstractionLayer
                     .setBasePipelineIndex(0);
 
                 renderPassNative.Pipeline = GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
-
-                renderPassPipeline.DescriptorBindings.Write(renderPassNative.DescriptorSet);
             }
         }
-
-        renderPassNative.OnRenderCallback = 
-            [callback = this->CreateInternalOnRenderCallback(renderPassReference.Name, dependencies, resourceTransitions)](vk::CommandBuffer cmd)
-            {
-                return callback(CommandBuffer{ cmd });
-            };
 
         return renderPassNative;
     }
@@ -679,8 +664,8 @@ namespace VulkanAbstractionLayer
     RenderGraphBuilder::ResourceTransitions RenderGraphBuilder::ResolveResourceTransitions(const DependencyHashMap& dependencies)
     {
         ResourceTransitions resourceTransitions;
-        ExternalBuffersHashMap lastBufferUsages;
-        ExternalImagesHashMap lastImageUsages;
+        std::unordered_map<void*, BufferUsage::Bits> lastBufferUsages;
+        std::unordered_map<void*, ImageUsage::Bits> lastImageUsages;
 
         for (const auto& renderPassReference : this->renderPassReferences)
         {
@@ -777,6 +762,13 @@ namespace VulkanAbstractionLayer
         return attachments;
     }
 
+    void RenderGraphBuilder::WriteDescriptorSets(StringId renderPassName, const RenderPassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments)
+    {
+        auto& pipeline = pipelines.at(renderPassName);
+        pipeline.DescriptorBindings.ResolveAttachments(attachments);
+        pipeline.DescriptorBindings.Write(renderPass.DescriptorSet);
+    }
+
     void RenderGraphBuilder::SetupOutputImage(ResourceTransitions& transitions, StringId outputImage)
     {
         transitions.TotalImageUsages.at(AttachmentNameToImageHandle(outputImage)) |= ImageUsage::TRANSFER_SOURCE;
@@ -794,20 +786,26 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
+    RenderGraphBuilder& RenderGraphBuilder::SetOptions(RenderGraphOptions::Value options)
+    {
+        this->options = options;
+        return *this;
+    }
+
     void RenderGraphBuilder::SetupExternalResources(const Pipeline& pipelineState)
     {
         auto& bufferDeclarations = pipelineState.GetBufferDeclarations();
         for (const auto& bufferDeclaration : bufferDeclarations)
         {
             assert(this->externalBuffers.find(bufferDeclaration.BufferNativeHandle) == this->externalBuffers.end());
-            this->externalBuffers[bufferDeclaration.BufferNativeHandle] = bufferDeclaration.InitialUsage;
+            this->externalBuffers[bufferDeclaration.BufferNativeHandle] = { bufferDeclaration.InitialUsage };
         }
 
         auto& imageDeclarations = pipelineState.GetImageDeclarations();
         for (const auto& imageDeclaration : imageDeclarations)
         {
             assert(this->externalImages.find(imageDeclaration.ImageNativeHandle) == this->externalImages.end());
-            this->externalImages[imageDeclaration.ImageNativeHandle] = imageDeclaration.InitialUsage;
+            this->externalImages[imageDeclaration.ImageNativeHandle] = { imageDeclaration.InitialUsage, imageDeclaration.ImageFormat };
         }
 
         auto& attachmentDeclarations = pipelineState.GetAttachmentDeclarations();
@@ -815,7 +813,7 @@ namespace VulkanAbstractionLayer
         {
             auto attachmentNativeHandle = AttachmentNameToImageHandle(attachmentDeclaration.Name);
             assert(this->externalImages.find(attachmentNativeHandle) == this->externalImages.end());
-            this->externalImages[attachmentNativeHandle] = ImageUsage::UNKNOWN;
+            this->externalImages[attachmentNativeHandle] = { ImageUsage::UNKNOWN, attachmentDeclaration.ImageFormat };
         }
     }
 
@@ -854,7 +852,7 @@ namespace VulkanAbstractionLayer
         return transition;
     }
 
-    RenderGraph RenderGraphBuilder::Build()
+    std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
     {
         DependencyHashMap dependencies = this->AcquireRenderPassDependencies();
         PipelineHashMap pipelines = this->CreatePipelines();
@@ -866,15 +864,14 @@ namespace VulkanAbstractionLayer
 
         for (auto& renderPassReference : this->renderPassReferences)
         {
-            std::vector<StringId> colorAttachments;
-            for (const auto& attachment : dependencies[renderPassReference.Name].GetAttachmentDependencies())
-                colorAttachments.push_back(attachment.Name);
+            auto renderPass = this->BuildRenderPass(renderPassReference, pipelines, attachments, resourceTransitions);
+            this->WriteDescriptorSets(renderPassReference.Name, renderPass, pipelines, attachments);
 
             nodes.push_back(RenderGraphNode{
                 renderPassReference.Name,
-                this->BuildRenderPass(renderPassReference, pipelines, attachments, resourceTransitions),
+                std::move(renderPass),
                 std::move(renderPassReference.Pass),
-                std::move(colorAttachments)
+                this->CreateInternalOnRenderCallback(renderPassReference.Name, dependencies.at(renderPassReference.Name), resourceTransitions, attachments),
             });
         }
 
@@ -906,24 +903,14 @@ namespace VulkanAbstractionLayer
             }
         };
 
-        auto OnDestroy = [](const RenderPassNative& pass)
-        {
-            auto& device = GetCurrentVulkanContext().GetDevice();
-            if ((bool)pass.Pipeline)         device.destroyPipeline(pass.Pipeline);
-            if ((bool)pass.PipelineLayout)   device.destroyPipelineLayout(pass.PipelineLayout);
-            if ((bool)pass.Framebuffer)      device.destroyFramebuffer(pass.Framebuffer);
-            if ((bool)pass.RenderPassHandle) device.destroyRenderPass(pass.RenderPassHandle);
-        };
+        auto OnCreatePipelines = this->CreateOnCreatePipelineCallback(resourceTransitions, attachments);
 
-        auto OnCreate = this->CreateInternalOnCreateCallback(resourceTransitions, attachments);
-
-        return RenderGraph{ 
+        return std::make_unique<RenderGraph>(
             std::move(nodes), 
             std::move(attachments), 
             std::move(this->outputName), 
             std::move(OnPresent), 
-            std::move(OnCreate),
-            std::move(OnDestroy) 
-        };
+            std::move(OnCreatePipelines)
+        );
     }
 }

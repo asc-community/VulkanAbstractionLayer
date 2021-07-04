@@ -39,6 +39,16 @@
 
 namespace VulkanAbstractionLayer
 {
+    struct RenderGraphOptions
+    {
+        using Value = uint32_t;
+
+        enum Bits
+        {
+            ON_SWAPCHAIN_RESIZE = 1 << 0,
+        };
+    };
+
     class RenderGraphBuilder
     {
         struct RenderPassReference
@@ -82,24 +92,37 @@ namespace VulkanAbstractionLayer
             std::unordered_map<void*, RenderPassNameId> LastImageUsages;
         };
 
+        struct ExternalImage
+        {
+            ImageUsage::Bits InitialUsage;
+            Format ImageFormat;
+        };
+
+        struct ExternalBuffer
+        {
+            BufferUsage::Bits InitialUsage;
+        };
+
         using AttachmentHashMap = std::unordered_map<StringId, Image>;
         using DependencyHashMap = std::unordered_map<StringId, DependencyStorage>;
         using PipelineHashMap = std::unordered_map<StringId, Pipeline>;
         using InternalCallback = std::function<void(CommandBuffer)>;
-        using ExternalImagesHashMap = std::unordered_map<void*, ImageUsage::Bits>;
-        using ExternalBuffersHashMap = std::unordered_map<void*, BufferUsage::Bits>;
+        using ExternalImagesHashMap = std::unordered_map<void*, ExternalImage>;
+        using ExternalBuffersHashMap = std::unordered_map<void*, ExternalBuffer>;
 
         ExternalImagesHashMap externalImages;
         ExternalBuffersHashMap externalBuffers;
         std::vector<RenderPassReference> renderPassReferences;
         StringId outputName = { };
+        RenderGraphOptions::Value options = { };
 
         RenderPassNative BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions);
         DependencyHashMap AcquireRenderPassDependencies();
-        InternalCallback CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions);
-        InternalCallback CreateInternalOnCreateCallback(const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
+        InternalCallback CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
+        InternalCallback CreateOnCreatePipelineCallback(const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
         ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies);
         AttachmentHashMap AllocateAttachments(const PipelineHashMap& pipelines, const ResourceTransitions& transitions, const DependencyHashMap& dependencies);
+        void WriteDescriptorSets(StringId renderPassName, const RenderPassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments);
         void SetupOutputImage(ResourceTransitions& transitions, StringId outputImage);
         PipelineHashMap CreatePipelines();
         void PreWarmDescriptorSets(const Pipeline& pipelineState);
@@ -108,6 +131,7 @@ namespace VulkanAbstractionLayer
     public:
         RenderGraphBuilder& AddRenderPass(StringId name, std::unique_ptr<RenderPass> renderPass);
         RenderGraphBuilder& SetOutputName(StringId name);
-        RenderGraph Build();
+        RenderGraphBuilder& SetOptions(RenderGraphOptions::Value options);
+        std::unique_ptr<RenderGraph> Build();
     };
 }

@@ -28,6 +28,7 @@
 
 #pragma once
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include <glm/gtx/euler_angles.hpp>
@@ -87,5 +88,10 @@ namespace VulkanAbstractionLayer
     inline Matrix4x4 MakeLookAtMatrix(const Vector3& position, const Vector3& direction, const Vector3& up)
     {
         return glm::lookAt(position, position + direction, up);
+    }
+
+    inline Matrix4x4 MakeOrthographicMatrix(float xLow, float xHigh, float yLow, float yHigh, float zLow, float zHigh)
+    {
+        return glm::ortho(xLow, xHigh, yLow, yHigh, zLow, zHigh);
     }
 }

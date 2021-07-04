@@ -31,10 +31,8 @@
 
 namespace VulkanAbstractionLayer
 {
-    const Image& RenderPassState::GetOutputColorAttachment(size_t index) const
+    const Image& RenderPassState::GetAttachment(StringId name)
     {
-        return this->Graph.GetImageByName(this->ColorAttachments[index]);
+        return this->Graph.GetAttachmentByName(name);
     }
-
-
 }

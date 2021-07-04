@@ -47,6 +47,7 @@ namespace VulkanAbstractionLayer
         {
             void* ImageNativeHandle;
             ImageUsage::Bits InitialUsage;
+            Format ImageFormat;
         };
 
         struct AttachmentDeclaration

@@ -53,6 +53,13 @@ namespace VulkanAbstractionLayer
         };
     };
 
+    enum class ImageView
+    {
+        NATIVE = 0,
+        DEPTH,
+        STENCIL,
+    };
+
     vk::ImageAspectFlags ImageFormatToImageAspect(Format format);
     vk::ImageLayout ImageUsageToImageLayout(ImageUsage::Bits usage);
     vk::AccessFlags ImageUsageToAccessFlags(ImageUsage::Bits usage);
@@ -60,14 +67,21 @@ namespace VulkanAbstractionLayer
 
     class Image
     {
+        struct ImageViews
+        {
+            vk::ImageView NativeView;
+            vk::ImageView DepthOnlyView;
+            vk::ImageView StencilOnlyView;
+        };
+
         vk::Image handle;
-        vk::ImageView view;
+        ImageViews imageViews;
         vk::Extent2D extent = { 0u, 0u };
         Format format = Format::UNDEFINED;
         VmaAllocation allocation = { };
 
         void Destroy();
-        void InitView(const vk::Image& image, Format format);
+        void InitViews(const vk::Image& image, Format format);
     public:
         Image() = default;
         Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage);
@@ -78,8 +92,9 @@ namespace VulkanAbstractionLayer
 
         void Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage);
 
+        vk::ImageView GetNativeView(ImageView view) const;
+
         vk::Image GetNativeHandle() const { return this->handle; }
-        vk::ImageView GetNativeView() const { return this->view; }
         Format GetFormat() const { return this->format; }
         uint32_t GetWidth() const { return this->extent.width; }
         uint32_t GetHeight() const { return this->extent.height; }
