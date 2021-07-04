@@ -88,4 +88,9 @@ namespace VulkanAbstractionLayer
     {
         return glm::lookAt(position, position + direction, up);
     }
+
+    inline Matrix4x4 MakeOrthographicMatrix(float xLow, float xHigh, float yLow, float yHigh, float zLow, float zHigh)
+    {
+        return glm::ortho(xLow, xHigh, yLow, yHigh, zLow, zHigh);
+    }
 }

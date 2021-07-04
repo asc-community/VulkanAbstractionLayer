@@ -162,6 +162,7 @@ public:
 
     struct LightUniformData
     {
+        Matrix4x4 Projection;
         Vector3 Color;
         float Padding_1;
         Vector3 Direction;
@@ -219,7 +220,7 @@ public:
             ShaderLoader::LoadFromSourceFile("shadow_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL),
         };
         
-        pipeline.DeclareAttachment("ShadowDepth"_id, Format::D32_SFLOAT_S8_UINT);
+        pipeline.DeclareAttachment("ShadowDepth"_id, Format::D32_SFLOAT_S8_UINT, 2048, 2048);
 
         pipeline.VertexBindings = {
             VertexBinding{
@@ -233,8 +234,8 @@ public:
         };
 
         pipeline.DescriptorBindings
-            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER);
+            .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER);
     }
 
     virtual void SetupDependencies(DependencyState dependencies) override
@@ -263,11 +264,13 @@ class OpaqueRenderPass : public RenderPass
 {    
     SharedResources& sharedResources;
     Sampler textureSampler;
+    Sampler depthSampler;
 public:
     OpaqueRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
         this->textureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
+        this->depthSampler.Init(Sampler::MinFilter::NEAREST, Sampler::MagFilter::NEAREST, Sampler::AddressMode::CLAMP_TO_EDGE, Sampler::MipFilter::NEAREST);
     }
 
     virtual void SetupPipeline(PipelineState pipeline) override
@@ -298,7 +301,8 @@ public:
             .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(3, this->textureSampler, UniformType::SAMPLER)
             .Bind(4, this->sharedResources.MeshTextures, UniformType::SAMPLED_IMAGE)
-            .Bind(5, "ShadowDepth"_id, UniformType::SAMPLED_IMAGE, ImageView::DEPTH);
+            .Bind(5, "ShadowDepth"_id, UniformType::SAMPLED_IMAGE, ImageView::DEPTH)
+            .Bind(6, this->depthSampler, UniformType::SAMPLER);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -446,6 +450,8 @@ int main()
     Vector3 modelRotation{ -HalfPi, Pi, 0.0f };
     Vector3 lightColor{ 1.0f, 1.0f, 1.0f };
     Vector3 lightDirection{ 0.0f, 1.0f, 0.0f };
+    float lightBounds = 100.0f;
+    Vector3 lightPosition{ 0.0f, 0.0f, 0.0f };
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
@@ -502,13 +508,21 @@ int main()
             ImGui::Begin("Light");
             ImGui::ColorEdit3("color", &lightColor[0], ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
             ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
+            ImGui::DragFloat("bounds", &lightBounds, 0.1f);
+            ImGui::DragFloat3("position", &lightPosition[0], 0.01f);
             ImGui::End();
+
+            Vector3 low = lightPosition - lightBounds;
+            Vector3 high = lightPosition + lightBounds;
 
             auto& uniformSubmitPass = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);
             uniformSubmitPass.CameraUniform.Matrix = camera.GetMatrix();
             uniformSubmitPass.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
             uniformSubmitPass.LightUniform.Color = lightColor;
             uniformSubmitPass.LightUniform.Direction = Normalize(lightDirection);
+            uniformSubmitPass.LightUniform.Projection = 
+                MakeOrthographicMatrix(low.x, high.x, low.y, high.y, low.z, high.z) *
+                MakeLookAtMatrix(Vector3{ 0.0f, 0.0f, 0.0f }, lightDirection, Vector3{ 0.001f, 1.0f, 0.001f });
 
             renderGraph->Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph->Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());

@@ -11,18 +11,20 @@ out gl_PerVertex
     vec4 gl_Position;
 };
 
-layout(set = 0, binding = 0) uniform uCameraBuffer
-{
-    mat4 uViewProjection;
-};
-
 layout(set = 0, binding = 1) uniform uModelBuffer
 {
     mat3 uModel;
 };
 
+layout(set = 0, binding = 2) uniform uLightBuffer
+{
+    mat4 uLightProjection;
+    vec4 uLightColorPadding;
+    vec3 uLightDirection;
+};
+
 void main()
 {
     vec3 worldSpacePosition = (uModel * iPosition) + iInstancePosition;
-    gl_Position = uViewProjection * vec4(worldSpacePosition, 1.0);
+    gl_Position = uLightProjection * vec4(worldSpacePosition, 1.0);
 }
