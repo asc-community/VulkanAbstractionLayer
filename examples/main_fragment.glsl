@@ -7,6 +7,12 @@ layout(location = 3) in flat uint vAlbedoTextureIndex;
 
 layout(location = 0) out vec4 oColor;
 
+layout(set = 0, binding = 0) uniform uCameraBuffer
+{
+    mat4 uViewProjection;
+    vec3 uCameraPosition;
+};
+
 layout(set = 0, binding = 2) uniform uLightBuffer
 {
     mat4 uLightProjection;
@@ -61,11 +67,16 @@ float computeShadow(vec3 position, mat4 lightProjection, texture2D shadowMap, sa
 
 void main() 
 {
-    vec3 lightColor = uLightColor_uAmbientIntensity.rgb;
-    float ambientFactor = uLightColor_uAmbientIntensity.a;
-    float shadowFactor = computeShadow(vPosition, uLightProjection, uShadowTexture, uShadowSampler);
-    
     vec3 albedoColor = texture(sampler2D(uTextures[vAlbedoTextureIndex], uImageSampler), vTexCoord).rgb;
+    float shadowFactor = computeShadow(vPosition, uLightProjection, uShadowTexture, uShadowSampler);
+
+    vec3 cameraDirection = normalize(uCameraPosition - vPosition);
+    vec3 H = normalize(cameraDirection + uLightDirection);
+    float specularFactor = pow(dot(H, vNormal), 400.0);
     float diffuseFactor = max(dot(uLightDirection, vNormal), 0.0);
-    oColor = vec4((shadowFactor + ambientFactor) * lightColor * albedoColor * diffuseFactor, 1.0);
+    float ambientFactor = uLightColor_uAmbientIntensity.a;
+    float totalFactor = shadowFactor * (diffuseFactor + specularFactor) + ambientFactor;
+
+    vec3 lightColor = uLightColor_uAmbientIntensity.rgb;
+    oColor = vec4(totalFactor * lightColor * albedoColor, 1.0);
 }

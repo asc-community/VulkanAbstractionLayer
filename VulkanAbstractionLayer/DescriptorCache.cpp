@@ -94,6 +94,17 @@ namespace VulkanAbstractionLayer
         {
             for (const auto& uniform : uniformsPerStage.Uniforms)
             {
+                auto layoutIt = std::find_if(layoutBindings.begin(), layoutBindings.end(),
+                    [&uniform](const auto& layout) { return layout.binding == uniform.Binding; });
+
+                if (layoutIt != layoutBindings.end())
+                {
+                    assert(layoutIt->descriptorType == ToNative(uniform.Type));
+                    assert(layoutIt->descriptorCount == uniform.Count);
+                    layoutIt->stageFlags |= ToNative(uniformsPerStage.ShaderStage);
+                    continue; // do not add new binding
+                }
+
                 layoutBindings.push_back(vk::DescriptorSetLayoutBinding{
                     uniform.Binding,
                     ToNative(uniform.Type),
