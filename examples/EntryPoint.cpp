@@ -302,8 +302,7 @@ public:
             .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(3, this->textureSampler, UniformType::SAMPLER)
             .Bind(4, this->sharedResources.MeshTextures, UniformType::SAMPLED_IMAGE)
-            .Bind(5, "ShadowDepth"_id, UniformType::SAMPLED_IMAGE, ImageView::DEPTH)
-            .Bind(6, this->depthSampler, UniformType::SAMPLER);
+            .Bind(5, "ShadowDepth"_id, this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override

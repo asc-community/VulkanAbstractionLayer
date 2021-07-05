@@ -23,17 +23,16 @@ layout(set = 0, binding = 2) uniform uLightBuffer
 layout(set = 0, binding = 3) uniform sampler uImageSampler;
 layout(set = 0, binding = 4) uniform texture2D uTextures[4096];
 
-layout(set = 0, binding = 5) uniform texture2D uShadowTexture;
-layout(set = 0, binding = 6) uniform sampler uShadowSampler;
+layout(set = 0, binding = 5) uniform sampler2D uShadowTexture;
 
-float isInShadow(vec2 projectedShadowUV, float depth, texture2D shadowMap, sampler depthSampler)
+float isInShadow(vec2 projectedShadowUV, float depth, sampler2D shadowMap)
 {
     const float bias = 0.02;
-    float compareDepth = texture(sampler2D(shadowMap, depthSampler), projectedShadowUV).r;
+    float compareDepth = texture(shadowMap, projectedShadowUV).r;
     return depth < compareDepth + bias ? 1.0 : 0.0;
 }
 
-float computeShadowPCF(vec3 position, mat4 lightProjection, texture2D shadowMap, sampler depthSampler, int kernelSize, float kernelOfffset)
+float computeShadowPCF(vec3 position, mat4 lightProjection, sampler2D shadowMap, int kernelSize, float kernelOfffset)
 {
     vec4 positionLightSpace = lightProjection * vec4(position, 1.0);
     vec3 projectedPosition = positionLightSpace.xyz / positionLightSpace.w;
@@ -43,7 +42,7 @@ float computeShadowPCF(vec3 position, mat4 lightProjection, texture2D shadowMap,
         projectedPosition.y < 0.0 || projectedPosition.y > 1.0 ||
         projectedPosition.z < 0.0 || projectedPosition.z > 1.0) return 1.0;
 
-    vec2 invShadowMapSize = vec2(kernelOfffset) / textureSize(sampler2D(shadowMap, depthSampler), 0);
+    vec2 invShadowMapSize = vec2(kernelOfffset) / textureSize(shadowMap, 0);
 
     float accum = 0.0;
     int totalSamples = (2 * kernelSize + 1) * (2 * kernelSize + 1);
@@ -51,24 +50,24 @@ float computeShadowPCF(vec3 position, mat4 lightProjection, texture2D shadowMap,
     {
         for (int y = -kernelSize; y <= kernelSize; y++)
         {
-            accum += isInShadow(projectedPosition.xy + vec2(x, y) * invShadowMapSize, projectedPosition.z, shadowMap, depthSampler);
+            accum += isInShadow(projectedPosition.xy + vec2(x, y) * invShadowMapSize, projectedPosition.z, shadowMap);
         }
     }
 
     return accum / float(totalSamples);
 }
 
-float computeShadow(vec3 position, mat4 lightProjection, texture2D shadowMap, sampler depthSampler)
+float computeShadow(vec3 position, mat4 lightProjection, sampler2D shadowMap)
 {
-    float initialTest = computeShadowPCF(position, lightProjection, shadowMap, depthSampler, 1, 5.0);
+    float initialTest = computeShadowPCF(position, lightProjection, shadowMap, 1, 5.0);
     if (initialTest == 0.0 || initialTest == 1.0) return initialTest;
-    return computeShadowPCF(position, lightProjection, shadowMap, depthSampler, 5, 1.0);
+    return computeShadowPCF(position, lightProjection, shadowMap, 5, 1.0);
 }
 
 void main() 
 {
     vec3 albedoColor = texture(sampler2D(uTextures[vAlbedoTextureIndex], uImageSampler), vTexCoord).rgb;
-    float shadowFactor = computeShadow(vPosition, uLightProjection, uShadowTexture, uShadowSampler);
+    float shadowFactor = computeShadow(vPosition, uLightProjection, uShadowTexture);
 
     vec3 cameraDirection = normalize(uCameraPosition - vPosition);
     vec3 H = normalize(cameraDirection + uLightDirection);
