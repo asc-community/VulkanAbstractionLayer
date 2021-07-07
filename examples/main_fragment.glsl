@@ -71,7 +71,7 @@ void main()
 
     vec3 cameraDirection = normalize(uCameraPosition - vPosition);
     vec3 H = normalize(cameraDirection + uLightDirection);
-    float specularFactor = pow(dot(H, vNormal), 400.0);
+    float specularFactor = pow(max(dot(H, vNormal), 0.0), 400.0);
     float diffuseFactor = max(dot(uLightDirection, vNormal), 0.0);
     float ambientFactor = uLightColor_uAmbientIntensity.a;
     float totalFactor = shadowFactor * (diffuseFactor + specularFactor) + ambientFactor;
