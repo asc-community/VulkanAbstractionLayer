@@ -31,6 +31,7 @@
 #include <vector>
 #include <array>
 #include <optional>
+#include <unordered_map>
 
 #include "StringId.h"
 #include "RenderGraph.h"
