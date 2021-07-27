@@ -35,6 +35,7 @@
 
 #include <vector>
 #include <functional>
+#include <unordered_map>
 
 namespace VulkanAbstractionLayer
 {
