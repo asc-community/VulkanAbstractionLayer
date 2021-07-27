@@ -30,11 +30,11 @@
 
 namespace VulkanAbstractionLayer
 {
-	void* AttachmentNameToImageHandle(StringId name);
+	VkImage AttachmentNameToImageHandle(StringId name);
 
 	void DependencyStorage::AddBuffer(const Buffer& buffer, BufferUsage::Bits usage)
 	{
-		this->bufferDependencies.push_back({ (void*)buffer.GetNativeHandle(), usage });
+		this->bufferDependencies.push_back({ (VkBuffer)buffer.GetNativeHandle(), usage });
 	}
 
 	void DependencyStorage::AddBuffers(ArrayView<BufferReference> buffers, BufferUsage::Bits usage)
@@ -45,7 +45,7 @@ namespace VulkanAbstractionLayer
 
 	void DependencyStorage::AddImage(const Image& image, ImageUsage::Bits usage)
 	{
-		this->imageDependencies.push_back({ (void*)image.GetNativeHandle(), usage });
+		this->imageDependencies.push_back({ (VkImage)image.GetNativeHandle(), usage });
 	}
 
 	void DependencyStorage::AddImage(StringId name, ImageUsage::Bits usage)

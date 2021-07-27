@@ -32,19 +32,19 @@
 
 namespace VulkanAbstractionLayer
 {
-    void* AttachmentNameToImageHandle(StringId name)
+    VkImage AttachmentNameToImageHandle(StringId name)
     {
         uintptr_t nameExtended = name;
-        return (void*)nameExtended;
+        return (VkImage)nameExtended;
     }
 
-    StringId ImageHandleToAttachmentName(void* imageHandle)
+    StringId ImageHandleToAttachmentName(VkImage imageHandle)
     {
         uintptr_t nameExtended = (uintptr_t)imageHandle;
         return (StringId)nameExtended;
     }
 
-    StringId IsAttachmentName(void* imageHandle)
+    StringId IsAttachmentName(VkImage imageHandle)
     {
         uintptr_t nameExtended = (uintptr_t)imageHandle;
         return (nameExtended - (StringId)nameExtended) == 0;
@@ -664,8 +664,8 @@ namespace VulkanAbstractionLayer
     RenderGraphBuilder::ResourceTransitions RenderGraphBuilder::ResolveResourceTransitions(const DependencyHashMap& dependencies)
     {
         ResourceTransitions resourceTransitions;
-        std::unordered_map<void*, BufferUsage::Bits> lastBufferUsages;
-        std::unordered_map<void*, ImageUsage::Bits> lastImageUsages;
+        std::unordered_map<VkBuffer, BufferUsage::Bits> lastBufferUsages;
+        std::unordered_map<VkImage, ImageUsage::Bits> lastImageUsages;
 
         for (const auto& renderPassReference : this->renderPassReferences)
         {

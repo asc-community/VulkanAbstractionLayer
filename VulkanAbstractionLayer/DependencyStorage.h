@@ -51,13 +51,13 @@ namespace VulkanAbstractionLayer
 	{
 		struct BufferDependency
 		{
-            void* BufferNativeHandle;
+            VkBuffer BufferNativeHandle;
             BufferUsage::Bits Usage;
 		};
 
         struct ImageDependency
         {
-            void* ImageNativeHandle;
+            VkImage ImageNativeHandle;
             ImageUsage::Bits Usage;
         };
 

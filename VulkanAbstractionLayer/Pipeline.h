@@ -39,13 +39,13 @@ namespace VulkanAbstractionLayer
     {
         struct BufferDeclaration
         {
-            void* BufferNativeHandle;
+            VkBuffer BufferNativeHandle;
             BufferUsage::Bits InitialUsage;
         };
 
         struct ImageDeclaration
         {
-            void* ImageNativeHandle;
+            VkImage ImageNativeHandle;
             ImageUsage::Bits InitialUsage;
             Format ImageFormat;
         };

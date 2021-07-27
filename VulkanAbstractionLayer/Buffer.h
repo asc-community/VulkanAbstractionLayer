@@ -32,6 +32,9 @@
 
 #include <vulkan/vulkan.hpp>
 
+struct VkBuffer_T;
+using VkBuffer = VkBuffer_T*;
+
 namespace VulkanAbstractionLayer
 {
     struct BufferUsage

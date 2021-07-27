@@ -512,6 +512,10 @@ int main()
             ImGui::DragFloat("ambient intensity", &lightAmbientIntensity, 0.01f);
             ImGui::End();
 
+            ImGui::Begin("Performace");
+            ImGui::Text("FPS: %f", ImGui::GetIO().Framerate);
+            ImGui::End();
+
             Vector3 low { -lightBounds, -lightBounds, -lightBounds };
             Vector3 high{ lightBounds, lightBounds, lightBounds };
 

@@ -37,6 +37,11 @@
 #include "GraphicShader.h"
 #include "DescriptorBinding.h"
 
+struct VkBuffer_T;
+struct VkImage_T;
+using VkBuffer = VkBuffer_T*;
+using VkImage = VkImage_T*;
+
 namespace VulkanAbstractionLayer
 {
     struct RenderGraphOptions
@@ -73,8 +78,8 @@ namespace VulkanAbstractionLayer
         {
             using RenderPassNameId = StringId;
 
-            using ImageTransitionHashMap = std::unordered_map<void*, ImageTransition>;
-            using BufferTransitionHashMap = std::unordered_map<void*, BufferTransition>;
+            using ImageTransitionHashMap = std::unordered_map<VkImage, ImageTransition>;
+            using BufferTransitionHashMap = std::unordered_map<VkBuffer, BufferTransition>;
 
             using PerRenderPassImageTransitionHashMap = std::unordered_map<RenderPassNameId, ImageTransitionHashMap>;
             using PerRenderPassBufferTransitionHashMap = std::unordered_map<RenderPassNameId, BufferTransitionHashMap>;
@@ -83,13 +88,13 @@ namespace VulkanAbstractionLayer
             PerRenderPassImageTransitionHashMap ImageTransitions;
             PerRenderPassBufferTransitionHashMap BufferTransitions;
 
-            std::unordered_map<void*, ImageUsage::Value> TotalImageUsages;
-            std::unordered_map<void*, BufferUsage::Value> TotalBufferUsages;
+            std::unordered_map<VkImage, ImageUsage::Value> TotalImageUsages;
+            std::unordered_map<VkBuffer, BufferUsage::Value> TotalBufferUsages;
 
-            std::unordered_map<void*, RenderPassNameId> FirstBufferUsages;
-            std::unordered_map<void*, RenderPassNameId> FirstImageUsages;
-            std::unordered_map<void*, RenderPassNameId> LastBufferUsages;
-            std::unordered_map<void*, RenderPassNameId> LastImageUsages;
+            std::unordered_map<VkBuffer, RenderPassNameId> FirstBufferUsages;
+            std::unordered_map<VkImage, RenderPassNameId> FirstImageUsages;
+            std::unordered_map<VkBuffer, RenderPassNameId> LastBufferUsages;
+            std::unordered_map<VkImage, RenderPassNameId> LastImageUsages;
         };
 
         struct ExternalImage
@@ -107,8 +112,8 @@ namespace VulkanAbstractionLayer
         using DependencyHashMap = std::unordered_map<StringId, DependencyStorage>;
         using PipelineHashMap = std::unordered_map<StringId, Pipeline>;
         using InternalCallback = std::function<void(CommandBuffer)>;
-        using ExternalImagesHashMap = std::unordered_map<void*, ExternalImage>;
-        using ExternalBuffersHashMap = std::unordered_map<void*, ExternalBuffer>;
+        using ExternalImagesHashMap = std::unordered_map<VkImage, ExternalImage>;
+        using ExternalBuffersHashMap = std::unordered_map<VkBuffer, ExternalBuffer>;
 
         ExternalImagesHashMap externalImages;
         ExternalBuffersHashMap externalBuffers;
