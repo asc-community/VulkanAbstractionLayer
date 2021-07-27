@@ -53,6 +53,112 @@ namespace VulkanAbstractionLayer
         }
     }
 
+    vk::ImageLayout ImageUsageToImageLayout(ImageUsage::Bits layout)
+    {
+        switch (layout)
+        {
+        case VulkanAbstractionLayer::ImageUsage::UNKNOWN:
+            return vk::ImageLayout::eUndefined;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_SOURCE:
+            return vk::ImageLayout::eTransferSrcOptimal;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION:
+            return vk::ImageLayout::eTransferDstOptimal;
+        case VulkanAbstractionLayer::ImageUsage::SHADER_READ:
+            return vk::ImageLayout::eShaderReadOnlyOptimal;
+        case VulkanAbstractionLayer::ImageUsage::STORAGE:
+            return vk::ImageLayout::eShaderReadOnlyOptimal; // TODO: what if writes?
+        case VulkanAbstractionLayer::ImageUsage::COLOR_ATTACHMENT:
+            return vk::ImageLayout::eColorAttachmentOptimal;
+        case VulkanAbstractionLayer::ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+            return vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        case VulkanAbstractionLayer::ImageUsage::INPUT_ATTACHMENT:
+            return vk::ImageLayout::eAttachmentOptimalKHR; // TODO: is it ok?
+        case VulkanAbstractionLayer::ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return vk::ImageLayout::eFragmentShadingRateAttachmentOptimalKHR;
+        default:
+            assert(false);
+            return vk::ImageLayout::eUndefined;
+        }
+    }
+
+    vk::AccessFlags ImageUsageToAccessFlags(ImageUsage::Bits layout)
+    {
+        switch (layout)
+        {
+        case ImageUsage::UNKNOWN:
+            return vk::AccessFlags{ };
+        case ImageUsage::TRANSFER_SOURCE:
+            return vk::AccessFlagBits::eTransferRead;
+        case ImageUsage::TRANSFER_DISTINATION:
+            return vk::AccessFlagBits::eTransferWrite;
+        case ImageUsage::SHADER_READ:
+            return vk::AccessFlagBits::eShaderRead;
+        case ImageUsage::STORAGE:
+            return vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite; // TODO: what if storage is not read or write?
+        case ImageUsage::COLOR_ATTACHMENT:
+            return vk::AccessFlagBits::eColorAttachmentWrite;
+        case ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+            return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        case ImageUsage::INPUT_ATTACHMENT:
+            return vk::AccessFlagBits::eInputAttachmentRead;
+        case ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return vk::AccessFlagBits::eFragmentShadingRateAttachmentReadKHR;
+        default:
+            assert(false);
+            return vk::AccessFlags{ };
+        }
+    }
+
+    vk::PipelineStageFlags ImageUsageToPipelineStage(ImageUsage::Bits layout)
+    {
+        switch (layout)
+        {
+        case VulkanAbstractionLayer::ImageUsage::UNKNOWN:
+            return vk::PipelineStageFlagBits::eTopOfPipe;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_SOURCE:
+            return vk::PipelineStageFlagBits::eTransfer;
+        case VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION:
+            return vk::PipelineStageFlagBits::eTransfer;
+        case VulkanAbstractionLayer::ImageUsage::SHADER_READ:
+            return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
+        case VulkanAbstractionLayer::ImageUsage::STORAGE:
+            return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
+        case VulkanAbstractionLayer::ImageUsage::COLOR_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        case VulkanAbstractionLayer::ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eEarlyFragmentTests; // TODO: whats for late fragment test?
+        case VulkanAbstractionLayer::ImageUsage::INPUT_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eFragmentShader; // TODO: check if at least works
+        case VulkanAbstractionLayer::ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return vk::PipelineStageFlagBits::eFragmentShadingRateAttachmentKHR;
+        default:
+            assert(false);
+            return vk::PipelineStageFlags{ };
+        }
+    }
+
+    vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image)
+    {
+        auto subresourceRange = GetDefaultImageSubresourceRange(image);
+        return vk::ImageSubresourceLayers{
+            subresourceRange.aspectMask,
+            subresourceRange.baseMipLevel,
+            subresourceRange.baseArrayLayer,
+            subresourceRange.layerCount
+        };
+    }
+
+    vk::ImageSubresourceRange GetDefaultImageSubresourceRange(const Image& image)
+    {
+        return vk::ImageSubresourceRange{
+            ImageFormatToImageAspect(image.GetFormat()),
+            0, // base mip level
+            1, // level count
+            0, // base layer
+            1  // layer count
+        };
+    }
+
     void Image::Destroy()
     {
         if ((bool)this->handle)
@@ -61,25 +167,26 @@ namespace VulkanAbstractionLayer
             {
                 DeallocateImage(this->handle, this->allocation);
             }
-            GetCurrentVulkanContext().GetDevice().destroyImageView(this->view);
+
+            GetCurrentVulkanContext().GetDevice().destroyImageView(this->imageViews.NativeView);
+            if ((bool)this->imageViews.DepthOnlyView) 
+                GetCurrentVulkanContext().GetDevice().destroyImageView(this->imageViews.DepthOnlyView);
+            if ((bool)this->imageViews.StencilOnlyView)
+                GetCurrentVulkanContext().GetDevice().destroyImageView(this->imageViews.StencilOnlyView);
+
             this->handle = vk::Image{ };
-            this->view = vk::ImageView{ };
+            this->imageViews = { };
             this->extent = vk::Extent2D{ 0u, 0u };
         }
     }
 
-    void Image::InitView(const vk::Image& image, Format format)
+    void Image::InitViews(const vk::Image& image, Format format)
     {
         this->handle = image;
         this->format = format;
 
-        vk::ImageSubresourceRange subresourceRange{
-            ImageFormatToImageAspect(format),
-            0, // base mip level
-            1, // level count
-            0, // base layer
-            1  // layer count
-        };
+        auto& Vulkan = GetCurrentVulkanContext();
+        auto subresourceRange = GetDefaultImageSubresourceRange(*this);
 
         vk::ImageViewCreateInfo imageViewCreateInfo;
         imageViewCreateInfo
@@ -94,7 +201,23 @@ namespace VulkanAbstractionLayer
             })
             .setSubresourceRange(subresourceRange);
 
-        this->view = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+        this->imageViews.NativeView = Vulkan.GetDevice().createImageView(imageViewCreateInfo);
+
+        auto depthSubresourceRange = GetDefaultImageSubresourceRange(*this);
+        depthSubresourceRange.aspectMask &= vk::ImageAspectFlagBits::eDepth;
+        if (depthSubresourceRange.aspectMask != vk::ImageAspectFlags{ })
+        {
+            imageViewCreateInfo.setSubresourceRange(depthSubresourceRange);
+            this->imageViews.DepthOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+        }
+
+        auto stencilSubresourceRange = GetDefaultImageSubresourceRange(*this);
+        stencilSubresourceRange.aspectMask &= vk::ImageAspectFlagBits::eStencil;
+        if (stencilSubresourceRange.aspectMask != vk::ImageAspectFlags{ })
+        {
+            imageViewCreateInfo.setSubresourceRange(stencilSubresourceRange);
+            this->imageViews.StencilOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+        }
     }
 
     Image::Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage)
@@ -106,19 +229,19 @@ namespace VulkanAbstractionLayer
     {
         this->extent = vk::Extent2D{ width, height };
         this->allocation = { }; // image is external resource
-        this->InitView(image, format);
+        this->InitViews(image, format);
     }
 
     Image::Image(Image&& other) noexcept
     {
         this->handle = other.handle;
-        this->view = other.view;
+        this->imageViews = other.imageViews;
         this->extent = other.extent;
         this->format = other.format;
         this->allocation = other.allocation;
 
         other.handle = vk::Image{ };
-        other.view = vk::ImageView{ };
+        other.imageViews = { };
         other.extent = vk::Extent2D{ 0u, 0u };
         other.format = Format::UNDEFINED;
         other.allocation = { };
@@ -129,13 +252,13 @@ namespace VulkanAbstractionLayer
         this->Destroy();
 
         this->handle = other.handle;
-        this->view = other.view;
+        this->imageViews = other.imageViews;
         this->extent = other.extent;
         this->format = other.format;
         this->allocation = other.allocation;
 
         other.handle = vk::Image{ };
-        other.view = vk::ImageView{ };
+        other.imageViews = { };
         other.extent = vk::Extent2D{ 0u, 0u };
         other.format = Format::UNDEFINED;
         other.allocation = { };
@@ -165,6 +288,22 @@ namespace VulkanAbstractionLayer
         
         this->allocation = AllocateImage(imageCreateInfo, memoryUsage, &this->handle);
         this->extent = vk::Extent2D{ (uint32_t)width, (uint32_t)height };
-        this->InitView(this->handle, format);
+        this->InitViews(this->handle, format);
+    }
+
+    vk::ImageView Image::GetNativeView(ImageView view) const
+    {
+        switch (view)
+        {
+        case VulkanAbstractionLayer::ImageView::NATIVE:
+            return this->imageViews.NativeView;
+        case VulkanAbstractionLayer::ImageView::DEPTH:
+            return this->imageViews.DepthOnlyView;
+        case VulkanAbstractionLayer::ImageView::STENCIL:
+            return this->imageViews.StencilOnlyView;
+        default:
+            assert(false);
+            return this->imageViews.NativeView;
+        }
     }
 }

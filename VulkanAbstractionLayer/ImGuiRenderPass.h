@@ -28,43 +28,27 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
+#include "RenderPass.h"
+#include "ImGuiContext.h"
 
 namespace VulkanAbstractionLayer
 {
-    class Sampler
-    {
-        vk::Sampler handle;
+	class ImGuiRenderPass : public RenderPass
+	{
+		StringId outputImageName;
 
-        void Destroy();
-    public:
-        enum class Filter : uint8_t
-        {
-            NEAREST = 0,
-            LINEAR
-        };
+	public:
+		ImGuiRenderPass(StringId outputImageName)
+			: outputImageName(outputImageName) { }
 
-        using MinFilter = Filter;
-        using MagFilter = Filter;
-        using MipFilter = Filter;
+		virtual void SetupDependencies(DependencyState state) override
+		{
+			state.AddAttachment(this->outputImageName, AttachmentState::LOAD_COLOR);
+		}
 
-        enum class AddressMode : uint8_t
-        {
-            REPEAT = 0,
-            MIRRORED_REPEAT,
-            CLAMP_TO_EDGE,
-            CLAMP_TO_BORDER,
-        };
-
-        Sampler() = default;
-        ~Sampler();
-        Sampler(Sampler&& other) noexcept;
-        Sampler& operator=(Sampler&& other) noexcept;
-        Sampler(MinFilter minFilter, MagFilter magFilter, AddressMode uvwAddress, MipFilter mipFilter);
-        void Init(MinFilter minFilter, MagFilter magFilter, AddressMode uvwAddress, MipFilter mipFilter);
-
-        const vk::Sampler& GetNativeHandle() const;
-    };
-
-    using SamplerReference = std::reference_wrapper<const Sampler>;
+		virtual void OnRender(RenderPassState state) override
+		{
+			ImGuiVulkanContext::RenderFrame(state.Commands.GetNativeHandle());
+		}
+	};
 }

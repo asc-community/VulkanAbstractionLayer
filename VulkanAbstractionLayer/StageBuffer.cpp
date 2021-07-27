@@ -26,45 +26,32 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include <vulkan/vulkan.hpp>
+#include "StageBuffer.h"
 
 namespace VulkanAbstractionLayer
 {
-    class Sampler
-    {
-        vk::Sampler handle;
+	StageBuffer::StageBuffer(size_t byteSize)
+		: buffer(byteSize, BufferUsage::TRANSFER_SOURCE, MemoryUsage::CPU_TO_GPU), currentOffset(0)
+	{
+		(void)this->buffer.MapMemory();
+	}
 
-        void Destroy();
-    public:
-        enum class Filter : uint8_t
-        {
-            NEAREST = 0,
-            LINEAR
-        };
+	StageBuffer::Allocation StageBuffer::Submit(const uint8_t* data, uint32_t byteSize)
+	{
+		assert(this->currentOffset + byteSize <= this->buffer.GetByteSize());
 
-        using MinFilter = Filter;
-        using MagFilter = Filter;
-        using MipFilter = Filter;
+		this->buffer.CopyData(data, byteSize, this->currentOffset);
+		this->currentOffset += byteSize;
+		return Allocation{ byteSize, this->currentOffset - byteSize };
+	}
 
-        enum class AddressMode : uint8_t
-        {
-            REPEAT = 0,
-            MIRRORED_REPEAT,
-            CLAMP_TO_EDGE,
-            CLAMP_TO_BORDER,
-        };
+	void StageBuffer::Reset()
+	{
+		this->currentOffset = 0;
+	}
 
-        Sampler() = default;
-        ~Sampler();
-        Sampler(Sampler&& other) noexcept;
-        Sampler& operator=(Sampler&& other) noexcept;
-        Sampler(MinFilter minFilter, MagFilter magFilter, AddressMode uvwAddress, MipFilter mipFilter);
-        void Init(MinFilter minFilter, MagFilter magFilter, AddressMode uvwAddress, MipFilter mipFilter);
-
-        const vk::Sampler& GetNativeHandle() const;
-    };
-
-    using SamplerReference = std::reference_wrapper<const Sampler>;
+	void StageBuffer::Flush()
+	{
+		this->buffer.FlushMemory(this->currentOffset, 0);
+	}
 }

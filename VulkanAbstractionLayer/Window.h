@@ -30,6 +30,7 @@
 
 #include "VectorMath.h"
 #include <vector>
+#include <string>
 #include <functional>
 
 struct GLFWwindow;
@@ -185,6 +186,8 @@ namespace VulkanAbstractionLayer
         };
     };
 
+    inline void DefaultWindowCallback(const std::string&) { }
+
     class VulkanContext;
     struct WindowSurface;
 
@@ -193,7 +196,7 @@ namespace VulkanAbstractionLayer
         bool TransparentFramebuffer = false;
         bool Resizeable = true;
         bool TileBar = true;
-        void (*ErrorCallback)(const char*) = nullptr;
+        std::function<void(const std::string&)> ErrorCallback = DefaultWindowCallback;
         Vector2 Size{ 800.0f, 600.0f };
         Vector2 Position{ 0.0f, 0.0f };
         const char* Title = "VulkanAbstractionLayer";

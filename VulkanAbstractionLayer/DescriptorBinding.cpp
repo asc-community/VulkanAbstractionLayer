@@ -31,6 +31,8 @@
 
 namespace VulkanAbstractionLayer
 {
+	Sampler EmptySampler;
+
 	size_t DescriptorBinding::AllocateBinding(const Buffer& buffer)
 	{
 		this->descriptorBufferInfos.push_back(vk::DescriptorBufferInfo{
@@ -41,11 +43,21 @@ namespace VulkanAbstractionLayer
 		return this->descriptorBufferInfos.size() - 1;
 	}
 
-	size_t DescriptorBinding::AllocateBinding(const Image& image)
+	size_t DescriptorBinding::AllocateBinding(const Image& image, ImageView view)
 	{
 		this->descriptorImageInfos.push_back(vk::DescriptorImageInfo{
 			{ },
-			image.GetNativeView(),
+			image.GetNativeView(view),
+			vk::ImageLayout::eShaderReadOnlyOptimal
+			});
+		return this->descriptorImageInfos.size() - 1;
+	}
+
+	size_t DescriptorBinding::AllocateBinding(const Image& image, const Sampler& sampler, ImageView view)
+	{
+		this->descriptorImageInfos.push_back(vk::DescriptorImageInfo{
+			sampler.GetNativeHandle(),
+			image.GetNativeView(view),
 			vk::ImageLayout::eShaderReadOnlyOptimal
 		});
 		return this->descriptorImageInfos.size() - 1;
@@ -70,8 +82,7 @@ namespace VulkanAbstractionLayer
 
 	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, UniformType type)
 	{
-		size_t index = this->AllocateBinding(image);
-		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
+		this->Bind(binding, image, type, ImageView::NATIVE);
 		return *this;
 	}
 
@@ -82,7 +93,40 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::vector<BufferRef>& buffers, UniformType type)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, const Sampler& sampler, UniformType type)
+	{
+		size_t index = this->AllocateBinding(image, sampler, ImageView::NATIVE);
+		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
+		return *this;
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, UniformType type, ImageView view)
+	{
+		size_t index = this->AllocateBinding(image, view);
+		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
+		return *this;
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, const Sampler& sampler, UniformType type, ImageView view)
+	{
+		size_t index = this->AllocateBinding(image, sampler, view);
+		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
+		return *this;
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, StringId attachment, UniformType type, ImageView view)
+	{
+		this->descriptorAttachmentInfos.push_back({ attachment, binding, type, view, EmptySampler });
+		return *this;
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, StringId attachment, const Sampler& sampler, UniformType type, ImageView view)
+	{
+		this->descriptorAttachmentInfos.push_back({ attachment, binding, type, view, sampler });
+		return *this;
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<BufferReference> buffers, UniformType type)
 	{
 		size_t index = 0;
 		for (const auto& buffer : buffers)
@@ -98,11 +142,29 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::vector<ImageRef>& images, UniformType type)
+	void DescriptorBinding::ResolveAttachments(const std::unordered_map<StringId, Image>& mappings)
+	{
+		for (const auto& attachmentInfo : this->descriptorAttachmentInfos)
+		{
+			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name), attachmentInfo.SamplerHandle.get(), attachmentInfo.Type, attachmentInfo.View);
+		}
+		this->descriptorAttachmentInfos.clear();
+	}
+
+	void DescriptorBinding::ResolveAttachments(const std::unordered_map<StringId, ImageReference>& mappings)
+	{
+		for (const auto& attachmentInfo : this->descriptorAttachmentInfos)
+		{
+			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name).get(), attachmentInfo.SamplerHandle.get(), attachmentInfo.Type, attachmentInfo.View);
+		}
+		this->descriptorAttachmentInfos.clear();
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type)
 	{
 		size_t index = 0;
 		for (const auto& image : images)
-			index = this->AllocateBinding(image.get());
+			index = this->AllocateBinding(image.get(), ImageView::NATIVE);
 
 		this->descriptorWrites.push_back({
 			type,
@@ -114,7 +176,7 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::vector<SamplerRef>& samplers, UniformType type)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<SamplerReference> samplers, UniformType type)
 	{
 		size_t index = 0;
 		for (const auto& sampler : samplers)

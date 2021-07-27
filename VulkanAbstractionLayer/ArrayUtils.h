@@ -36,5 +36,7 @@ using ArrayView = tcb::span<T, tcb::dynamic_extent>;
 template <typename T>
 constexpr auto MakeView(T&& v)
 {
-	return ArrayView<typename T::value_type>{ v.data(), v.size() };
+	using ValueType = typename std::decay_t<T>::value_type;
+	using Ret = std::conditional_t<std::is_const_v<std::remove_reference_t<T>>, const ValueType, ValueType>;
+	return ArrayView<Ret>{ v.data(), v.size() };
 }

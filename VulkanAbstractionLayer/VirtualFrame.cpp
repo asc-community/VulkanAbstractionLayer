@@ -34,7 +34,7 @@ namespace VulkanAbstractionLayer
     void VirtualFrameProvider::Init(size_t frameCount, size_t stageBufferSize)
     {
         auto& vulkanContext = GetCurrentVulkanContext();
-        this->virtualFrames.resize(frameCount);
+        this->virtualFrames.reserve(frameCount);
 
         vk::CommandBufferAllocateInfo commandBufferAllocateInfo;
         commandBufferAllocateInfo
@@ -46,11 +46,13 @@ namespace VulkanAbstractionLayer
 
         for (size_t i = 0; i < frameCount; i++)
         {
-            VirtualFrame& virtualFrame = this->virtualFrames[i];
-            virtualFrame.Commands = CommandBuffer{ commandBuffers[i] };
-            virtualFrame.StageBuffer.Init(stageBufferSize, BufferUsage::TRANSFER_SOURCE, MemoryUsage::CPU_TO_GPU);
-            (void)virtualFrame.StageBuffer.MapMemory(); // map memory for future use as stage point for other resources
-            virtualFrame.CommandQueueFence = vulkanContext.GetDevice().createFence(vk::FenceCreateInfo{ vk::FenceCreateFlagBits::eSignaled });
+            auto fence = vulkanContext.GetDevice().createFence(vk::FenceCreateInfo{ vk::FenceCreateFlagBits::eSignaled });
+
+            this->virtualFrames.push_back(VirtualFrame{
+                CommandBuffer{ commandBuffers[i] },
+                StageBuffer(stageBufferSize),
+                fence,
+            });
         }
     }
 
@@ -117,6 +119,9 @@ namespace VulkanAbstractionLayer
         );
 
         frame.Commands.End();
+
+        frame.StagingBuffer.Flush();
+        frame.StagingBuffer.Reset();
 
         std::array waitDstStageMask = { (vk::PipelineStageFlags)vk::PipelineStageFlagBits::eTransfer };
 

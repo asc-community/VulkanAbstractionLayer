@@ -39,14 +39,12 @@ namespace VulkanAbstractionLayer
     {
         if (glfwInit() != GLFW_TRUE)
         {
-            if (options.ErrorCallback) 
-                options.ErrorCallback("glfw context initialization failed");
+            options.ErrorCallback("glfw context initialization failed");
             return;
         }
         if (glfwVulkanSupported() != GLFW_TRUE)
         {
-            if (options.ErrorCallback) 
-                options.ErrorCallback("glfw context does not support Vulkan API");
+            options.ErrorCallback("glfw context does not support Vulkan API");
             return;
         }
 
@@ -58,8 +56,7 @@ namespace VulkanAbstractionLayer
         this->handle = glfwCreateWindow((int)options.Size.x, (int)options.Size.y, options.Title, nullptr, nullptr);
         if (this->handle == nullptr)
         {
-            if(options.ErrorCallback) 
-                options.ErrorCallback("glfw window creation failed");
+            options.ErrorCallback("glfw window creation failed");
             return;
         }
 

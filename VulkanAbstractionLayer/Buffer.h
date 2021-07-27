@@ -40,6 +40,7 @@ namespace VulkanAbstractionLayer
 
         enum Bits : Value
         {
+            UNKNOWN = (Value)vk::BufferUsageFlags{ },
             TRANSFER_SOURCE = (Value)vk::BufferUsageFlagBits::eTransferSrc,
             TRANSFER_DESTINATION = (Value)vk::BufferUsageFlagBits::eTransferDst,
             UNIFORM_TEXEL_BUFFER = (Value)vk::BufferUsageFlagBits::eUniformTexelBuffer,
@@ -48,7 +49,7 @@ namespace VulkanAbstractionLayer
             STORAGE_BUFFER = (Value)vk::BufferUsageFlagBits::eStorageBuffer,
             INDEX_BUFFER = (Value)vk::BufferUsageFlagBits::eIndexBuffer,
             VERTEX_BUFFER = (Value)vk::BufferUsageFlagBits::eVertexBuffer,
-            INDIRECT_BUFFER = (Value)vk::BufferUsageFlagBits::eIndexBuffer,
+            INDIRECT_BUFFER = (Value)vk::BufferUsageFlagBits::eIndirectBuffer,
             SHADER_DEVICE_ADDRESS = (Value)vk::BufferUsageFlagBits::eShaderDeviceAddress,
             TRANSFORM_FEEDBACK_BUFFER = (Value)vk::BufferUsageFlagBits::eTransformFeedbackBufferEXT,
             TRANSFORM_FEEDBACK_COUNTER_BUFFER = (Value)vk::BufferUsageFlagBits::eTransformFeedbackCounterBufferEXT,
@@ -86,6 +87,9 @@ namespace VulkanAbstractionLayer
         void UnmapMemory();
         void FlushMemory();
         void FlushMemory(size_t byteSize, size_t offset);
-        void LoadData(const uint8_t* data, size_t byteSize, size_t offset);
+        void CopyData(const uint8_t* data, size_t byteSize, size_t offset);
+        void CopyDataWithFlush(const uint8_t* data, size_t byteSize, size_t offset);
     };
+
+    using BufferReference = std::reference_wrapper<const Buffer>;
 }

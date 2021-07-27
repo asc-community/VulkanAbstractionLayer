@@ -28,6 +28,7 @@
 
 #include "ShaderLoader.h"
 #include "VectorMath.h"
+#include "VulkanContext.h"
 
 #include <ShaderLang.h>
 #include <GlslangToSpv.h>
@@ -211,28 +212,32 @@ namespace VulkanAbstractionLayer
         return TypeSPIRV{ format, componentCount, byteSize };
     }
 
-    ShaderData ShaderLoader::LoadFromBinary(const std::string& filepath)
+    ShaderData ShaderLoader::LoadFromBinaryFile(const std::string& filepath)
     {
         std::vector<uint32_t> bytecode;
         std::ifstream file(filepath, std::ios_base::binary);
         auto binaryData = std::vector<char>(std::istreambuf_iterator(file), std::istreambuf_iterator<char>());
         bytecode.resize(binaryData.size() / sizeof(uint32_t));
         std::copy((uint32_t*)binaryData.data(), (uint32_t*)(binaryData.data() + binaryData.size()), bytecode.begin());
-        return ShaderLoader::LoadFromMemory(std::move(bytecode));
+        return ShaderLoader::LoadFromBinary(std::move(bytecode));
     }
 
-    ShaderData ShaderLoader::LoadFromSource(const std::string& filepath, ShaderType type, ShaderLanguage language, uint32_t vulkanVersion)
+    ShaderData ShaderLoader::LoadFromSourceFile(const std::string& filepath, ShaderType type, ShaderLanguage language)
     {
         std::ifstream file(filepath);
         std::string source{ std::istreambuf_iterator(file), std::istreambuf_iterator<char>() };
-        const char* rawSource = source.c_str();
+        return ShaderLoader::LoadFromSource(source, type, language);
+    }
 
+    ShaderData ShaderLoader::LoadFromSource(const std::string& code, ShaderType type, ShaderLanguage language)
+    {
+        const char* rawSource = code.c_str();
         constexpr static auto ResourceLimits = GetResourceLimits();
 
         glslang::TShader shader{ ShaderTypeTable[(size_t)type] };
         shader.setStrings(&rawSource, 1);
         shader.setEnvInput(ShaderLanguageTable[(size_t)language], ShaderTypeTable[(size_t)type], glslang::EShClient::EShClientVulkan, 460);
-        shader.setEnvClient(glslang::EShClient::EShClientVulkan, (glslang::EShTargetClientVersion)vulkanVersion);
+        shader.setEnvClient(glslang::EShClient::EShClientVulkan, (glslang::EShTargetClientVersion)GetCurrentVulkanContext().GetAPIVersion());
         shader.setEnvTarget(glslang::EShTargetLanguage::EShTargetSpv, glslang::EShTargetLanguageVersion::EShTargetSpv_1_5);
         bool isParsed = shader.parse(&ResourceLimits, 100, false, EShMessages::EShMsgDefault);
         if (!isParsed) return ShaderData{ };
@@ -246,10 +251,10 @@ namespace VulkanAbstractionLayer
         std::vector<uint32_t> bytecode;
         glslang::GlslangToSpv(*intermediate, bytecode);
 
-        return ShaderLoader::LoadFromMemory(std::move(bytecode));
+        return ShaderLoader::LoadFromBinary(std::move(bytecode));
     }
 
-    ShaderData ShaderLoader::LoadFromMemory(std::vector<uint32_t> bytecode)
+    ShaderData ShaderLoader::LoadFromBinary(std::vector<uint32_t> bytecode)
     {
         ShaderData result;
         result.Bytecode = std::move(bytecode);
@@ -282,10 +287,10 @@ namespace VulkanAbstractionLayer
 
         for (const auto& descriptorBinding : descriptorBindings)
         {
-            if (result.UniformBlocks.size() < (size_t)descriptorBinding->set + 1)
-                result.UniformBlocks.resize((size_t)descriptorBinding->set + 1);
+            if (result.DescriptorSets.size() < (size_t)descriptorBinding->set + 1)
+                result.DescriptorSets.resize((size_t)descriptorBinding->set + 1);
 
-            auto& uniformBlock = result.UniformBlocks[descriptorBinding->set];
+            auto& uniformBlock = result.DescriptorSets[descriptorBinding->set];
 
             std::vector<TypeSPIRV> uniformVariables(descriptorBinding->type_description->member_count);
             for (uint32_t i = 0; i < uniformVariables.size(); i++)
@@ -301,6 +306,8 @@ namespace VulkanAbstractionLayer
                 descriptorBinding->count
             });
         }
+        if (result.DescriptorSets.empty()) 
+            result.DescriptorSets.emplace_back(); // insert empty descriptor set
 
         spvReflectDestroyShaderModule(&reflectedShader);
 

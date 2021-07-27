@@ -28,43 +28,41 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
+#include "Buffer.h"
+#include "ArrayUtils.h"
 
 namespace VulkanAbstractionLayer
 {
-    class Sampler
-    {
-        vk::Sampler handle;
+	class StageBuffer
+	{
+		Buffer buffer;
+		uint32_t currentOffset;
 
-        void Destroy();
-    public:
-        enum class Filter : uint8_t
-        {
-            NEAREST = 0,
-            LINEAR
-        };
+	public:
+		struct Allocation
+		{
+			uint32_t Size;
+			uint32_t Offset;
+		};
 
-        using MinFilter = Filter;
-        using MagFilter = Filter;
-        using MipFilter = Filter;
+		StageBuffer(size_t byteSize);
 
-        enum class AddressMode : uint8_t
-        {
-            REPEAT = 0,
-            MIRRORED_REPEAT,
-            CLAMP_TO_EDGE,
-            CLAMP_TO_BORDER,
-        };
+		Allocation Submit(const uint8_t* data, uint32_t byteSize);
+		void Flush();
+		void Reset();
+		Buffer& GetBuffer() { return this->buffer; }
+		const Buffer& GetBuffer() const { return this->buffer; }
 
-        Sampler() = default;
-        ~Sampler();
-        Sampler(Sampler&& other) noexcept;
-        Sampler& operator=(Sampler&& other) noexcept;
-        Sampler(MinFilter minFilter, MagFilter magFilter, AddressMode uvwAddress, MipFilter mipFilter);
-        void Init(MinFilter minFilter, MagFilter magFilter, AddressMode uvwAddress, MipFilter mipFilter);
+		template<typename T>
+		Allocation Submit(ArrayView<const T> view)
+		{
+			return this->Submit((uint8_t*)view.data(), uint32_t(view.size() * sizeof(T)));
+		}
 
-        const vk::Sampler& GetNativeHandle() const;
-    };
-
-    using SamplerReference = std::reference_wrapper<const Sampler>;
+		template<typename T>
+		Allocation Submit(const T* value)
+		{
+			return this->Submit((uint8_t*)value, uint32_t(sizeof(T)));
+		}
+	};
 }

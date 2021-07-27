@@ -27,8 +27,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "RenderPass.h"
+#include "RenderGraph.h"
 
 namespace VulkanAbstractionLayer
 {
-
+    const Image& RenderPassState::GetAttachment(StringId name)
+    {
+        return this->Graph.GetAttachmentByName(name);
+    }
 }

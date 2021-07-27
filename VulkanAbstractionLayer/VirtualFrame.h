@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "Buffer.h"
+#include "StageBuffer.h"
 #include "CommandBuffer.h"
 #include <vulkan/vulkan.hpp>
 
@@ -39,7 +39,7 @@ namespace VulkanAbstractionLayer
     struct VirtualFrame
     {
         CommandBuffer Commands{ vk::CommandBuffer{ } };
-        Buffer StageBuffer;
+        StageBuffer StagingBuffer;
         vk::Fence CommandQueueFence;
     };
 

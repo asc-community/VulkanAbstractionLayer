@@ -28,44 +28,47 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
+#include "DependencyStorage.h"
+#include "Pipeline.h"
+#include "CommandBuffer.h"
+#include "StringId.h"
 
 namespace VulkanAbstractionLayer
 {
+    class RenderGraph;
+
+    struct RenderPassNative
+    {
+        vk::RenderPass RenderPassHandle;
+        vk::DescriptorSet DescriptorSet;
+        vk::Framebuffer Framebuffer;
+        vk::Pipeline Pipeline;
+        vk::PipelineLayout PipelineLayout;
+        vk::Rect2D RenderArea;
+        std::vector<vk::ClearValue> ClearValues;
+    };
+
+    struct RenderPassState
+    {
+        RenderGraph& Graph;
+        CommandBuffer& Commands;
+
+        const Image& GetAttachment(StringId name);
+    };
+
+    using DependencyState = DependencyStorage&;
+    using PipelineState = Pipeline&;
+
     class RenderPass
     {
-        vk::RenderPass handle;
-        vk::DescriptorSet descriptorSet;
-        vk::Rect2D renderArea;
-        vk::Framebuffer framebuffer;
-        std::vector<vk::ClearValue> clearValues;
-        vk::Pipeline pipeline;
-        vk::PipelineLayout pipelineLayout;
     public:
-        RenderPass(
-            vk::RenderPass renderPass, 
-            vk::DescriptorSet descriptorSet, 
-            vk::Pipeline pipeline, 
-            vk::PipelineLayout pipelineLayout,
-            vk::Rect2D renderArea, 
-            vk::Framebuffer framebuffer, 
-            std::vector<vk::ClearValue> clearValues
-        )
-            : 
-            handle(renderPass), 
-            descriptorSet(descriptorSet), 
-            renderArea(renderArea), 
-            framebuffer(framebuffer), 
-            clearValues(clearValues),
-            pipeline(pipeline),
-            pipelineLayout(pipelineLayout) { }
+        virtual ~RenderPass() = default;
 
-        const auto& GetNativeHandle() const { return this->handle; }
-        const auto& GetPipeline() const { return this->pipeline; }
-        const auto& GetPipelineLayout() const { return this->pipelineLayout; }
-        const auto& GetRenderArea() const { return this->renderArea; }
-        const auto& GetFramebuffer() const { return this->framebuffer; }
-        const auto& GetDescriptorSet() const { return this->descriptorSet; }
-        const auto& GetClearValues() const { return this->clearValues; }
+        virtual void SetupPipeline(PipelineState state) { }
+        virtual void SetupDependencies(DependencyState state) { }
+
+        virtual void BeforeRender(RenderPassState state) { }
+        virtual void OnRender(RenderPassState state) { }
+        virtual void AfterRender(RenderPassState state) { }
     };
 }

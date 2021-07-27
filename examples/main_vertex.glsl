@@ -11,13 +11,15 @@ out gl_PerVertex
     vec4 gl_Position;
 };
 
-layout(location = 0) out vec2 vTexCoord;
-layout(location = 1) out vec3 vNormal;
-layout(location = 2) out flat uint vAlbedoTextureIndex;
+layout(location = 0) out vec3 vPosition;
+layout(location = 1) out vec2 vTexCoord;
+layout(location = 2) out vec3 vNormal;
+layout(location = 3) out flat uint vAlbedoTextureIndex;
 
 layout(set = 0, binding = 0) uniform uCameraBuffer
 {
     mat4 uViewProjection;
+    vec3 uCameraPosition;
 };
 
 layout(set = 0, binding = 1) uniform uModelBuffer
@@ -27,8 +29,8 @@ layout(set = 0, binding = 1) uniform uModelBuffer
 
 void main() 
 {
-    vec3 worldSpacePosition = (uModel * iPosition) + iInstancePosition;
-    gl_Position = uViewProjection * vec4(worldSpacePosition, 1.0);
+    vPosition = (uModel * iPosition) + iInstancePosition;
+    gl_Position = uViewProjection * vec4(vPosition, 1.0);
     vTexCoord = iTexCoord; 
     vNormal = uModel * iNormal;
     vAlbedoTextureIndex = iAlbedoTextureIndex;

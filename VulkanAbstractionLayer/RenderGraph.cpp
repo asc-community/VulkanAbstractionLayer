@@ -32,31 +32,47 @@
 
 namespace VulkanAbstractionLayer
 {
-    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> images, StringId outputName, PresentCallback onPresent, DestroyCallback onDestroy)
-        : nodes(std::move(nodes)), images(std::move(images)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onDestroy(std::move(onDestroy))
+    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> attachments, StringId outputName, PresentCallback onPresent, CreateCallback onCreate)
+        : nodes(std::move(nodes)), attachments(std::move(attachments)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onCreate(std::move(onCreate))
     {
+
+    }
+
+    void RenderGraph::InitializeOnFirstFrame(CommandBuffer& commandBuffer)
+    {
+        if ((bool)this->onCreate)
+        {
+            this->onCreate(commandBuffer);
+            this->onCreate = { }; // destroy resources, avoid calling onCreate again
+        }
     }
 
     void RenderGraph::ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer)
     {
-        RenderState state{ *this, commandBuffer, node.ColorAttachments, node.Pass.GetPipelineLayout() };
+        RenderPassState state{ *this, commandBuffer };
+            
+        node.PassCustom->BeforeRender(state);
 
-        if((bool)node.BeforeRender)
-            node.BeforeRender(state);
+        node.PipelineBarrierCallback(commandBuffer);
 
-        commandBuffer.BeginRenderPass(node.Pass);
+        if ((bool)node.PassNative.RenderPassHandle) // has render pass
+        {
+            commandBuffer.BeginRenderPass(node.PassNative);
+            node.PassCustom->OnRender(state);
+            commandBuffer.EndRenderPass();
+        }
+        else
+        {
+            node.PassCustom->OnRender(state);
+        }
 
-        if ((bool)node.OnRender)
-            node.OnRender(state);
-
-        commandBuffer.EndRenderPass();
-
-        if ((bool)node.AfterRender)
-            node.AfterRender(state);
+        node.PassCustom->AfterRender(state);
     }
 
     void RenderGraph::Execute(CommandBuffer& commandBuffer)
     {
+        this->InitializeOnFirstFrame(commandBuffer);
+
         for (const auto& node : this->nodes)
         {
             CommandBuffer command{ commandBuffer };
@@ -66,7 +82,7 @@ namespace VulkanAbstractionLayer
 
     void RenderGraph::Present(CommandBuffer& commandBuffer, const Image& presentImage)
     {
-        this->onPresent(commandBuffer, this->images.at(this->outputName), presentImage);
+        this->onPresent(commandBuffer, this->attachments.at(this->outputName), presentImage);
     }
 
     const RenderGraphNode& RenderGraph::GetNodeByName(StringId name) const
@@ -76,33 +92,32 @@ namespace VulkanAbstractionLayer
         return *it;
     }
 
-    RenderGraph& RenderGraph::operator=(RenderGraph&& other) noexcept
+    RenderGraphNode& RenderGraph::GetNodeByName(StringId name)
     {
-        if (this != std::addressof(other))
-        {
-            this->~RenderGraph();
-            return *std::launder(new(this) RenderGraph(std::move(other)));
-        }
-        else return *this;
+        auto it = std::find_if(this->nodes.begin(), this->nodes.end(), [name](const RenderGraphNode& node) { return node.Name == name; });
+        assert(it != this->nodes.end());
+        return *it;
     }
 
     RenderGraph::~RenderGraph()
     {
+        auto& vulkan = GetCurrentVulkanContext();
+
         for (const auto& node : this->nodes)
         {
-            this->onDestroy(node.Pass);
+            auto& device = vulkan.GetDevice();
+            auto& pass = node.PassNative;
+            if ((bool)pass.Pipeline)         device.destroyPipeline(pass.Pipeline);
+            if ((bool)pass.PipelineLayout)   device.destroyPipelineLayout(pass.PipelineLayout);
+            if ((bool)pass.Framebuffer)      device.destroyFramebuffer(pass.Framebuffer);
+            if ((bool)pass.RenderPassHandle) device.destroyRenderPass(pass.RenderPassHandle);
         }
         this->nodes.clear();
-        this->images.clear();
+        this->attachments.clear();
     }
 
-    const Image& RenderGraph::GetImageByName(StringId name) const
+    const Image& RenderGraph::GetAttachmentByName(StringId name) const
     {
-        return this->images.at(name);
-    }
-
-    const Image& RenderState::GetOutputColorAttachment(size_t index) const
-    {
-        return this->Graph.GetImageByName(this->ColorAttachments[index]);
+        return this->attachments.at(name);
     }
 }

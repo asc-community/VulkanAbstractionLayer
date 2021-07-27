@@ -1,3 +1,4 @@
+#include "Pipeline.h"
 // Copyright(c) 2021, #Momo
 // All rights reserved.
 // 
@@ -26,45 +27,41 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include <vulkan/vulkan.hpp>
+#include "Pipeline.h"
 
 namespace VulkanAbstractionLayer
 {
-    class Sampler
-    {
-        vk::Sampler handle;
+	void Pipeline::DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage)
+	{
+		this->bufferDeclarations.push_back({ (void*)buffer.GetNativeHandle(), oldUsage });
+	}
 
-        void Destroy();
-    public:
-        enum class Filter : uint8_t
-        {
-            NEAREST = 0,
-            LINEAR
-        };
+	void Pipeline::DeclareImage(const Image& image, ImageUsage::Bits oldUsage)
+	{
+		this->imageDeclarations.push_back({ (void*)image.GetNativeHandle(), oldUsage });
+	}
 
-        using MinFilter = Filter;
-        using MagFilter = Filter;
-        using MipFilter = Filter;
+	void Pipeline::DeclareBuffers(const std::vector<BufferReference>& buffers, BufferUsage::Bits oldUsage)
+	{
+		this->bufferDeclarations.reserve(this->bufferDeclarations.size() + buffers.size());
+		for (auto bufferReference : buffers)
+			this->DeclareBuffer(bufferReference.get(), oldUsage);
+	}
 
-        enum class AddressMode : uint8_t
-        {
-            REPEAT = 0,
-            MIRRORED_REPEAT,
-            CLAMP_TO_EDGE,
-            CLAMP_TO_BORDER,
-        };
+	void Pipeline::DeclareImages(const std::vector<ImageReference>& images, ImageUsage::Bits oldUsage)
+	{
+		this->imageDeclarations.reserve(this->imageDeclarations.size() + images.size());
+		for (auto imageReference : images)
+			this->DeclareImage(imageReference.get(), oldUsage);
+	}
 
-        Sampler() = default;
-        ~Sampler();
-        Sampler(Sampler&& other) noexcept;
-        Sampler& operator=(Sampler&& other) noexcept;
-        Sampler(MinFilter minFilter, MagFilter magFilter, AddressMode uvwAddress, MipFilter mipFilter);
-        void Init(MinFilter minFilter, MagFilter magFilter, AddressMode uvwAddress, MipFilter mipFilter);
+	void Pipeline::DeclareAttachment(StringId name, Format format)
+	{
+		this->attachmentDeclarations.push_back({ name, format, 0, 0 });
+	}
 
-        const vk::Sampler& GetNativeHandle() const;
-    };
-
-    using SamplerReference = std::reference_wrapper<const Sampler>;
+	void Pipeline::DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height)
+	{
+		this->attachmentDeclarations.push_back({ name, format, width, height });
+	}
 }
