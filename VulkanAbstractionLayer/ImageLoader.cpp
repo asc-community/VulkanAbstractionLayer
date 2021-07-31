@@ -37,8 +37,12 @@ namespace VulkanAbstractionLayer
     ImageData ImageLoader::LoadFromFile(const std::string& filepath)
     {
         int width = 0, height = 0, channels = 0;
+        const uint32_t actualChannels = 4;
         stbi_set_flip_vertically_on_load(true);
         uint8_t* data = stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-        return ImageData{ data, (uint32_t)width, (uint32_t)height, (uint32_t)channels, sizeof(uint8_t) };
+        std::vector<uint8_t> vecData;
+        vecData.resize(width * height * actualChannels * sizeof(uint8_t));
+        std::copy(data, data + vecData.size(), vecData.begin());
+        return ImageData{ std::move(vecData), (uint32_t)width, (uint32_t)height, (uint32_t)actualChannels, sizeof(uint8_t) };
     }
 }

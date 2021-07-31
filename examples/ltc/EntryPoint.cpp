@@ -30,7 +30,17 @@ void WindowErrorCallback(const std::string& message)
 
 struct Mesh
 {
+    struct Material
+    {
+        uint32_t AlbedoIndex;
+        uint32_t NormalIndex;
+        uint32_t Stub_1;
+        uint32_t Stub_2;
+    };
+    constexpr static size_t MaxMaterialCount = 256;
+
     std::vector<Buffer> Submeshes;
+    std::vector<Material> Materials;
     std::vector<Image> Textures;
 };
 
@@ -38,52 +48,10 @@ struct SharedResources
 {
     Buffer CameraUniformBuffer;
     Buffer ModelUniformBuffer;
+    Buffer MaterialUniformBuffer;
     Buffer LightUniformBuffer;
     Mesh Sponza;
 };
-
-// Mesh CreateMesh(ArrayView<ModelData::Vertex> vertices, ArrayView<ImageData> textures)
-// {
-//     Mesh result;
-// 
-//     auto& vulkanContext = GetCurrentVulkanContext();
-//     auto& stageBuffer = vulkanContext.GetCurrentStageBuffer();
-//     auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
-// 
-//     commandBuffer.Begin();
-// 
-//     auto vertexAllocation = stageBuffer.Submit(MakeView(vertices));
-// 
-//     result.InstanceBuffer.Init(instanceAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
-//     result.VertexBuffer.Init(vertexAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
-// 
-//     commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), instanceAllocation.Offset, result.InstanceBuffer, 0, instanceAllocation.Size);
-//     commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), vertexAllocation.Offset, result.VertexBuffer, 0, vertexAllocation.Size);
-// 
-//     for (const auto& texture : textures)
-//     {
-//         auto& image = result.Textures.emplace_back();
-//         image.Init(
-//             texture.Width,
-//             texture.Height,
-//             Format::R8G8B8A8_UNORM,
-//             ImageUsage::TRANSFER_DISTINATION | ImageUsage::SHADER_READ,
-//             MemoryUsage::GPU_ONLY
-//         );
-// 
-//         auto textureAllocation = stageBuffer.Submit(texture.ByteData, texture.GetByteSize());
-// 
-//         commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), textureAllocation.Offset, image, ImageUsage::UNKNOWN, textureAllocation.Size);
-//     }
-// 
-//     stageBuffer.Flush();
-//     commandBuffer.End();
-// 
-//     vulkanContext.SubmitCommandsImmediate(commandBuffer);
-//     stageBuffer.Reset();
-// 
-//     return result;
-// }
 
 Mesh CreateSponza()
 {
@@ -113,7 +81,59 @@ Mesh CreateSponza()
     GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
     stageBuffer.Reset();
 
+    uint32_t textureIndex = 0;
+    for (const auto& material : sponza.Materials)
+    {
+        commandBuffer.Begin();
+
+        auto& albedoImage = mesh.Textures.emplace_back();
+        albedoImage.Init(
+            material.AlbedoTexture.Width,
+            material.AlbedoTexture.Height,
+            Format::R8G8B8A8_UNORM,
+            ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
+            MemoryUsage::GPU_ONLY
+        );
+        auto albedoAllocation = stageBuffer.Submit(MakeView(material.AlbedoTexture.ByteData));
+        commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), albedoAllocation.Offset, albedoImage, ImageUsage::UNKNOWN, albedoAllocation.Size);
+
+        auto& normalImage = mesh.Textures.emplace_back();
+        normalImage.Init(
+            material.NormalTexture.Width,
+            material.NormalTexture.Height,
+            Format::R8G8B8A8_UNORM,
+            ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
+            MemoryUsage::GPU_ONLY
+        );
+        auto normalAllocation = stageBuffer.Submit(MakeView(material.NormalTexture.ByteData));
+        commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), normalAllocation.Offset, normalImage, ImageUsage::UNKNOWN, normalAllocation.Size);
+
+        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1 });
+        textureIndex += 2;
+
+        stageBuffer.Flush();
+        commandBuffer.End();
+        GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
+        stageBuffer.Reset();
+    }
+
     return mesh;
+}
+
+void FillMaterialUniform(Buffer& buffer, const std::vector<Mesh::Material>& materials)
+{
+    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
+    auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+
+    commandBuffer.Begin();
+
+    auto allocation = stageBuffer.Submit(MakeView(materials));
+    commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), allocation.Offset, buffer, 0, allocation.Size);
+
+    commandBuffer.End();
+    stageBuffer.Flush();
+    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
+    stageBuffer.Reset();
 }
 
 class UniformSubmitRenderPass : public RenderPass
@@ -177,11 +197,18 @@ public:
 class OpaqueRenderPass : public RenderPass
 {    
     SharedResources& sharedResources;
+    std::vector<ImageReference> textureArray;
+    Sampler textureSampler;
 public:
     OpaqueRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
+        this->textureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
 
+        for (const auto& texture : this->sharedResources.Sponza.Textures)
+        {
+            this->textureArray.push_back(std::ref(texture));
+        }
     }
 
     virtual void SetupPipeline(PipelineState pipeline) override
@@ -204,7 +231,10 @@ public:
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER);
+            .Bind(2, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(3, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
+            .Bind(5, this->textureSampler, UniformType::SAMPLER);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -214,6 +244,7 @@ public:
 
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
     }
     
@@ -327,13 +358,15 @@ int main()
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
     SharedResources sharedResources{
-        Buffer{ sizeof(UniformSubmitRenderPass::CameraUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(UniformSubmitRenderPass::ModelUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(UniformSubmitRenderPass::LightUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(UniformSubmitRenderPass::CameraUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(UniformSubmitRenderPass::ModelUniform),   BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(Mesh::Material) * Mesh::MaxMaterialCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(UniformSubmitRenderPass::LightUniform),   BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // sponza
     };
 
     sharedResources.Sponza = CreateSponza();
+    FillMaterialUniform(sharedResources.MaterialUniformBuffer, sharedResources.Sponza.Materials);
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 

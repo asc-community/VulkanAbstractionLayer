@@ -30,21 +30,17 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace VulkanAbstractionLayer
 {
     struct ImageData
     {
-        const uint8_t* ByteData = nullptr;
+        std::vector<uint8_t> ByteData;
         uint32_t Width = 0;
         uint32_t Height = 0;
         uint32_t Channels = 0;
         uint32_t ChannelSize = 0;
-
-        uint32_t GetByteSize() const
-        {
-            return this->Width * this->Height * this->Channels * this->ChannelSize;
-        }
     };
 
     class ImageLoader

@@ -80,7 +80,7 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
             MemoryUsage::GPU_ONLY
         );
 
-        auto textureAllocation = stageBuffer.Submit(texture.ByteData, texture.GetByteSize());
+        auto textureAllocation = stageBuffer.Submit(texture.ByteData.data(), texture.ByteData.size());
 
         commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), textureAllocation.Offset, image, ImageUsage::UNKNOWN, textureAllocation.Size);
     }
@@ -127,19 +127,19 @@ Mesh CreateDragonMesh(uint32_t& globalTextureIndex)
     auto& vertices = model.Shapes.front().Vertices;
 
     std::array textureData = {
-        std::array<uint8_t, 4>{ 255, 255, 255, 255 },
-        std::array<uint8_t, 4>{ 150, 225, 100, 255 },
-        std::array<uint8_t, 4>{ 100, 150, 225, 255 },
-        std::array<uint8_t, 4>{ 255, 220,  60, 255 },
-        std::array<uint8_t, 4>{ 150, 150, 150, 255 },
+        std::vector<uint8_t>{ 255, 255, 255, 255 },
+        std::vector<uint8_t>{ 150, 225, 100, 255 },
+        std::vector<uint8_t>{ 100, 150, 225, 255 },
+        std::vector<uint8_t>{ 255, 220,  60, 255 },
+        std::vector<uint8_t>{ 150, 150, 150, 255 },
     };
 
     std::array textures = {
-        ImageData{ textureData[0].data(), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ textureData[1].data(), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ textureData[2].data(), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ textureData[3].data(), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ textureData[4].data(), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ std::move(textureData[0]), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ std::move(textureData[1]), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ std::move(textureData[2]), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ std::move(textureData[3]), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ std::move(textureData[4]), 1, 1, 4, sizeof(uint8_t) },
     };
 
     return CreateMesh(vertices, instances, textures);

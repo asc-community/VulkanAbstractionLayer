@@ -31,8 +31,22 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
+#include <filesystem>
+
 namespace VulkanAbstractionLayer
 {
+    static std::string GetAbsolutePathToObjResource(const std::string& objPath, const std::string& relativePath)
+    {
+        const auto parentPath = std::filesystem::path{ objPath }.parent_path();
+        const auto absolutePath = parentPath / relativePath;
+        return absolutePath.string();
+    }
+
+    static ImageData CreateStubTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+    {
+        return ImageData{ std::vector{ r, g, b, a }, 1, 1, 4, sizeof(uint8_t) };
+    }
+
     ModelData ModelLoader::LoadFromObj(const std::string& filepath)
     {
         ModelData result;
@@ -49,12 +63,32 @@ namespace VulkanAbstractionLayer
         auto& shapes = reader.GetShapes();
         auto& materials = reader.GetMaterials();
 
+        result.Materials.reserve(materials.size());
+        for (const auto& material : materials)
+        {
+            auto& resultMaterial = result.Materials.emplace_back();
+
+            resultMaterial.Name = material.name;
+
+            if (!material.diffuse_texname.empty())
+                resultMaterial.AlbedoTexture = ImageLoader::LoadFromFile(GetAbsolutePathToObjResource(filepath, material.diffuse_texname));
+            else
+                resultMaterial.AlbedoTexture = CreateStubTexture(255, 255, 255, 255);
+
+            if (!material.normal_texname.empty())
+                resultMaterial.NormalTexture = ImageLoader::LoadFromFile(GetAbsolutePathToObjResource(filepath, material.bump_texname));
+            else
+                resultMaterial.NormalTexture = CreateStubTexture(127, 127, 255, 255);
+        }
+
         result.Shapes.reserve(shapes.size());
         for (const auto& shape : shapes)
         {
-            size_t index_offset = 0;
             auto& resultShape = result.Shapes.emplace_back();
 
+            resultShape.Name = shape.name;
+
+            size_t index_offset = 0;
             for (size_t faceIndex : shape.mesh.num_face_vertices)
             {
                 for (size_t v = 0; v < faceIndex; v++)
@@ -77,6 +111,11 @@ namespace VulkanAbstractionLayer
                         vertex.Normal.x = attrib.normals[3 * size_t(idx.normal_index) + 0];
                         vertex.Normal.y = attrib.normals[3 * size_t(idx.normal_index) + 1];
                         vertex.Normal.z = attrib.normals[3 * size_t(idx.normal_index) + 2];
+                    }
+
+                    if (!shape.mesh.material_ids.empty())
+                    {
+                        vertex.MaterialIndex = shape.mesh.material_ids.front();
                     }
                 }
                 index_offset += faceIndex;
