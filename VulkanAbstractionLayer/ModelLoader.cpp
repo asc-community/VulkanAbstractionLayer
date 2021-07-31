@@ -88,6 +88,9 @@ namespace VulkanAbstractionLayer
 
             resultShape.Name = shape.name;
 
+            if (!shape.mesh.material_ids.empty())
+                resultShape.MaterialIndex = shape.mesh.material_ids.front();
+
             size_t index_offset = 0;
             for (size_t faceIndex : shape.mesh.num_face_vertices)
             {
@@ -111,11 +114,6 @@ namespace VulkanAbstractionLayer
                         vertex.Normal.x = attrib.normals[3 * size_t(idx.normal_index) + 0];
                         vertex.Normal.y = attrib.normals[3 * size_t(idx.normal_index) + 1];
                         vertex.Normal.z = attrib.normals[3 * size_t(idx.normal_index) + 2];
-                    }
-
-                    if (!shape.mesh.material_ids.empty())
-                    {
-                        vertex.MaterialIndex = shape.mesh.material_ids.front();
                     }
                 }
                 index_offset += faceIndex;

@@ -131,6 +131,17 @@ namespace VulkanAbstractionLayer
         this->SetScissor(Rect2D{ 0, 0, image.GetWidth(), image.GetHeight() });
     }
 
+    void CommandBuffer::PushConstants(const RenderPassNative& renderPass, const uint8_t* data, size_t size)
+    {
+        this->GetNativeHandle().pushConstants(
+            renderPass.PipelineLayout,
+            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+            0,
+            size,
+            data
+        );
+    }
+
     void CommandBuffer::CopyImage(const Image& source, ImageUsage::Bits sourceUsage, const Image& distance, ImageUsage::Bits distanceUsage)
     {
         auto sourceRange = GetDefaultImageSubresourceRange(source);
@@ -236,6 +247,11 @@ namespace VulkanAbstractionLayer
             .setImageExtent(vk::Extent3D{ source.GetWidth(), source.GetHeight(), 1 });
 
         this->handle.copyImageToBuffer(source.GetNativeHandle(), vk::ImageLayout::eTransferSrcOptimal, distance.GetNativeHandle(), imageToBufferCopyInfo);
+    }
+
+    void CommandBuffer::CopyBufferToImage(const Buffer& source, const Image& distance, ImageUsage::Bits distanceUsage)
+    {
+        this->CopyBufferToImage(source, 0, distance, distanceUsage, source.GetByteSize());
     }
 
     void CommandBuffer::CopyBufferToImage(const Buffer& source, size_t sourceOffset, const Image& distance, ImageUsage::Bits distanceUsage, size_t byteSize)

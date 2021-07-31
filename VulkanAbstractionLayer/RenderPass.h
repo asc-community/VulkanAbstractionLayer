@@ -52,6 +52,7 @@ namespace VulkanAbstractionLayer
     {
         RenderGraph& Graph;
         CommandBuffer& Commands;
+        const RenderPassNative& Pass;
 
         const Image& GetAttachment(StringId name);
     };

@@ -49,7 +49,7 @@ namespace VulkanAbstractionLayer
 
     void RenderGraph::ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer)
     {
-        RenderPassState state{ *this, commandBuffer };
+        RenderPassState state{ *this, commandBuffer, node.PassNative };
             
         node.PassCustom->BeforeRender(state);
 

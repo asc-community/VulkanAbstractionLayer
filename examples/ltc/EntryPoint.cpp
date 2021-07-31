@@ -39,7 +39,13 @@ struct Mesh
     };
     constexpr static size_t MaxMaterialCount = 256;
 
-    std::vector<Buffer> Submeshes;
+    struct Submesh
+    {
+        Buffer VertexBuffer;
+        uint32_t MaterialIndex;
+    };
+
+    std::vector<Submesh> Submeshes;
     std::vector<Material> Materials;
     std::vector<Image> Textures;
 };
@@ -65,15 +71,17 @@ Mesh CreateSponza()
 
     for (const auto& shape : sponza.Shapes)
     {
-        auto& buffer = mesh.Submeshes.emplace_back();
-        buffer.Init(
+        auto& submesh = mesh.Submeshes.emplace_back();
+        submesh.VertexBuffer.Init(
             shape.Vertices.size() * sizeof(ModelData::Vertex),
             BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, 
             MemoryUsage::GPU_ONLY
         );
 
         auto allocation = stageBuffer.Submit(MakeView(shape.Vertices));
-        commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), allocation.Offset, buffer, 0, allocation.Size);
+        commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), allocation.Offset, submesh.VertexBuffer, 0, allocation.Size);
+
+        submesh.MaterialIndex = shape.MaterialIndex;
     }
 
     stageBuffer.Flush();
@@ -253,10 +261,11 @@ public:
         auto& output = state.GetAttachment("Output"_id);
         state.Commands.SetRenderArea(output);
 
-        for (const auto& meshBuffer : this->sharedResources.Sponza.Submeshes)
+        for (const auto& submesh : this->sharedResources.Sponza.Submeshes)
         {
-            size_t vertexCount = meshBuffer.GetByteSize() / sizeof(ModelData::Vertex);
-            state.Commands.BindVertexBuffers(meshBuffer);
+            size_t vertexCount = submesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
+            state.Commands.PushConstants(state.Pass, &submesh.MaterialIndex);
+            state.Commands.BindVertexBuffers(submesh.VertexBuffer);
             state.Commands.Draw((uint32_t)vertexCount, 1);
         }
     }

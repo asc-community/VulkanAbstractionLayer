@@ -620,8 +620,16 @@ namespace VulkanAbstractionLayer
                 vk::PipelineDynamicStateCreateInfo dynamicStateCreateInfo;
                 dynamicStateCreateInfo.setDynamicStates(dynamicStates);
 
+                vk::PushConstantRange pushConstantRange;
+                pushConstantRange
+                    .setOffset(0)
+                    .setSize(128)
+                    .setStageFlags(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
+
                 vk::PipelineLayoutCreateInfo layoutCreateInfo;
-                layoutCreateInfo.setSetLayouts(descriptor.SetLayout);
+                layoutCreateInfo
+                    .setSetLayouts(descriptor.SetLayout)
+                    .setPushConstantRanges(pushConstantRange);
 
                 renderPassNative.PipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
 

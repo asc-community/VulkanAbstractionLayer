@@ -3,7 +3,6 @@
 layout(location = 0) in vec3 iPosition;
 layout(location = 1) in vec2 iTexCoord;
 layout(location = 2) in vec3 iNormal;
-layout(location = 3) in uint iMaterialIndex;
 
 out gl_PerVertex
 {
@@ -13,7 +12,6 @@ out gl_PerVertex
 layout(location = 0) out vec3 vPosition;
 layout(location = 1) out vec2 vTexCoord;
 layout(location = 2) out vec3 vNormal;
-layout(location = 3) out flat uint vMaterialIndex;
 
 layout(set = 0, binding = 0) uniform uCameraBuffer
 {
@@ -32,5 +30,4 @@ void main()
     gl_Position = uViewProjection * vec4(vPosition, 1.0);
     vTexCoord = iTexCoord; 
     vNormal = uModel * iNormal;
-    vMaterialIndex = iMaterialIndex;
 }

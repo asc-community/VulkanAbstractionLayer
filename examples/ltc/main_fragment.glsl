@@ -3,7 +3,6 @@
 layout(location = 0) in vec3 vPosition;
 layout(location = 1) in vec2 vTexCoord;
 layout(location = 2) in vec3 vNormal;
-layout(location = 3) in flat uint vMaterialIndex;
 
 layout(location = 0) out vec4 oColor;
 
@@ -24,6 +23,11 @@ layout(set = 0, binding = 2) uniform uMaterialArray
     Material uMaterials[256];
 };
 
+layout(push_constant) uniform uMaterialConstant
+{
+    uint uMaterialIndex;
+};
+
 layout(set = 0, binding = 3) uniform uLightBuffer
 {
     vec4 uLightColor_uAmbientIntensity;
@@ -36,7 +40,7 @@ layout(set = 0, binding = 5) uniform sampler uTextureSampler;
 
 void main() 
 {
-    Material material = uMaterials[vMaterialIndex];
+    Material material = uMaterials[uMaterialIndex];
     vec3 albedoColor = texture(sampler2D(uTextures[material.AlbedoIndex], uTextureSampler), vTexCoord).rgb;
     vec3 cameraDirection = normalize(uCameraPosition - vPosition);
     vec3 H = normalize(cameraDirection + uLightDirection);

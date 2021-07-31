@@ -43,7 +43,6 @@ namespace VulkanAbstractionLayer
             Vector3 Position{ 0.0f, 0.0f, 0.0f };
             Vector2 TexCoord{ 0.0f, 0.0f };
             Vector3 Normal{ 0.0f, 0.0f, 0.0f };
-            uint32_t MaterialIndex = 0;
         };
 
         struct Material
@@ -57,6 +56,7 @@ namespace VulkanAbstractionLayer
         {
             std::string Name;
             std::vector<Vertex> Vertices;
+            uint32_t MaterialIndex = 0;
         };
 
         std::vector<Shape> Shapes;

@@ -96,6 +96,8 @@ namespace VulkanAbstractionLayer
         void SetViewport(const Viewport& viewport);
         void SetScissor(const Rect2D& scissor);
         void SetRenderArea(const Image& image);
+
+        void PushConstants(const RenderPassNative& renderPass, const uint8_t* data, size_t size);
         
         void CopyImage(const Image& source, ImageUsage::Bits sourceUsage, const Image& distance, ImageUsage::Bits distanceUsage);
         
@@ -114,9 +116,21 @@ namespace VulkanAbstractionLayer
         void BindVertexBuffers(const Buffers&... vertexBuffers)
         {
             constexpr size_t BufferCount = sizeof...(Buffers);
-            const vk::Buffer buffers[BufferCount] = { vertexBuffers.GetNativeHandle()... };
-            vk::DeviceSize offsets[BufferCount] = { 0 };
-            this->GetNativeHandle().bindVertexBuffers(0, BufferCount, buffers, offsets);
+            std::array buffers = { vertexBuffers.GetNativeHandle()... };
+            uint64_t offsets[BufferCount] = { 0 };
+            this->GetNativeHandle().bindVertexBuffers(0, BufferCount, buffers.data(), offsets);
+        }
+
+        template<typename T>
+        void PushConstants(const RenderPassNative& renderPass, ArrayView<const T> constants)
+        {
+            this->PushConstants(renderPass, (const uint8_t*)constants.data(), constants.size() * sizeof(T));
+        }
+
+        template<typename T>
+        void PushConstants(const RenderPassNative& renderPass, const T* constants)
+        {
+            this->PushConstants(renderPass, (const uint8_t*)constants, sizeof(T));
         }
     };
 }
