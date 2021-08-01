@@ -62,7 +62,7 @@ namespace VulkanAbstractionLayer
         std::vector<ImageDeclaration> imageDeclarations;
         std::vector<AttachmentDeclaration> attachmentDeclarations;
     public:
-        std::optional<GraphicShader> Shader;
+        GraphicShader Shader;
         std::vector<VertexBinding> VertexBindings;
         DescriptorBinding DescriptorBindings;
 

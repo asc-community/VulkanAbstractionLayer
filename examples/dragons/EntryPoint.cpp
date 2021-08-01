@@ -226,7 +226,7 @@ public:
         pipeline.VertexBindings = {
             VertexBinding{
                 VertexBinding::Rate::PER_VERTEX,
-                3,
+                5,
             },
             VertexBinding{
                 VertexBinding::Rate::PER_INSTANCE,
@@ -284,7 +284,7 @@ public:
         pipeline.VertexBindings = {
             VertexBinding{
                 VertexBinding::Rate::PER_VERTEX,
-                3,
+                5,
             },
             VertexBinding{
                 VertexBinding::Rate::PER_INSTANCE,

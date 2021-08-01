@@ -484,28 +484,27 @@ namespace VulkanAbstractionLayer
 
             renderPassNative.RenderArea = vk::Rect2D{ vk::Offset2D{ 0u, 0u }, vk::Extent2D{ renderAreaWidth, renderAreaHeight } };
 
-            if (renderPassPipeline.Shader.has_value())
+            if ((bool)renderPassPipeline.Shader.GetNativeShader(ShaderType::VERTEX))
             {
-                const auto& shader = renderPassPipeline.Shader.value();
-                auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(shader.GetShaderUniforms());
+                auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(renderPassPipeline.Shader.GetShaderUniforms());
                 renderPassNative.DescriptorSet = descriptor.Set;
 
                 std::array shaderStageCreateInfos = {
                     vk::PipelineShaderStageCreateInfo {
                         vk::PipelineShaderStageCreateFlags{ },
                         ToNative(ShaderType::VERTEX),
-                        shader.GetNativeShader(ShaderType::VERTEX),
+                        renderPassPipeline.Shader.GetNativeShader(ShaderType::VERTEX),
                         "main"
                     },
                     vk::PipelineShaderStageCreateInfo {
                         vk::PipelineShaderStageCreateFlags{ },
                         ToNative(ShaderType::FRAGMENT),
-                        shader.GetNativeShader(ShaderType::FRAGMENT),
+                        renderPassPipeline.Shader.GetNativeShader(ShaderType::FRAGMENT),
                         "main"
                     }
                 };
 
-                auto& vertexAttributes = shader.GetVertexAttributes();
+                auto& vertexAttributes = renderPassPipeline.Shader.GetVertexAttributes();
                 auto& vertexBindings = renderPassPipeline.VertexBindings;
 
                 std::vector<vk::VertexInputBindingDescription> vertexBindingDescriptions;
@@ -840,10 +839,10 @@ namespace VulkanAbstractionLayer
 
     void RenderGraphBuilder::PreWarmDescriptorSets(const Pipeline& pipelineState)
     {
-        if (pipelineState.Shader.has_value())
+        if ((bool)pipelineState.Shader.GetNativeShader(ShaderType::VERTEX))
         {
             auto& descriptorCache = GetCurrentVulkanContext().GetDescriptorCache();
-            auto& uniforms = pipelineState.Shader.value().GetShaderUniforms();
+            auto& uniforms = pipelineState.Shader.GetShaderUniforms();
             (void)descriptorCache.GetDescriptor(uniforms);
         }
     }

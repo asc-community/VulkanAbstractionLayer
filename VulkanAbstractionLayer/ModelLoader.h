@@ -43,6 +43,8 @@ namespace VulkanAbstractionLayer
             Vector3 Position{ 0.0f, 0.0f, 0.0f };
             Vector2 TexCoord{ 0.0f, 0.0f };
             Vector3 Normal{ 0.0f, 0.0f, 0.0f };
+            Vector3 Tangent{ 0.0f, 0.0f, 0.0f };
+            Vector3 Bitangent{ 0.0f, 0.0f, 0.0f };
         };
 
         struct Material

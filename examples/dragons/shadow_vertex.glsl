@@ -1,10 +1,12 @@
 #version 460
 
 layout(location = 0) in vec3 iPosition;
-layout(location = 1) in vec2 unused_1;
-layout(location = 2) in vec3 unused_2;
-layout(location = 3) in vec3 iInstancePosition;
-layout(location = 4) in uint unused_3;
+layout(location = 1) in vec2 iTexCoord;
+layout(location = 2) in vec3 iNormal;
+layout(location = 3) in vec3 iTangent;
+layout(location = 4) in vec3 iBitangent;
+layout(location = 5) in vec3 iInstancePosition;
+layout(location = 6) in uint iAlbedoTextureIndex;
 
 out gl_PerVertex
 {
