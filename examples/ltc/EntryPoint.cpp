@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <iostream>
+#include <map>
 
 #include "VulkanAbstractionLayer/Window.h"
 #include "VulkanAbstractionLayer/VulkanContext.h"
@@ -10,6 +11,7 @@
 #include "VulkanAbstractionLayer/ImageLoader.h"
 #include "VulkanAbstractionLayer/ImGuiRenderPass.h"
 #include "imgui.h"
+#include "backends/imgui_impl_vulkan.h"
 
 using namespace VulkanAbstractionLayer;
 
@@ -34,8 +36,8 @@ struct Mesh
     {
         uint32_t AlbedoIndex;
         uint32_t NormalIndex;
-        uint32_t Stub_1;
-        uint32_t Stub_2;
+        float Metallic;
+        float Roughness;
     };
     constexpr static size_t MaxMaterialCount = 256;
 
@@ -206,12 +208,13 @@ class OpaqueRenderPass : public RenderPass
 {    
     SharedResources& sharedResources;
     std::vector<ImageReference> textureArray;
-    Sampler textureSampler;
 public:
+    Sampler TextureSampler;
+
     OpaqueRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
-        this->textureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
+        this->TextureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
 
         for (const auto& texture : this->sharedResources.Sponza.Textures)
         {
@@ -236,13 +239,15 @@ public:
         pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
         pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
 
+        pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
+
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(2, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(3, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
-            .Bind(5, this->textureSampler, UniformType::SAMPLER);
+            .Bind(5, this->TextureSampler, UniformType::SAMPLER);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -254,6 +259,7 @@ public:
         depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+        depedencies.AddImages(this->textureArray, ImageUsage::SHADER_READ);
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -376,6 +382,7 @@ int main()
 
     sharedResources.Sponza = CreateSponza();
     FillMaterialUniform(sharedResources.MaterialUniformBuffer, sharedResources.Sponza.Materials);
+    Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 
@@ -393,6 +400,21 @@ int main()
     });
     
     ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
+
+    std::map<size_t, ImTextureID> ImGuiRegisteredImages;
+    for (const auto& material : sharedResources.Sponza.Materials)
+    {
+        if (ImGuiRegisteredImages.find(material.AlbedoIndex) == ImGuiRegisteredImages.end())
+            ImGuiRegisteredImages.emplace(
+                material.AlbedoIndex,
+                ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.AlbedoIndex], ImGuiImageSampler)
+            );
+        if (ImGuiRegisteredImages.find(material.NormalIndex) == ImGuiRegisteredImages.end())
+            ImGuiRegisteredImages.emplace(
+                material.NormalIndex,
+                ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.NormalIndex], ImGuiImageSampler)
+            );
+    }
 
     while (!window.ShouldClose())
     {
@@ -445,6 +467,33 @@ int main()
 
             ImGui::Begin("Performace");
             ImGui::Text("FPS: %f", ImGui::GetIO().Framerate);
+            ImGui::End();
+
+            int materialIndex = 0;
+            ImGui::Begin("Sponza materials");
+            for (auto& material : sharedResources.Sponza.Materials)
+            {
+                ImGui::PushID(materialIndex++);
+
+                ImGui::BeginTable("images", 2);
+
+                ImGui::TableSetupColumn("albedo image");
+                ImGui::TableSetupColumn("normal image");
+                ImGui::TableHeadersRow();
+
+                ImGui::TableNextColumn();
+                ImGui::Image(ImGuiRegisteredImages.at(material.AlbedoIndex), { 128.0f, 128.0f }, { 0.0f, 1.0f }, { 1.0f, 0.0f });
+                ImGui::TableNextColumn();
+                ImGui::Image(ImGuiRegisteredImages.at(material.NormalIndex), { 128.0f, 128.0f }, { 0.0f, 1.0f }, { 1.0f, 0.0f });
+
+                ImGui::EndTable();
+
+                ImGui::DragFloat("metallic", &material.Metallic, 0.001f, 0.0f, 1.0f);
+                ImGui::DragFloat("roughness", &material.Roughness, 0.001f, 0.0f, 1.0f);
+
+                ImGui::Separator();
+                ImGui::PopID();
+            }
             ImGui::End();
 
             auto& uniformSubmitPass = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);

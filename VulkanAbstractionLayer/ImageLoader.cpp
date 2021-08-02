@@ -43,6 +43,7 @@ namespace VulkanAbstractionLayer
         std::vector<uint8_t> vecData;
         vecData.resize(width * height * actualChannels * sizeof(uint8_t));
         std::copy(data, data + vecData.size(), vecData.begin());
+        stbi_image_free(data);
         return ImageData{ std::move(vecData), (uint32_t)width, (uint32_t)height, (uint32_t)actualChannels, sizeof(uint8_t) };
     }
 }

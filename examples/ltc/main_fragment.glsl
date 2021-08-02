@@ -16,6 +16,8 @@ struct Material
 {
     uint AlbedoIndex;
     uint NormalIndex;
+    float Metallic;
+    float Roughness;
 };
 
 layout(set = 0, binding = 2) uniform uMaterialArray

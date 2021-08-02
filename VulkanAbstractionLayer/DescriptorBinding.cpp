@@ -49,7 +49,7 @@ namespace VulkanAbstractionLayer
 			{ },
 			image.GetNativeView(view),
 			vk::ImageLayout::eShaderReadOnlyOptimal
-			});
+		});
 		return this->descriptorImageInfos.size() - 1;
 	}
 
