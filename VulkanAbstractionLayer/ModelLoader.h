@@ -52,6 +52,8 @@ namespace VulkanAbstractionLayer
             std::string Name;
             ImageData AlbedoTexture;
             ImageData NormalTexture;
+            float Metallic = 0.0f;
+            float Roughness = 0.0f;
         };
 
         struct Shape
@@ -69,5 +71,6 @@ namespace VulkanAbstractionLayer
     {
     public:
         static ModelData LoadFromObj(const std::string& filepath);
+        static ModelData LoadFromGltf(const std::string& filepath);
     };
 }

@@ -49,7 +49,7 @@ void main()
 
     vec3 cameraDirection = normalize(uCameraPosition - vPosition);
     vec3 H = normalize(cameraDirection + uLightDirection);
-    float specularFactor = pow(max(dot(H, normal), 0.0), 400.0);
+    float specularFactor = material.Metallic * pow(max(dot(H, normal), 0.0), 256.0 - 255.0 * material.Roughness);
     float diffuseFactor = max(dot(uLightDirection, normal), 0.0);
     float ambientFactor = uLightColor_uAmbientIntensity.a;
     float totalFactor = diffuseFactor + specularFactor + ambientFactor;

@@ -27,9 +27,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "ModelLoader.h"
+#include "ArrayUtils.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
+#include "tiny_gltf.h"
 
 #include <filesystem>
 
@@ -110,6 +115,45 @@ namespace VulkanAbstractionLayer
         return tangentsBitangents;
     }
 
+    static auto ComputeTangentsBitangents(ArrayView<const uint16_t> indicies, ArrayView<const Vector3> positions, ArrayView<const Vector2> texCoords)
+    {
+        std::vector<std::pair<Vector3, Vector3>> tangentsBitangents;
+        tangentsBitangents.resize(positions.size(), { Vector3{ 0.0f, 0.0f, 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f } });
+
+        assert(indicies.size() % 3 == 0);
+        for (size_t i = 0; i < indicies.size(); i += 3)
+        {
+            const auto& position1 = positions[indicies[i + 0]];
+            const auto& position2 = positions[indicies[i + 1]];
+            const auto& position3 = positions[indicies[i + 2]];
+
+            const auto& texCoord1 = texCoords[indicies[i + 0]];
+            const auto& texCoord2 = texCoords[indicies[i + 1]];
+            const auto& texCoord3 = texCoords[indicies[i + 2]];
+
+            auto tangentBitangent = ComputeTangentSpace(
+                position1, position2, position3,
+                texCoord1, texCoord2, texCoord3
+            );
+
+            tangentsBitangents[indicies[i + 0]].first += tangentBitangent.first;
+            tangentsBitangents[indicies[i + 0]].second += tangentBitangent.second;
+
+            tangentsBitangents[indicies[i + 1]].first += tangentBitangent.first;
+            tangentsBitangents[indicies[i + 1]].second += tangentBitangent.second;
+
+            tangentsBitangents[indicies[i + 2]].first += tangentBitangent.first;
+            tangentsBitangents[indicies[i + 2]].second += tangentBitangent.second;
+        }
+
+        for (auto& [tangent, bitangent] : tangentsBitangents)
+        {
+            if (Dot(tangent, tangent) > 0.0f) tangent = Normalize(tangent);
+            if (Dot(bitangent, bitangent) > 0.0f) bitangent = Normalize(bitangent);
+        }
+        return tangentsBitangents;
+    }
+
     ModelData ModelLoader::LoadFromObj(const std::string& filepath)
     {
         ModelData result;
@@ -132,6 +176,8 @@ namespace VulkanAbstractionLayer
             auto& resultMaterial = result.Materials.emplace_back();
 
             resultMaterial.Name = material.name;
+            resultMaterial.Metallic = material.metallic;
+            resultMaterial.Roughness = material.roughness;
 
             if (!material.diffuse_texname.empty())
                 resultMaterial.AlbedoTexture = ImageLoader::LoadFromFile(GetAbsolutePathToObjResource(filepath, material.diffuse_texname));
@@ -185,6 +231,107 @@ namespace VulkanAbstractionLayer
                     }
                 }
                 index_offset += faceIndex;
+            }
+        }
+
+        return result;
+    }
+
+    ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
+    {
+        ModelData result;
+
+        tinygltf::TinyGLTF loader;
+        tinygltf::Model model;
+        std::string errorMessage, warningMessage;
+
+        bool res = loader.LoadASCIIFromFile(&model, &errorMessage, &warningMessage, filepath);
+        if (!res) return result;
+
+        result.Materials.reserve(model.materials.size());
+        for (const auto& material : model.materials)
+        {
+            auto& resultMaterial = result.Materials.emplace_back();
+            
+            resultMaterial.Name = material.name;
+            resultMaterial.Metallic = material.pbrMetallicRoughness.metallicFactor;
+            resultMaterial.Roughness = material.pbrMetallicRoughness.roughnessFactor;
+
+            if (material.pbrMetallicRoughness.baseColorTexture.index != -1)
+            {
+                const auto& albedoTexture = model.images[model.textures[material.pbrMetallicRoughness.baseColorTexture.index].source];
+                resultMaterial.AlbedoTexture = ImageData{ 
+                    albedoTexture.image, 
+                    (uint32_t)albedoTexture.width, 
+                    (uint32_t)albedoTexture.height, 
+                    (uint32_t)albedoTexture.component, 
+                    (uint32_t)albedoTexture.bits / 8 
+                };
+            }
+            else
+            {
+                resultMaterial.AlbedoTexture = CreateStubTexture(255, 255, 255, 255);
+            }
+
+            if (material.normalTexture.index != -1)
+            {
+                const auto& normalTexture = model.images[model.textures[material.normalTexture.index].source];
+                resultMaterial.NormalTexture = ImageData{ 
+                    normalTexture.image, 
+                    (uint32_t)normalTexture.width, 
+                    (uint32_t)normalTexture.height, 
+                    (uint32_t)normalTexture.component, 
+                    (uint32_t)normalTexture.bits / 8 
+                };
+            }
+            else
+            {
+                resultMaterial.NormalTexture = CreateStubTexture(127, 127, 255, 255);
+            }
+        }
+
+        for (const auto& mesh : model.meshes)
+        {
+            result.Shapes.reserve(result.Shapes.size() + mesh.primitives.size());
+            for (const auto& primitive : mesh.primitives)
+            {
+                auto& resultShape = result.Shapes.emplace_back();
+                resultShape.Name = "shape_" + std::to_string(result.Shapes.size());
+                resultShape.MaterialIndex = (uint32_t)primitive.material;
+
+                const auto& indexAccessor = model.accessors[primitive.indices];
+                auto& indexBuffer = model.bufferViews[indexAccessor.bufferView];
+                const uint8_t* indexBegin = model.buffers[indexBuffer.buffer].data.data() + indexBuffer.byteOffset;
+                ArrayView<const uint16_t> indicies((const uint16_t*)indexBegin, (const uint16_t*)(indexBegin + indexBuffer.byteLength));
+
+                const auto& positionAccessor = model.accessors[primitive.attributes.at("POSITION")];
+                const auto& texCoordAccessor = model.accessors[primitive.attributes.at("TEXCOORD_0")];
+                const auto& normalAccessor = model.accessors[primitive.attributes.at("NORMAL")];
+
+                const auto& positionBuffer = model.bufferViews[positionAccessor.bufferView];
+                const auto& texCoordBuffer = model.bufferViews[texCoordAccessor.bufferView];
+                const auto& normalBuffer = model.bufferViews[normalAccessor.bufferView];
+
+                const uint8_t* positionBegin = model.buffers[positionBuffer.buffer].data.data() + positionBuffer.byteOffset;
+                const uint8_t* texCoordBegin = model.buffers[texCoordBuffer.buffer].data.data() + texCoordBuffer.byteOffset;
+                const uint8_t* normalBegin = model.buffers[normalBuffer.buffer].data.data() + normalBuffer.byteOffset;
+
+                ArrayView<const Vector3> positions((const Vector3*)positionBegin, (const Vector3*)(positionBegin + positionBuffer.byteLength));
+                ArrayView<const Vector2> texCoords((const Vector2*)texCoordBegin, (const Vector2*)(texCoordBegin + texCoordBuffer.byteLength));
+                ArrayView<const Vector3> normals((const Vector3*)normalBegin, (const Vector3*)(normalBegin + normalBuffer.byteLength));
+
+                auto tangentsBitangents = ComputeTangentsBitangents(indicies, positions, texCoords);
+
+                resultShape.Vertices.reserve(indicies.size());
+                for (auto& index : indicies)
+                {
+                    auto& vertex = resultShape.Vertices.emplace_back();
+                    vertex.Position = positions[index];
+                    vertex.TexCoord = texCoords[index];
+                    vertex.Normal = normals[index];
+                    vertex.Tangent = tangentsBitangents[index].first;
+                    vertex.Bitangent = tangentsBitangents[index].second;
+                }
             }
         }
 

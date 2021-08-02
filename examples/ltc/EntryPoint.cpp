@@ -64,7 +64,7 @@ struct SharedResources
 Mesh CreateSponza()
 {
     Mesh mesh;
-    auto sponza = ModelLoader::LoadFromObj("models/Sponza/sponza.obj");
+    auto sponza = ModelLoader::LoadFromGltf("models/Sponza/glTF/Sponza.gltf");
     
     auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
     auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
@@ -118,7 +118,7 @@ Mesh CreateSponza()
         auto normalAllocation = stageBuffer.Submit(MakeView(material.NormalTexture.ByteData));
         commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), normalAllocation.Offset, normalImage, ImageUsage::UNKNOWN, normalAllocation.Size);
 
-        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1 });
+        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, material.Metallic, material.Roughness });
         textureIndex += 2;
 
         stageBuffer.Flush();
@@ -128,22 +128,6 @@ Mesh CreateSponza()
     }
 
     return mesh;
-}
-
-void FillMaterialUniform(Buffer& buffer, const std::vector<Mesh::Material>& materials)
-{
-    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
-    auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
-
-    commandBuffer.Begin();
-
-    auto allocation = stageBuffer.Submit(MakeView(materials));
-    commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), allocation.Offset, buffer, 0, allocation.Size);
-
-    commandBuffer.End();
-    stageBuffer.Flush();
-    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
-    stageBuffer.Reset();
 }
 
 class UniformSubmitRenderPass : public RenderPass
@@ -177,16 +161,18 @@ public:
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNKNOWN);
-        pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNKNOWN);
-        pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNKNOWN);
+        pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer,   BufferUsage::UNKNOWN);
+        pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer,    BufferUsage::UNKNOWN);
+        pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer,    BufferUsage::UNKNOWN);
+        pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::UNKNOWN);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,   BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.LightUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -197,10 +183,17 @@ public:
             auto uniformAllocation = stageBuffer.Submit(&uniformData);
             state.Commands.CopyBuffer(stageBuffer.GetBuffer(), uniformAllocation.Offset, uniformBuffer, 0, uniformAllocation.Size);
         };
+        auto FillUniformArray = [&state](const auto& uniformArray, const auto& uniformBuffer) mutable
+        {
+            auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+            auto uniformAllocation = stageBuffer.Submit(MakeView(uniformArray));
+            state.Commands.CopyBuffer(stageBuffer.GetBuffer(), uniformAllocation.Offset, uniformBuffer, 0, uniformAllocation.Size);
+        };
 
         FillUniform(this->CameraUniform, this->sharedResources.CameraUniformBuffer);
         FillUniform(this->ModelUniform, this->sharedResources.ModelUniformBuffer);
         FillUniform(this->LightUniform, this->sharedResources.LightUniformBuffer);
+        FillUniformArray(this->sharedResources.Sponza.Materials, this->sharedResources.MaterialUniformBuffer);
     }
 };
 
@@ -381,7 +374,6 @@ int main()
     };
 
     sharedResources.Sponza = CreateSponza();
-    FillMaterialUniform(sharedResources.MaterialUniformBuffer, sharedResources.Sponza.Materials);
     Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
@@ -482,14 +474,14 @@ int main()
                 ImGui::TableHeadersRow();
 
                 ImGui::TableNextColumn();
-                ImGui::Image(ImGuiRegisteredImages.at(material.AlbedoIndex), { 128.0f, 128.0f }, { 0.0f, 1.0f }, { 1.0f, 0.0f });
+                ImGui::Image(ImGuiRegisteredImages.at(material.AlbedoIndex), { 128.0f, 128.0f });
                 ImGui::TableNextColumn();
-                ImGui::Image(ImGuiRegisteredImages.at(material.NormalIndex), { 128.0f, 128.0f }, { 0.0f, 1.0f }, { 1.0f, 0.0f });
+                ImGui::Image(ImGuiRegisteredImages.at(material.NormalIndex), { 128.0f, 128.0f });
 
                 ImGui::EndTable();
 
-                ImGui::DragFloat("metallic", &material.Metallic, 0.001f, 0.0f, 1.0f);
-                ImGui::DragFloat("roughness", &material.Roughness, 0.001f, 0.0f, 1.0f);
+                ImGui::DragFloat("metallic", &material.Metallic, 0.01f, 0.0f, 1.0f);
+                ImGui::DragFloat("roughness", &material.Roughness, 0.01f, 0.0f, 1.0f);
 
                 ImGui::Separator();
                 ImGui::PopID();
