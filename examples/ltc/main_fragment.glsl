@@ -47,7 +47,8 @@ struct Fragment
     float Roughness;
 };
 
-#define PI 3.1415926535f
+#define PI 3.1415926535
+#define GAMMA 2.2
 
 float GGXPartialGeometry(float NV, float roughness2)
 {
@@ -58,7 +59,7 @@ float GGXDistribution(float NH, float roughness)
 {
     float roughness2 = roughness * roughness;
     float alpha2 = roughness2 * roughness2;
-    float distr = (NH * NH) * (alpha2 - 1.0f) + 1.0f;
+    float distr = (NH * NH) * (alpha2 - 1.0f) + 1.0;
     float distr2 = distr * distr;
     float totalDistr = alpha2 / (PI * distr2);
     return totalDistr;
@@ -140,7 +141,7 @@ void main()
         discard;
 
     Fragment fragment;
-    fragment.Albedo = albedoColor.rgb;
+    fragment.Albedo = pow(albedoColor.rgb, vec3(GAMMA));
     fragment.Normal = vNormalMatrix * vec3(2.0 * normalColor - 1.0);
     fragment.Metallic = metallicRoughnessColor.b;
     fragment.Roughness = metallicRoughnessColor.g;
@@ -149,5 +150,5 @@ void main()
 
     vec3 totalColor = calculateLighting(fragment, viewDirection, uLightDirection, uLightColor_uAmbientIntensity.rgb, uLightColor_uAmbientIntensity.a);
 
-    oColor = vec4(totalColor, 1.0);
+    oColor = vec4(pow(totalColor, vec3(1.0 /  GAMMA)), 1.0);
 }
