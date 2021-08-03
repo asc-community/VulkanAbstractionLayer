@@ -52,8 +52,7 @@ namespace VulkanAbstractionLayer
             std::string Name;
             ImageData AlbedoTexture;
             ImageData NormalTexture;
-            float Metallic = 0.0f;
-            float Roughness = 0.0f;
+            ImageData MetallicRoughness;
         };
 
         struct Shape

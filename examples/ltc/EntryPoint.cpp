@@ -36,8 +36,8 @@ struct Mesh
     {
         uint32_t AlbedoIndex;
         uint32_t NormalIndex;
-        float Metallic;
-        float Roughness;
+        uint32_t MetallicRoughnessIndex;
+        uint32_t Stub;
     };
     constexpr static size_t MaxMaterialCount = 256;
 
@@ -118,8 +118,19 @@ Mesh CreateSponza()
         auto normalAllocation = stageBuffer.Submit(MakeView(material.NormalTexture.ByteData));
         commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), normalAllocation.Offset, normalImage, ImageUsage::UNKNOWN, normalAllocation.Size);
 
-        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, material.Metallic, material.Roughness });
-        textureIndex += 2;
+        auto& metallicRoughnessImage = mesh.Textures.emplace_back();
+        metallicRoughnessImage.Init(
+            material.MetallicRoughness.Width,
+            material.MetallicRoughness.Height,
+            Format::R8G8B8A8_UNORM,
+            ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
+            MemoryUsage::GPU_ONLY
+        );
+        auto metallicRoughnessAllocation = stageBuffer.Submit(MakeView(material.MetallicRoughness.ByteData));
+        commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), metallicRoughnessAllocation.Offset, metallicRoughnessImage, ImageUsage::UNKNOWN, metallicRoughnessAllocation.Size);
+
+        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2 });
+        textureIndex += 3;
 
         stageBuffer.Flush();
         commandBuffer.End();
@@ -406,6 +417,11 @@ int main()
                 material.NormalIndex,
                 ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.NormalIndex], ImGuiImageSampler)
             );
+        if (ImGuiRegisteredImages.find(material.MetallicRoughnessIndex) == ImGuiRegisteredImages.end())
+            ImGuiRegisteredImages.emplace(
+                material.MetallicRoughnessIndex,
+                ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.MetallicRoughnessIndex], ImGuiImageSampler)
+            );
     }
 
     while (!window.ShouldClose())
@@ -467,21 +483,21 @@ int main()
             {
                 ImGui::PushID(materialIndex++);
 
-                ImGui::BeginTable("images", 2);
+                ImGui::BeginTable("images", 3);
 
                 ImGui::TableSetupColumn("albedo image");
                 ImGui::TableSetupColumn("normal image");
+                ImGui::TableSetupColumn("metallic-roughness image");
                 ImGui::TableHeadersRow();
 
                 ImGui::TableNextColumn();
                 ImGui::Image(ImGuiRegisteredImages.at(material.AlbedoIndex), { 128.0f, 128.0f });
                 ImGui::TableNextColumn();
                 ImGui::Image(ImGuiRegisteredImages.at(material.NormalIndex), { 128.0f, 128.0f });
+                ImGui::TableNextColumn();
+                ImGui::Image(ImGuiRegisteredImages.at(material.MetallicRoughnessIndex), { 128.0f, 128.0f });
 
                 ImGui::EndTable();
-
-                ImGui::DragFloat("metallic", &material.Metallic, 0.01f, 0.0f, 1.0f);
-                ImGui::DragFloat("roughness", &material.Roughness, 0.01f, 0.0f, 1.0f);
 
                 ImGui::Separator();
                 ImGui::PopID();

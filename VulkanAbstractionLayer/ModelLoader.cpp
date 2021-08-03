@@ -176,8 +176,6 @@ namespace VulkanAbstractionLayer
             auto& resultMaterial = result.Materials.emplace_back();
 
             resultMaterial.Name = material.name;
-            resultMaterial.Metallic = material.metallic;
-            resultMaterial.Roughness = material.roughness;
 
             if (!material.diffuse_texname.empty())
                 resultMaterial.AlbedoTexture = ImageLoader::LoadFromFile(GetAbsolutePathToObjResource(filepath, material.diffuse_texname));
@@ -188,6 +186,9 @@ namespace VulkanAbstractionLayer
                 resultMaterial.NormalTexture = ImageLoader::LoadFromFile(GetAbsolutePathToObjResource(filepath, material.normal_texname));
             else
                 resultMaterial.NormalTexture = CreateStubTexture(127, 127, 255, 255);
+
+            // not supported by obj format
+            resultMaterial.MetallicRoughness = CreateStubTexture(0, 255, 0, 255);
         }
 
         result.Shapes.reserve(shapes.size());
@@ -254,8 +255,6 @@ namespace VulkanAbstractionLayer
             auto& resultMaterial = result.Materials.emplace_back();
             
             resultMaterial.Name = material.name;
-            resultMaterial.Metallic = material.pbrMetallicRoughness.metallicFactor;
-            resultMaterial.Roughness = material.pbrMetallicRoughness.roughnessFactor;
 
             if (material.pbrMetallicRoughness.baseColorTexture.index != -1)
             {
@@ -287,6 +286,22 @@ namespace VulkanAbstractionLayer
             else
             {
                 resultMaterial.NormalTexture = CreateStubTexture(127, 127, 255, 255);
+            }
+
+            if (material.pbrMetallicRoughness.metallicRoughnessTexture.index != -1)
+            {
+                const auto& metallicRoughnessTexture = model.images[model.textures[material.pbrMetallicRoughness.metallicRoughnessTexture.index].source];
+                resultMaterial.MetallicRoughness = ImageData{
+                    metallicRoughnessTexture.image,
+                    (uint32_t)metallicRoughnessTexture.width,
+                    (uint32_t)metallicRoughnessTexture.height,
+                    (uint32_t)metallicRoughnessTexture.component,
+                    (uint32_t)metallicRoughnessTexture.bits / 8
+                };
+            }
+            else
+            {
+                resultMaterial.MetallicRoughness = CreateStubTexture(0, 255, 0, 255);
             }
         }
 
