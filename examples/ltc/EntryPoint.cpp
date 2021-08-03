@@ -102,7 +102,7 @@ void LoadLookupTextures(Image& lookupLTCMatrix, Image& lookupLTCAmplitude)
 void LoadSponzaModel(Mesh& mesh)
 {
     auto sponza = ModelLoader::LoadFromGltf("resources/Sponza/glTF/Sponza.gltf");
-    
+   
     auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
     auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
 
@@ -166,7 +166,8 @@ void LoadSponzaModel(Mesh& mesh)
         auto metallicRoughnessAllocation = stageBuffer.Submit(MakeView(material.MetallicRoughness.ByteData));
         commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), metallicRoughnessAllocation.Offset, metallicRoughnessImage, ImageUsage::UNKNOWN, metallicRoughnessAllocation.Size);
 
-        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, 1.0f });
+        const float appliedRoughnessScale = 0.5f;
+        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, appliedRoughnessScale * material.RoughnessScale });
         textureIndex += 3;
 
         stageBuffer.Flush();
@@ -340,8 +341,8 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
 
 struct Camera
 {
-    Vector3 Position{ 40.0f, 25.0f, -90.0f };
-    Vector2 Rotation{ 5.74f, 0.0f };
+    Vector3 Position{ 40.0f, 200.0f, -90.0f };
+    Vector2 Rotation{ Pi, 0.0f };
     float Fov = 65.0f;
     float MovementSpeed = 250.0f;
     float RotationMovementSpeed = 2.5f;
@@ -396,8 +397,8 @@ int main()
     std::filesystem::current_path(APPLICATION_WORKING_DIRECTORY);
 
     WindowCreateOptions windowOptions;
-    windowOptions.Position = { 300.0f, 100.0f };
-    windowOptions.Size = { 1280.0f, 720.0f };
+    windowOptions.Position = { 100.0f, 100.0f };
+    windowOptions.Size = { 1728.0f, 972.0f };
     windowOptions.ErrorCallback = WindowErrorCallback;
 
     Window window(windowOptions);
@@ -437,10 +438,10 @@ int main()
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 
     Camera camera;
-    Vector3 modelRotation{ 0.0f, 0.0f, 0.0f };
+    Vector3 modelRotation{ 0.0f, HalfPi, 0.0f };
     Vector3 lightColor{ 0.7f, 0.7f, 0.7f };
     Vector3 lightRotation{ 0.0f, 0.0f, 0.0f };
-    Vector3 lightPosition{ 0.0f, 200.0f, 0.0f };
+    Vector3 lightPosition{ -45.0f, 200.0f, -1000.0f };
     Vector2 lightSize{ 200.0f, 200.0f };
     float lightIntensity = 1.0f;
 
@@ -534,7 +535,7 @@ int main()
             {
                 ImGui::PushID(materialIndex++);
 
-                ImGui::BeginTable("material", 4);
+                ImGui::BeginTable(("material_" + std::to_string(materialIndex)).c_str(), 4);
 
                 ImGui::TableSetupColumn("roughness");
                 ImGui::TableSetupColumn("albedo image");
