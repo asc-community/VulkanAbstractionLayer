@@ -17,7 +17,7 @@ struct Material
     uint AlbedoIndex;
     uint NormalIndex;
     uint MetallicRoughnessIndex;
-    uint stub;
+    float RoughnessScale;
 };
 
 layout(set = 0, binding = 2) uniform uMaterialArray
@@ -32,12 +32,15 @@ layout(push_constant) uniform uMaterialConstant
 
 layout(set = 0, binding = 3) uniform uLightBuffer
 {
-    vec4 uLightColor_uAmbientIntensity;
-    vec3 uLightDirection;
+    vec4 uLightPosition_Width;
+    vec4 uLightRotation_Height;
+    vec4 uLightColor_Intensity;
 };
 
 layout(set = 0, binding = 4) uniform texture2D uTextures[512];
 layout(set = 0, binding = 5) uniform sampler uTextureSampler;
+layout(set = 0, binding = 6) uniform sampler2D uLookupLTCMatrix;
+layout(set = 0, binding = 7) uniform sampler2D uLookupLTCAmplitude;
 
 struct Fragment
 {
@@ -50,87 +53,389 @@ struct Fragment
 #define PI 3.1415926535
 #define GAMMA 2.2
 
-float GGXPartialGeometry(float NV, float roughness2)
+// float GGXPartialGeometry(float NV, float roughness2)
+// {
+//     return NV / mix(NV, 1.0, roughness2);
+// }
+// 
+// float GGXDistribution(float NH, float roughness)
+// {
+//     float roughness2 = roughness * roughness;
+//     float alpha2 = roughness2 * roughness2;
+//     float distr = (NH * NH) * (alpha2 - 1.0f) + 1.0;
+//     float distr2 = distr * distr;
+//     float totalDistr = alpha2 / (PI * distr2);
+//     return totalDistr;
+// }
+// 
+// float GGXSmith(float NV, float NL, float roughness)
+// {
+//     float d = roughness * 0.125 + 0.125;
+//     float roughness2 = roughness * d + d;
+//     return GGXPartialGeometry(NV, roughness2) * GGXPartialGeometry(NL, roughness2);
+// }
+// 
+// vec3 fresnelSchlick(vec3 F0, float HV)
+// {
+//     vec3 fresnel = F0 + (1.0 - F0) * pow(2.0, (-5.55473 * HV - 6.98316) * HV);
+//     return fresnel;
+// }
+// 
+// void GGXCookTorranceSampled(vec3 normal, vec3 lightDirection, vec3 viewDirection, float roughness, float metallic, vec3 albedo,
+//     out vec3 specular, out vec3 diffuse)
+// {
+//     vec3 H = normalize(viewDirection + lightDirection);
+//     float LV = dot(lightDirection, viewDirection);
+//     float NV = dot(normal, viewDirection);
+//     float NL = dot(normal, lightDirection);
+//     float NH = dot(normal, H);
+//     float HV = dot(H, viewDirection);
+// 
+//     if (NV < 0.0 || NL < 0.0)
+//     {
+//         specular = vec3(0.0);
+//         diffuse = vec3(0.0);
+//         return;
+//     }
+// 
+//     vec3 F0 = mix(vec3(0.04), albedo, metallic);
+// 
+//     float G = GGXSmith(NV, NL, roughness);
+//     float D = GGXDistribution(NH, roughness);
+//     vec3 F = fresnelSchlick(F0, HV);
+// 
+//     specular = D * F * G / (4.0 * NL * NV);
+//     specular = clamp(specular, vec3(0.0), vec3(1.0));
+// 
+//     float s = max(LV, 0.0) - NL * NV;
+//     float t = mix(1.0, max(NL, NV), step(0.0, s));
+//     float d = 1.0 - metallic;
+// 
+//     float sigma2 = roughness * roughness;
+//     float A = 1.0 + sigma2 * (d / (sigma2 + 0.13) + 0.5 / (sigma2 + 0.33));
+//     float B = 0.45 * sigma2 / (sigma2 + 0.09);
+// 
+//     diffuse = albedo * NL * (1.0 - F) * (A + B * s / t) / PI;
+// }
+// 
+// vec3 calculateLighting(Fragment fragment, vec3 viewDirection, vec3 lightDirection, vec3 lightColor, float ambientFactor)
+// {
+//     float roughness = clamp(fragment.Roughness, 0.05, 0.95);
+//     float metallic = clamp(fragment.Metallic, 0.05, 0.95);
+// 
+//     vec3 specularColor = vec3(0.0);
+//     vec3 diffuseColor = vec3(0.0);
+//     GGXCookTorranceSampled(fragment.Normal, lightDirection, viewDirection, roughness, metallic, fragment.Albedo,
+//         specularColor, diffuseColor);
+// 
+//     vec3 ambientColor = diffuseColor * ambientFactor;
+//     vec3 totalColor = (ambientColor + diffuseColor + specularColor) * lightColor;
+//     return totalColor;
+// }
+
+// Tracing and intersection
+///////////////////////////
+
+struct Ray
 {
-    return NV / mix(NV, 1.0, roughness2);
+    vec3 origin;
+    vec3 dir;
+};
+
+struct Rect
+{
+    vec3  center;
+    vec3  dirx;
+    vec3  diry;
+    float halfx;
+    float halfy;
+
+    vec4  plane;
+};
+
+bool RayPlaneIntersect(Ray ray, vec4 plane, out float t)
+{
+    t = -dot(plane, vec4(ray.origin, 1.0)) / dot(plane.xyz, ray.dir);
+    return t > 0.0;
 }
 
-float GGXDistribution(float NH, float roughness)
+bool RayRectIntersect(Ray ray, Rect rect, out float t)
 {
-    float roughness2 = roughness * roughness;
-    float alpha2 = roughness2 * roughness2;
-    float distr = (NH * NH) * (alpha2 - 1.0f) + 1.0;
-    float distr2 = distr * distr;
-    float totalDistr = alpha2 / (PI * distr2);
-    return totalDistr;
-}
-
-float GGXSmith(float NV, float NL, float roughness)
-{
-    float d = roughness * 0.125 + 0.125;
-    float roughness2 = roughness * d + d;
-    return GGXPartialGeometry(NV, roughness2) * GGXPartialGeometry(NL, roughness2);
-}
-
-vec3 fresnelSchlick(vec3 F0, float HV)
-{
-    vec3 fresnel = F0 + (1.0 - F0) * pow(2.0, (-5.55473 * HV - 6.98316) * HV);
-    return fresnel;
-}
-
-void GGXCookTorranceSampled(vec3 normal, vec3 lightDirection, vec3 viewDirection, float roughness, float metallic, vec3 albedo,
-    out vec3 specular, out vec3 diffuse)
-{
-    vec3 H = normalize(viewDirection + lightDirection);
-    float LV = dot(lightDirection, viewDirection);
-    float NV = dot(normal, viewDirection);
-    float NL = dot(normal, lightDirection);
-    float NH = dot(normal, H);
-    float HV = dot(H, viewDirection);
-
-    if (NV < 0.0 || NL < 0.0)
+    bool intersect = RayPlaneIntersect(ray, rect.plane, t);
+    if (intersect)
     {
-        specular = vec3(0.0);
-        diffuse = vec3(0.0);
-        return;
+        vec3 pos = ray.origin + ray.dir * t;
+        vec3 lpos = pos - rect.center;
+
+        float x = dot(lpos, rect.dirx);
+        float y = dot(lpos, rect.diry);
+
+        if (abs(x) > rect.halfx || abs(y) > rect.halfy)
+            intersect = false;
     }
 
-    vec3 F0 = mix(vec3(0.04), albedo, metallic);
-
-    float G = GGXSmith(NV, NL, roughness);
-    float D = GGXDistribution(NH, roughness);
-    vec3 F = fresnelSchlick(F0, HV);
-
-    specular = D * F * G / (4.0 * NL * NV);
-    specular = clamp(specular, vec3(0.0), vec3(1.0));
-
-    float s = max(LV, 0.0) - NL * NV;
-    float t = mix(1.0, max(NL, NV), step(0.0, s));
-    float d = 1.0 - metallic;
-
-    float sigma2 = roughness * roughness;
-    float A = 1.0 + sigma2 * (d / (sigma2 + 0.13) + 0.5 / (sigma2 + 0.33));
-    float B = 0.45 * sigma2 / (sigma2 + 0.09);
-
-    diffuse = albedo * NL * (1.0 - F) * (A + B * s / t) / PI;
+    return intersect;
 }
 
-vec3 calculateLighting(Fragment fragment, vec3 viewDirection, vec3 lightDirection, vec3 lightColor, float ambientFactor)
+vec3 mul(mat3 m, vec3 v)
 {
-    float roughness = clamp(fragment.Roughness, 0.05, 0.95);
-    float metallic = clamp(fragment.Metallic, 0.05, 0.95);
-
-    vec3 specularColor = vec3(0.0);
-    vec3 diffuseColor = vec3(0.0);
-    GGXCookTorranceSampled(fragment.Normal, lightDirection, viewDirection, roughness, metallic, fragment.Albedo,
-        specularColor, diffuseColor);
-
-    vec3 ambientColor = diffuseColor * ambientFactor;
-    vec3 totalColor = (ambientColor + diffuseColor + specularColor) * lightColor;
-    return totalColor;
+    return m * v;
 }
 
-void main() 
+mat3 mul(mat3 m1, mat3 m2)
+{
+    return m1 * m2;
+}
+
+vec3 rotationX(vec3 v, float a)
+{
+    vec3 r;
+    r.x = v.x;
+    r.y = v.y * cos(a) - v.z * sin(a);
+    r.z = v.y * sin(a) + v.z * cos(a);
+    return r;
+}
+
+vec3 rotationY(vec3 v, float a)
+{
+    vec3 r;
+    r.x = v.x * cos(a) + v.z * sin(a);
+    r.y = v.y;
+    r.z = -v.x * sin(a) + v.z * cos(a);
+    return r;
+}
+
+vec3 rotationZ(vec3 v, float a)
+{
+    vec3 r;
+    r.x = v.x * cos(a) - v.y * sin(a);
+    r.y = v.x * sin(a) + v.y * cos(a);
+    r.z = v.z;
+    return r;
+}
+
+vec3 rotationYXZ(vec3 v, vec3 rot)
+{
+    return rotationZ(rotationX(rotationY(v, rot.y), rot.x), rot.z);
+}
+
+// Linearly Transformed Cosines
+///////////////////////////////
+
+float IntegrateEdge(vec3 v1, vec3 v2)
+{
+    float cosTheta = dot(v1, v2);
+    cosTheta = clamp(cosTheta, -0.9999, 0.9999);
+
+    float theta = acos(cosTheta);    
+    float res = cross(v1, v2).z * theta / sin(theta);
+
+    return res;
+}
+
+void ClipQuadToHorizon(inout vec3 L[5], out int n)
+{
+    // detect clipping config
+    int config = 0;
+    if (L[0].z > 0.0) config += 1;
+    if (L[1].z > 0.0) config += 2;
+    if (L[2].z > 0.0) config += 4;
+    if (L[3].z > 0.0) config += 8;
+
+    // clip
+    n = 0;
+
+    if (config == 0)
+    {
+        // clip all
+    }
+    else if (config == 1) // V1 clip V2 V3 V4
+    {
+        n = 3;
+        L[1] = -L[1].z * L[0] + L[0].z * L[1];
+        L[2] = -L[3].z * L[0] + L[0].z * L[3];
+    }
+    else if (config == 2) // V2 clip V1 V3 V4
+    {
+        n = 3;
+        L[0] = -L[0].z * L[1] + L[1].z * L[0];
+        L[2] = -L[2].z * L[1] + L[1].z * L[2];
+    }
+    else if (config == 3) // V1 V2 clip V3 V4
+    {
+        n = 4;
+        L[2] = -L[2].z * L[1] + L[1].z * L[2];
+        L[3] = -L[3].z * L[0] + L[0].z * L[3];
+    }
+    else if (config == 4) // V3 clip V1 V2 V4
+    {
+        n = 3;
+        L[0] = -L[3].z * L[2] + L[2].z * L[3];
+        L[1] = -L[1].z * L[2] + L[2].z * L[1];
+    }
+    else if (config == 5) // V1 V3 clip V2 V4) impossible
+    {
+        n = 0;
+    }
+    else if (config == 6) // V2 V3 clip V1 V4
+    {
+        n = 4;
+        L[0] = -L[0].z * L[1] + L[1].z * L[0];
+        L[3] = -L[3].z * L[2] + L[2].z * L[3];
+    }
+    else if (config == 7) // V1 V2 V3 clip V4
+    {
+        n = 5;
+        L[4] = -L[3].z * L[0] + L[0].z * L[3];
+        L[3] = -L[3].z * L[2] + L[2].z * L[3];
+    }
+    else if (config == 8) // V4 clip V1 V2 V3
+    {
+        n = 3;
+        L[0] = -L[0].z * L[3] + L[3].z * L[0];
+        L[1] = -L[2].z * L[3] + L[3].z * L[2];
+        L[2] = L[3];
+    }
+    else if (config == 9) // V1 V4 clip V2 V3
+    {
+        n = 4;
+        L[1] = -L[1].z * L[0] + L[0].z * L[1];
+        L[2] = -L[2].z * L[3] + L[3].z * L[2];
+    }
+    else if (config == 10) // V2 V4 clip V1 V3) impossible
+    {
+        n = 0;
+    }
+    else if (config == 11) // V1 V2 V4 clip V3
+    {
+        n = 5;
+        L[4] = L[3];
+        L[3] = -L[2].z * L[3] + L[3].z * L[2];
+        L[2] = -L[2].z * L[1] + L[1].z * L[2];
+    }
+    else if (config == 12) // V3 V4 clip V1 V2
+    {
+        n = 4;
+        L[1] = -L[1].z * L[2] + L[2].z * L[1];
+        L[0] = -L[0].z * L[3] + L[3].z * L[0];
+    }
+    else if (config == 13) // V1 V3 V4 clip V2
+    {
+        n = 5;
+        L[4] = L[3];
+        L[3] = L[2];
+        L[2] = -L[1].z * L[2] + L[2].z * L[1];
+        L[1] = -L[1].z * L[0] + L[0].z * L[1];
+    }
+    else if (config == 14) // V2 V3 V4 clip V1
+    {
+        n = 5;
+        L[4] = -L[0].z * L[3] + L[3].z * L[0];
+        L[0] = -L[0].z * L[1] + L[1].z * L[0];
+    }
+    else if (config == 15) // V1 V2 V3 V4
+    {
+        n = 4;
+    }
+
+    if (n == 3)
+        L[3] = L[0];
+    if (n == 4)
+        L[4] = L[0];
+}
+
+
+vec2 LTC_Coords(float cosTheta, float roughness)
+{
+    float theta = acos(cosTheta);
+    vec2 coords = vec2(roughness, theta / (0.5 * PI));
+
+    const float LUT_SIZE = 32.0;
+    // scale and bias coordinates, for correct filtered lookup
+    coords = coords * (LUT_SIZE - 1.0) / LUT_SIZE + 0.5 / LUT_SIZE;
+
+    return coords;
+}
+
+
+vec3 LTC_Evaluate(
+    vec3 N, vec3 V, vec3 P, mat3 Minv, vec3 points[4], bool twoSided)
+{
+    // construct orthonormal basis around N
+    vec3 T1, T2;
+    T1 = normalize(V - N * dot(V, N));
+    T2 = cross(N, T1);
+
+    // rotate area light in (T1, T2, N) basis
+    Minv = mul(Minv, transpose(mat3(T1, T2, N)));
+
+    // polygon (allocate 5 vertices for clipping)
+    vec3 L[5];
+    L[0] = mul(Minv, points[0] - P);
+    L[1] = mul(Minv, points[1] - P);
+    L[2] = mul(Minv, points[2] - P);
+    L[3] = mul(Minv, points[3] - P);
+    L[4] = L[3]; // avoid warning
+
+    int n;
+    ClipQuadToHorizon(L, n);
+
+    if (n == 0)
+        return vec3(0, 0, 0);
+
+    // project onto sphere
+    L[0] = normalize(L[0]);
+    L[1] = normalize(L[1]);
+    L[2] = normalize(L[2]);
+    L[3] = normalize(L[3]);
+    L[4] = normalize(L[4]);
+
+    // integrate
+    float sum = 0.0;
+
+    sum += IntegrateEdge(L[0], L[1]);
+    sum += IntegrateEdge(L[1], L[2]);
+    sum += IntegrateEdge(L[2], L[3]);
+    if (n >= 4)
+        sum += IntegrateEdge(L[3], L[4]);
+    if (n == 5)
+        sum += IntegrateEdge(L[4], L[0]);
+
+    sum = twoSided ? abs(sum) : max(0.0, sum);
+
+    vec3 Lo_i = vec3(sum, sum, sum);
+
+    return Lo_i;
+}
+
+// Scene helpers
+////////////////
+
+void InitRect(out Rect rect, vec3 position, vec3 rotation, float width, float height)
+{
+    rect.dirx = rotationYXZ(vec3(1, 0, 0), rotation);
+    rect.diry = rotationYXZ(vec3(0, 1, 0), rotation);
+
+    rect.center = position;
+    rect.halfx = 0.5 * width;
+    rect.halfy = 0.5 * height;
+
+    vec3 rectNormal = cross(rect.dirx, rect.diry);
+    rect.plane = vec4(rectNormal, -dot(rectNormal, rect.center));
+}
+
+void InitRectPoints(Rect rect, out vec3 points[4])
+{
+    vec3 ex = rect.halfx * rect.dirx;
+    vec3 ey = rect.halfy * rect.diry;
+
+    points[0] = rect.center - ex - ey;
+    points[1] = rect.center + ex - ey;
+    points[2] = rect.center + ex + ey;
+    points[3] = rect.center - ex + ey;
+}
+
+void main()
 {
     Material material = uMaterials[uMaterialIndex];
     vec4 albedoColor = texture(sampler2D(uTextures[material.AlbedoIndex], uTextureSampler), vTexCoord).rgba;
@@ -144,11 +449,49 @@ void main()
     fragment.Albedo = pow(albedoColor.rgb, vec3(GAMMA));
     fragment.Normal = vNormalMatrix * vec3(2.0 * normalColor - 1.0);
     fragment.Metallic = metallicRoughnessColor.b;
-    fragment.Roughness = metallicRoughnessColor.g;
+    fragment.Roughness = material.RoughnessScale * metallicRoughnessColor.g;
 
-    vec3 viewDirection = normalize(uCameraPosition - vPosition); 
+    vec3 viewDirection = normalize(uCameraPosition - vPosition);
 
-    vec3 totalColor = calculateLighting(fragment, viewDirection, uLightDirection, uLightColor_uAmbientIntensity.rgb, uLightColor_uAmbientIntensity.a);
+    Rect rect;
+    InitRect(rect, uLightPosition_Width.xyz, uLightRotation_Height.xyz, uLightPosition_Width.w, uLightRotation_Height.w);
+    vec3 points[4];
+    InitRectPoints(rect, points);
 
-    oColor = vec4(pow(totalColor, vec3(1.0 /  GAMMA)), 1.0);
+    vec3 lightColor = vec3(uLightColor_Intensity.rgb * uLightColor_Intensity.a);
+    vec3 diffuseColor = fragment.Albedo * (1.0 - fragment.Metallic);
+    vec3 specularColor = fragment.Albedo;
+
+    Ray ray;
+    ray.origin = uCameraPosition;
+    ray.dir = -viewDirection;
+
+    const bool twoSided = true;
+
+    vec2 uv = LTC_Coords(dot(fragment.Normal, -viewDirection), fragment.Roughness);
+
+    vec4 t = texture(uLookupLTCMatrix, uv);
+    mat3 Minv = mat3(
+        vec3(1, 0, t.y),
+        vec3(0, t.z, 0),
+        vec3(t.w, 0, t.x)
+    );
+
+    vec3 specular = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, Minv, points, twoSided);
+
+    vec2 schlick = texture(uLookupLTCAmplitude, uv).xy;
+
+    specularColor = specularColor * schlick.x + (1.0 - specularColor) * schlick.y;
+
+    vec3 diffuse = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, mat3(1), points, twoSided);
+
+    vec3 totalColor = lightColor * (specularColor * specular + diffuseColor * diffuse);
+    totalColor /= (2.0 * PI);
+
+    float distanceToRect;
+    if (RayRectIntersect(ray, rect, distanceToRect))
+        if ((distanceToRect < length(vPosition - uCameraPosition)))
+            totalColor = lightColor;
+
+    oColor = vec4(pow(totalColor, vec3(1.0 / GAMMA)), 1.0);
 }

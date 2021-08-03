@@ -53,6 +53,7 @@ namespace VulkanAbstractionLayer
             ImageData AlbedoTexture;
             ImageData NormalTexture;
             ImageData MetallicRoughness;
+            float RoughnessScale = 1.0f;
         };
 
         struct Shape

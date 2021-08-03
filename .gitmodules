@@ -28,3 +28,6 @@
 [submodule "submodules/tinygltf"]
 	path = submodules/tinygltf
 	url = https://github.com/syoyo/tinygltf
+[submodule "submodules/tinyddsloader"]
+	path = submodules/tinyddsloader
+	url = https://github.com/benikabocha/tinyddsloader

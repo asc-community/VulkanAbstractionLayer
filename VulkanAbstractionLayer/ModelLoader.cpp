@@ -189,6 +189,7 @@ namespace VulkanAbstractionLayer
 
             // not supported by obj format
             resultMaterial.MetallicRoughness = CreateStubTexture(0, 255, 0, 255);
+            resultMaterial.RoughnessScale = 1.0f;
         }
 
         result.Shapes.reserve(shapes.size());
@@ -255,6 +256,7 @@ namespace VulkanAbstractionLayer
             auto& resultMaterial = result.Materials.emplace_back();
             
             resultMaterial.Name = material.name;
+            resultMaterial.RoughnessScale = material.pbrMetallicRoughness.roughnessFactor;
 
             if (material.pbrMetallicRoughness.baseColorTexture.index != -1)
             {

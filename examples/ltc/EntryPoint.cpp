@@ -37,7 +37,7 @@ struct Mesh
         uint32_t AlbedoIndex;
         uint32_t NormalIndex;
         uint32_t MetallicRoughnessIndex;
-        uint32_t Stub;
+        float RoughnessScale;
     };
     constexpr static size_t MaxMaterialCount = 256;
 
@@ -59,12 +59,49 @@ struct SharedResources
     Buffer MaterialUniformBuffer;
     Buffer LightUniformBuffer;
     Mesh Sponza;
+    Image LookupLTCMatrix;
+    Image LookupLTCAmplitude;
 };
 
-Mesh CreateSponza()
+void LoadLookupTextures(Image& lookupLTCMatrix, Image& lookupLTCAmplitude)
 {
-    Mesh mesh;
-    auto sponza = ModelLoader::LoadFromGltf("models/Sponza/glTF/Sponza.gltf");
+    auto lookupMatrixTexture = ImageLoader::LoadFromFile("resources/lookup/ltc_matrix.dds");
+    auto lookupAmplitudeTexture = ImageLoader::LoadFromFile("resources/lookup/ltc_amplitude.dds");
+
+    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
+    auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+
+    commandBuffer.Begin();
+
+    lookupLTCMatrix.Init(
+        lookupMatrixTexture.Width,
+        lookupMatrixTexture.Height,
+        Format::R32G32B32A32_SFLOAT,
+        ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
+        MemoryUsage::GPU_ONLY
+    );
+    auto lookupMatrixAllocation = stageBuffer.Submit(MakeView(lookupMatrixTexture.ByteData));
+    commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), lookupMatrixAllocation.Offset, lookupLTCMatrix, ImageUsage::UNKNOWN, lookupMatrixAllocation.Size);
+
+    lookupLTCAmplitude.Init(
+        lookupAmplitudeTexture.Width,
+        lookupAmplitudeTexture.Height,
+        Format::R32G32_SFLOAT,
+        ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
+        MemoryUsage::GPU_ONLY
+    );
+    auto lookupAmplitudeAllocation = stageBuffer.Submit(MakeView(lookupAmplitudeTexture.ByteData));
+    commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), lookupAmplitudeAllocation.Offset, lookupLTCAmplitude, ImageUsage::UNKNOWN, lookupAmplitudeAllocation.Size);
+
+    stageBuffer.Flush();
+    commandBuffer.End();
+    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
+    stageBuffer.Reset();
+}
+
+void LoadSponzaModel(Mesh& mesh)
+{
+    auto sponza = ModelLoader::LoadFromGltf("resources/Sponza/glTF/Sponza.gltf");
     
     auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
     auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
@@ -129,7 +166,7 @@ Mesh CreateSponza()
         auto metallicRoughnessAllocation = stageBuffer.Submit(MakeView(material.MetallicRoughness.ByteData));
         commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), metallicRoughnessAllocation.Offset, metallicRoughnessImage, ImageUsage::UNKNOWN, metallicRoughnessAllocation.Size);
 
-        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2 });
+        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, 1.0f });
         textureIndex += 3;
 
         stageBuffer.Flush();
@@ -137,8 +174,6 @@ Mesh CreateSponza()
         GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
         stageBuffer.Reset();
     }
-
-    return mesh;
 }
 
 class UniformSubmitRenderPass : public RenderPass
@@ -159,9 +194,12 @@ public:
 
     struct LightUniformData
     {
+        Vector3 Position;
+        float Width;
+        Vector3 Rotation;
+        float Height;
         Vector3 Color;
-        float AmbientIntensity;
-        Vector3 Direction;
+        float Intensity;
     } LightUniform;
 
     UniformSubmitRenderPass(SharedResources& sharedResources)
@@ -244,6 +282,8 @@ public:
         pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.LookupLTCMatrix, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.LookupLTCAmplitude, ImageUsage::TRANSFER_DISTINATION);
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
@@ -251,7 +291,9 @@ public:
             .Bind(2, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(3, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
-            .Bind(5, this->TextureSampler, UniformType::SAMPLER);
+            .Bind(5, this->TextureSampler, UniformType::SAMPLER)
+            .Bind(6, this->sharedResources.LookupLTCMatrix, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(7, this->sharedResources.LookupLTCAmplitude, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -264,6 +306,8 @@ public:
         depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         depedencies.AddImages(this->textureArray, ImageUsage::SHADER_READ);
+        depedencies.AddImage(this->sharedResources.LookupLTCMatrix, ImageUsage::SHADER_READ);
+        depedencies.AddImage(this->sharedResources.LookupLTCAmplitude, ImageUsage::SHADER_READ);
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -382,18 +426,23 @@ int main()
         Buffer{ sizeof(Mesh::Material) * Mesh::MaxMaterialCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(UniformSubmitRenderPass::LightUniform),   BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // sponza
+        { }, // ltc matrix lookup
+        { }, // ltc amplitude lookup
     };
 
-    sharedResources.Sponza = CreateSponza();
+    LoadSponzaModel(sharedResources.Sponza);
     Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
+    LoadLookupTextures(sharedResources.LookupLTCMatrix, sharedResources.LookupLTCAmplitude);
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 
     Camera camera;
     Vector3 modelRotation{ 0.0f, 0.0f, 0.0f };
     Vector3 lightColor{ 0.7f, 0.7f, 0.7f };
-    Vector3 lightDirection{ -0.3f, 1.0f, -0.6f };
-    float lightAmbientIntensity = 0.3f;
+    Vector3 lightRotation{ 0.0f, 0.0f, 0.0f };
+    Vector3 lightPosition{ 0.0f, 200.0f, 0.0f };
+    Vector2 lightSize{ 200.0f, 200.0f };
+    float lightIntensity = 1.0f;
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
@@ -469,8 +518,10 @@ int main()
 
             ImGui::Begin("Light");
             ImGui::ColorEdit3("color", &lightColor[0], ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
-            ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
-            ImGui::DragFloat("ambient intensity", &lightAmbientIntensity, 0.01f);
+            ImGui::DragFloat3("rotation", &lightRotation[0], 0.01f);
+            ImGui::DragFloat3("position", &lightPosition[0]);
+            ImGui::DragFloat2("size", &lightSize[0]);
+            ImGui::DragFloat("intensity", &lightIntensity, 0.01f);
             ImGui::End();
 
             ImGui::Begin("Performace");
@@ -483,13 +534,16 @@ int main()
             {
                 ImGui::PushID(materialIndex++);
 
-                ImGui::BeginTable("images", 3);
+                ImGui::BeginTable("material", 4);
 
+                ImGui::TableSetupColumn("roughness");
                 ImGui::TableSetupColumn("albedo image");
                 ImGui::TableSetupColumn("normal image");
                 ImGui::TableSetupColumn("metallic-roughness image");
                 ImGui::TableHeadersRow();
 
+                ImGui::TableNextColumn();
+                ImGui::DragFloat("scale", &material.RoughnessScale, 0.01f, 0.0f, 1.0f);
                 ImGui::TableNextColumn();
                 ImGui::Image(ImGuiRegisteredImages.at(material.AlbedoIndex), { 128.0f, 128.0f });
                 ImGui::TableNextColumn();
@@ -509,8 +563,11 @@ int main()
             uniformSubmitPass.CameraUniform.Position = camera.Position;
             uniformSubmitPass.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
             uniformSubmitPass.LightUniform.Color = lightColor;
-            uniformSubmitPass.LightUniform.AmbientIntensity = lightAmbientIntensity;
-            uniformSubmitPass.LightUniform.Direction = Normalize(lightDirection);
+            uniformSubmitPass.LightUniform.Rotation = lightRotation;
+            uniformSubmitPass.LightUniform.Position = lightPosition;
+            uniformSubmitPass.LightUniform.Width = lightSize.x;
+            uniformSubmitPass.LightUniform.Height = lightSize.y;
+            uniformSubmitPass.LightUniform.Intensity = lightIntensity;
 
             renderGraph->Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph->Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());
