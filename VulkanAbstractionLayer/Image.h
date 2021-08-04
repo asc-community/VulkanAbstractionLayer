@@ -44,7 +44,7 @@ namespace VulkanAbstractionLayer
 
         enum Bits : Value
         {
-            UNKNOWN = (Value)vk::ImageViewCreateFlagBits{ },
+            UNKNOWN = (Value)vk::ImageUsageFlagBits{ },
             TRANSFER_SOURCE = (Value)vk::ImageUsageFlagBits::eTransferSrc,
             TRANSFER_DISTINATION = (Value)vk::ImageUsageFlagBits::eTransferDst,
             SHADER_READ = (Value)vk::ImageUsageFlagBits::eSampled,
@@ -61,6 +61,12 @@ namespace VulkanAbstractionLayer
         NATIVE = 0,
         DEPTH,
         STENCIL,
+    };
+
+    enum class Mipmapping
+    {
+        NO_MIPMAPS,
+        USE_MIPMAPS,
     };
 
     vk::ImageAspectFlags ImageFormatToImageAspect(Format format);
@@ -80,6 +86,7 @@ namespace VulkanAbstractionLayer
         vk::Image handle;
         ImageViews imageViews;
         vk::Extent2D extent = { 0u, 0u };
+        uint32_t mipLevelCount = 1;
         Format format = Format::UNDEFINED;
         VmaAllocation allocation = { };
 
@@ -87,13 +94,13 @@ namespace VulkanAbstractionLayer
         void InitViews(const vk::Image& image, Format format);
     public:
         Image() = default;
-        Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage);
+        Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, Mipmapping mipmapping);
         Image(vk::Image image, uint32_t width, uint32_t height, Format format);
         Image(Image&& other) noexcept;
         Image& operator=(Image&& other) noexcept;
         ~Image();
 
-        void Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage);
+        void Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, Mipmapping mipmapping);
 
         vk::ImageView GetNativeView(ImageView view) const;
 
@@ -101,6 +108,7 @@ namespace VulkanAbstractionLayer
         Format GetFormat() const { return this->format; }
         uint32_t GetWidth() const { return this->extent.width; }
         uint32_t GetHeight() const { return this->extent.height; }
+        uint32_t GetMipLevelCount() const { return this->mipLevelCount; }
     };
 
     vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image);

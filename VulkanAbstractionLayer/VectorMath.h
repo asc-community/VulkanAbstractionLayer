@@ -33,6 +33,7 @@
 #include <glm/ext.hpp>
 #include <glm/gtx/euler_angles.hpp>
 #include <glm/simd/matrix.h>
+#include <utility>
 
 namespace VulkanAbstractionLayer
 {
@@ -65,6 +66,12 @@ namespace VulkanAbstractionLayer
         return glm::length(v);
     }
 
+    template<typename T>
+    float Dot(const T& v1, const T& v2)
+    {
+        return glm::dot(v1, v2);
+    }
+
     inline float ToRadians(float degrees)
     {
         return glm::radians(degrees);
@@ -93,5 +100,25 @@ namespace VulkanAbstractionLayer
     inline Matrix4x4 MakeOrthographicMatrix(float xLow, float xHigh, float yLow, float yHigh, float zLow, float zHigh)
     {
         return glm::ortho(xLow, xHigh, yLow, yHigh, zLow, zHigh);
+    }
+
+    inline std::pair<Vector3, Vector3> ComputeTangentSpace(
+        const Vector3& pos1, const Vector3& pos2, const Vector3& pos3,
+        const Vector2& tex1, const Vector2& tex2, const Vector2& tex3
+    )
+    {
+        // Edges of the triangle : postion delta
+        auto deltaPos1 = pos2 - pos1;
+        auto deltaPos2 = pos3 - pos1;
+
+        // texture delta
+        auto deltaT1 = tex2 - tex1;
+        auto deltaT2 = tex3 - tex1;
+
+        float r = 1.0f / (deltaT1.x * deltaT2.y - deltaT1.y * deltaT2.x);
+        auto tangent = (deltaPos1 * deltaT2.y - deltaPos2 * deltaT1.y) * r;
+        auto bitangent = (deltaPos2 * deltaT1.x - deltaPos1 * deltaT2.x) * r;
+
+        return std::make_pair(Normalize(tangent), Normalize(bitangent));
     }
 }

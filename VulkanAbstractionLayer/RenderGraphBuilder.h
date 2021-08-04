@@ -102,6 +102,7 @@ namespace VulkanAbstractionLayer
         {
             ImageUsage::Bits InitialUsage;
             Format ImageFormat;
+            uint32_t MipLevelCount;
         };
 
         struct ExternalBuffer

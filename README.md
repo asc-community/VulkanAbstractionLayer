@@ -164,3 +164,4 @@ while (!window.ShouldClose())
 
 ## Some Examples
 ![instanced-dragons](preview/instanced-dragons.png)
+![ltc-rectange](preview/ltc-rectangle.png))

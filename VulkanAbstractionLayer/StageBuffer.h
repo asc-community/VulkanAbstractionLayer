@@ -56,7 +56,13 @@ namespace VulkanAbstractionLayer
 		template<typename T>
 		Allocation Submit(ArrayView<const T> view)
 		{
-			return this->Submit((uint8_t*)view.data(), uint32_t(view.size() * sizeof(T)));
+			return this->Submit((const uint8_t*)view.data(), uint32_t(view.size() * sizeof(T)));
+		}
+
+		template<typename T>
+		Allocation Submit(ArrayView<T> view)
+		{
+			return this->Submit((const uint8_t*)view.data(), uint32_t(view.size() * sizeof(T)));
 		}
 
 		template<typename T>

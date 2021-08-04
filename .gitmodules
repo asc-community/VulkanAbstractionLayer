@@ -6,14 +6,13 @@
 	url = https://github.com/g-truc/glm
 [submodule "submodules/imgui"]
 	path = submodules/imgui
-	url = https://github.com/ocornut/imgui
+	url = https://github.com/MomoDeve/imgui
 [submodule "submodules/VulkanMemoryAllocator"]
 	path = submodules/VulkanMemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
 [submodule "submodules/glslang"]
 	path = submodules/glslang
 	url = https://github.com/KhronosGroup/glslang
-
 [submodule "submodules/tinyobjloader"]
 	path = submodules/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader
@@ -26,3 +25,9 @@
 [submodule "submodules/stb"]
 	path = submodules/stb
 	url = https://github.com/nothings/stb
+[submodule "submodules/tinygltf"]
+	path = submodules/tinygltf
+	url = https://github.com/syoyo/tinygltf
+[submodule "submodules/tinyddsloader"]
+	path = submodules/tinyddsloader
+	url = https://github.com/benikabocha/tinyddsloader

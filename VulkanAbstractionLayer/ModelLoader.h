@@ -32,6 +32,7 @@
 
 #include "ShaderReflection.h"
 #include "VectorMath.h"
+#include "ImageLoader.h"
 
 namespace VulkanAbstractionLayer
 {
@@ -42,19 +43,34 @@ namespace VulkanAbstractionLayer
             Vector3 Position{ 0.0f, 0.0f, 0.0f };
             Vector2 TexCoord{ 0.0f, 0.0f };
             Vector3 Normal{ 0.0f, 0.0f, 0.0f };
+            Vector3 Tangent{ 0.0f, 0.0f, 0.0f };
+            Vector3 Bitangent{ 0.0f, 0.0f, 0.0f };
+        };
+
+        struct Material
+        {
+            std::string Name;
+            ImageData AlbedoTexture;
+            ImageData NormalTexture;
+            ImageData MetallicRoughness;
+            float RoughnessScale = 1.0f;
         };
 
         struct Shape
         {
+            std::string Name;
             std::vector<Vertex> Vertices;
+            uint32_t MaterialIndex = 0;
         };
 
         std::vector<Shape> Shapes;
+        std::vector<Material> Materials;
     };
 
     class ModelLoader
     {
     public:
         static ModelData LoadFromObj(const std::string& filepath);
+        static ModelData LoadFromGltf(const std::string& filepath);
     };
 }

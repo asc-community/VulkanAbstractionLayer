@@ -212,6 +212,20 @@ namespace VulkanAbstractionLayer
         return TypeSPIRV{ format, componentCount, byteSize };
     }
 
+    void RecursiveUniformVisit(std::vector<TypeSPIRV>& uniformVariables, const SpvReflectTypeDescription& type)
+    {
+        if (type.member_count > 0)
+        {
+            for (uint32_t i = 0; i < type.member_count; i++)
+                RecursiveUniformVisit(uniformVariables, type.members[i]);
+        }
+        else
+        {
+            if(type.type_flags & (SPV_REFLECT_TYPE_FLAG_INT | SPV_REFLECT_TYPE_FLAG_FLOAT))
+                uniformVariables.push_back(GetTypeByReflection(type));
+        }
+    }
+
     ShaderData ShaderLoader::LoadFromBinaryFile(const std::string& filepath)
     {
         std::vector<uint32_t> bytecode;
@@ -292,12 +306,8 @@ namespace VulkanAbstractionLayer
 
             auto& uniformBlock = result.DescriptorSets[descriptorBinding->set];
 
-            std::vector<TypeSPIRV> uniformVariables(descriptorBinding->type_description->member_count);
-            for (uint32_t i = 0; i < uniformVariables.size(); i++)
-            {
-                SpvReflectTypeDescription& member = descriptorBinding->type_description->members[i];
-                uniformVariables[i] = GetTypeByReflection(member);
-            }
+            std::vector<TypeSPIRV> uniformVariables;
+            RecursiveUniformVisit(uniformVariables, *descriptorBinding->type_description);
 
             uniformBlock.push_back(Uniform { 
                 std::move(uniformVariables),

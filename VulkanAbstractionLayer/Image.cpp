@@ -153,7 +153,7 @@ namespace VulkanAbstractionLayer
         return vk::ImageSubresourceRange{
             ImageFormatToImageAspect(image.GetFormat()),
             0, // base mip level
-            1, // level count
+            image.GetMipLevelCount(),
             0, // base layer
             1  // layer count
         };
@@ -220,9 +220,9 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    Image::Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage)
+    Image::Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, Mipmapping mipmapping)
     {
-        this->Init(width, height, format, usage, memoryUsage);
+        this->Init(width, height, format, usage, memoryUsage, mipmapping);
     }
 
     Image::Image(vk::Image image, uint32_t width, uint32_t height, Format format)
@@ -239,12 +239,14 @@ namespace VulkanAbstractionLayer
         this->extent = other.extent;
         this->format = other.format;
         this->allocation = other.allocation;
+        this->mipLevelCount = other.mipLevelCount;
 
         other.handle = vk::Image{ };
         other.imageViews = { };
         other.extent = vk::Extent2D{ 0u, 0u };
         other.format = Format::UNDEFINED;
         other.allocation = { };
+        other.mipLevelCount = 1;
     }
 
     Image& Image::operator=(Image&& other) noexcept
@@ -256,12 +258,14 @@ namespace VulkanAbstractionLayer
         this->extent = other.extent;
         this->format = other.format;
         this->allocation = other.allocation;
+        this->mipLevelCount = other.mipLevelCount;
 
         other.handle = vk::Image{ };
         other.imageViews = { };
         other.extent = vk::Extent2D{ 0u, 0u };
         other.format = Format::UNDEFINED;
         other.allocation = { };
+        other.mipLevelCount = 1;
 
         return *this;
     }
@@ -271,23 +275,28 @@ namespace VulkanAbstractionLayer
         this->Destroy();
     }
 
-    void Image::Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage)
+    void Image::Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, Mipmapping mipmapping)
     {
+        if (mipmapping == Mipmapping::USE_MIPMAPS)
+            this->mipLevelCount = (uint32_t)std::floor(std::log2(std::max(width, height))) + 1;
+        else
+            this->mipLevelCount = 1;
+
         vk::ImageCreateInfo imageCreateInfo;
         imageCreateInfo
             .setImageType(vk::ImageType::e2D)
             .setFormat(ToNative(format))
             .setExtent(vk::Extent3D{ width, height, 1 })
             .setSamples(vk::SampleCountFlagBits::e1)
-            .setMipLevels(1)
+            .setMipLevels(this->GetMipLevelCount())
             .setArrayLayers(1)
             .setTiling(vk::ImageTiling::eOptimal)
             .setUsage((vk::ImageUsageFlags)usage)
             .setSharingMode(vk::SharingMode::eExclusive)
             .setInitialLayout(vk::ImageLayout::eUndefined);
         
-        this->allocation = AllocateImage(imageCreateInfo, memoryUsage, &this->handle);
         this->extent = vk::Extent2D{ (uint32_t)width, (uint32_t)height };
+        this->allocation = AllocateImage(imageCreateInfo, memoryUsage, &this->handle);
         this->InitViews(this->handle, format);
     }
 

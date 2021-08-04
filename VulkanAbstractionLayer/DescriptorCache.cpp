@@ -60,7 +60,7 @@ namespace VulkanAbstractionLayer
         descriptorPoolCreateInfo
             .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
             .setPoolSizes(descriptorPoolSizes)
-            .setMaxSets(1024 * (uint32_t)descriptorPoolSizes.size());
+            .setMaxSets(2048 * (uint32_t)descriptorPoolSizes.size());
 
         this->descriptorPool = vulkan.GetDevice().createDescriptorPool(descriptorPoolCreateInfo);
 	}

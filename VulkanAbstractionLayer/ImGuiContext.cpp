@@ -29,7 +29,7 @@
 #include "ImGuiContext.h"
 #include "VulkanContext.h"
 #include "Window.h"
-#include "imgui.h"
+#include "Sampler.h"
 #include "backends/imgui_impl_vulkan.h"
 #include "backends/imgui_impl_glfw.h"
 
@@ -85,6 +85,21 @@ namespace VulkanAbstractionLayer
         ImGui::Render();
         ImDrawData* drawData = ImGui::GetDrawData();
         ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
+    }
+
+    ImTextureID ImGuiVulkanContext::RegisterImage(const vk::ImageView& imageView, const vk::Sampler& sampler)
+    {
+        return ImGui_ImplVulkan_AddTexture(sampler, imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+
+    ImTextureID ImGuiVulkanContext::RegisterImage(const Image& image, const Sampler& sampler)
+    {
+        return ImGuiVulkanContext::RegisterImage(image.GetNativeView(ImageView::NATIVE), sampler.GetNativeHandle());
+    }
+
+    void ImGuiVulkanContext::UnregisterImage(ImTextureID id)
+    {
+        ImGui_ImplVulkan_RemoveTexture(id);
     }
 
     void ImGuiVulkanContext::EndFrame()
