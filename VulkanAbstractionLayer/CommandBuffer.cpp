@@ -386,4 +386,114 @@ namespace VulkanAbstractionLayer
             BlitFilterToNative(filter)
         );
     }
+
+    void CommandBuffer::GenerateMipLevels(const Image& image, ImageUsage::Bits initialUsage, BlitFilter filter)
+    {
+        if (image.GetMipLevelCount() < 2) return;
+
+        auto sourceRange = GetDefaultImageSubresourceRange(image);
+        auto distanceRange = GetDefaultImageSubresourceRange(image);
+        auto sourceLayers = GetDefaultImageSubresourceLayers(image);
+        auto distanceLayers = GetDefaultImageSubresourceLayers(image);
+        auto sourceUsage = initialUsage;
+        auto distanceUsage = initialUsage;
+        uint32_t sourceWidth = image.GetWidth();
+        uint32_t sourceHeight = image.GetHeight();
+        uint32_t distanceWidth = image.GetWidth();
+        uint32_t distanceHeight = image.GetHeight();
+
+        for (size_t i = 0; i + 1 < image.GetMipLevelCount(); i++)
+        {
+            sourceWidth = distanceWidth;
+            sourceHeight = distanceHeight;
+            distanceWidth = std::max(sourceWidth / 2, 1u);
+            distanceHeight = std::max(sourceHeight / 2, 1u);
+            
+            sourceLayers.setMipLevel(i);
+            sourceRange.setBaseMipLevel(i);
+            sourceRange.setLevelCount(1);
+
+            distanceLayers.setMipLevel(i + 1);
+            distanceRange.setBaseMipLevel(i + 1);
+            distanceRange.setLevelCount(1);
+
+            sourceUsage = distanceUsage;
+            distanceUsage = ImageUsage::UNKNOWN;
+
+            std::array<vk::ImageMemoryBarrier, 2> imageBarriers;
+            imageBarriers[0] // to transfer source
+                .setSrcAccessMask(ImageUsageToAccessFlags(sourceUsage))
+                .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
+                .setOldLayout(ImageUsageToImageLayout(sourceUsage))
+                .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setImage(image.GetNativeHandle())
+                .setSubresourceRange(sourceRange);
+
+            imageBarriers[1] // to transfer distance
+                .setSrcAccessMask(ImageUsageToAccessFlags(distanceUsage))
+                .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
+                .setOldLayout(ImageUsageToImageLayout(distanceUsage))
+                .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setImage(image.GetNativeHandle())
+                .setSubresourceRange(distanceRange);
+
+            this->handle.pipelineBarrier(
+                vk::PipelineStageFlagBits::eTransfer,
+                vk::PipelineStageFlagBits::eTransfer,
+                { }, // dependencies
+                { }, // memory barriers
+                { }, // buffer barriers,
+                imageBarriers
+            );
+
+            vk::ImageBlit imageBlitInfo;
+            imageBlitInfo
+                .setSrcOffsets({
+                    vk::Offset3D{ 0, 0, 0 },
+                    vk::Offset3D{ (int32_t)sourceWidth, (int32_t)sourceHeight, 1 }
+                })
+                .setDstOffsets({
+                    vk::Offset3D{ 0, 0, 0 },
+                    vk::Offset3D{ (int32_t)distanceWidth, (int32_t)distanceHeight, 1 }
+                })
+                .setSrcSubresource(sourceLayers)
+                .setDstSubresource(distanceLayers);
+
+            this->handle.blitImage(
+                image.GetNativeHandle(),
+                vk::ImageLayout::eTransferSrcOptimal,
+                image.GetNativeHandle(),
+                vk::ImageLayout::eTransferDstOptimal,
+                imageBlitInfo,
+                BlitFilterToNative(filter)
+            );
+
+        }
+
+        auto mipLevelsSubresourceRange = GetDefaultImageSubresourceRange(image);
+        mipLevelsSubresourceRange.setLevelCount(mipLevelsSubresourceRange.levelCount - 1);
+        vk::ImageMemoryBarrier mipLevelsTransfer;
+        mipLevelsTransfer
+            .setSrcAccessMask(vk::AccessFlagBits::eTransferRead)
+            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setOldLayout(vk::ImageLayout::eTransferSrcOptimal)
+            .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setImage(image.GetNativeHandle())
+            .setSubresourceRange(mipLevelsSubresourceRange);
+
+        this->handle.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eTransfer,
+            { }, // dependecies
+            { }, // memory barriers
+            { }, // buffer barriers
+            mipLevelsTransfer
+        );
+    }
 }

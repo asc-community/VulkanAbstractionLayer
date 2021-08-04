@@ -48,6 +48,7 @@ namespace VulkanAbstractionLayer
             VkImage ImageNativeHandle;
             ImageUsage::Bits InitialUsage;
             Format ImageFormat;
+            uint32_t MipLevelCount;
         };
 
         struct AttachmentDeclaration

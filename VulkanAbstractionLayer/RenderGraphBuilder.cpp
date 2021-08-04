@@ -220,7 +220,7 @@ namespace VulkanAbstractionLayer
         return isOldWrite || isNewWrite; // two reads do not need barriers
     }
 
-    vk::ImageMemoryBarrier CreateImageMemoryBarrier(VkImage image, ImageUsage::Bits oldUsage, ImageUsage::Bits newUsage, Format format)
+    vk::ImageMemoryBarrier CreateImageMemoryBarrier(VkImage image, ImageUsage::Bits oldUsage, ImageUsage::Bits newUsage, Format format, uint32_t mipLevelCount)
     {
         vk::ImageSubresourceRange subresourceRange;
         subresourceRange
@@ -228,7 +228,7 @@ namespace VulkanAbstractionLayer
             .setBaseArrayLayer(0)
             .setBaseMipLevel(0)
             .setLayerCount(1)
-            .setLevelCount(1);
+            .setLevelCount(mipLevelCount);
 
         vk::ImageMemoryBarrier imageBarrier;
         imageBarrier
@@ -285,7 +285,7 @@ namespace VulkanAbstractionLayer
             if (externalImage.InitialUsage == inPassImageUsage)
                 continue;
 
-            imageBarriers.push_back(CreateImageMemoryBarrier(imageHandle, externalImage.InitialUsage, inPassImageUsage, externalImage.ImageFormat));
+            imageBarriers.push_back(CreateImageMemoryBarrier(imageHandle, externalImage.InitialUsage, inPassImageUsage, externalImage.ImageFormat, externalImage.MipLevelCount));
             pipelineSourceFlags |= ImageUsageToPipelineStage(externalImage.InitialUsage);
             pipelineDistanceFlags |= ImageUsageToPipelineStage(inPassImageUsage);
         }
@@ -332,6 +332,7 @@ namespace VulkanAbstractionLayer
         for (const auto& [imageHandle, imageTransition] : imageTransitions)
         {
             auto imageFormat = this->externalImages.at(imageHandle).ImageFormat;
+            auto mipLevelCount = this->externalImages.at(imageHandle).MipLevelCount;
             auto isAttachment = std::find_if(renderPassAttachments.begin(), renderPassAttachments.end(), [handle = imageHandle](const auto& attachment)
             {
                 return AttachmentNameToImageHandle(attachment.Name) == handle;
@@ -346,7 +347,7 @@ namespace VulkanAbstractionLayer
             if (imageTransition.InitialUsage == imageTransition.FinalUsage)
                 continue;
 
-            imageBarriers.push_back(CreateImageMemoryBarrier(imageNativeHandle, imageTransition.InitialUsage, imageTransition.FinalUsage, imageFormat));
+            imageBarriers.push_back(CreateImageMemoryBarrier(imageNativeHandle, imageTransition.InitialUsage, imageTransition.FinalUsage, imageFormat, mipLevelCount));
             pipelineSourceFlags |= ImageUsageToPipelineStage(imageTransition.InitialUsage);
             pipelineDistanceFlags |= ImageUsageToPipelineStage(imageTransition.FinalUsage);
         }
@@ -385,7 +386,7 @@ namespace VulkanAbstractionLayer
         auto& renderPassPipeline = pipelines.at(renderPassReference.Name);
         auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
         auto& attachmentTransitions = resourceTransitions.ImageTransitions.at(renderPassReference.Name);
-        std::optional<vk::AttachmentReference> depthStencilAttachmentReference;
+        vk::AttachmentReference depthStencilAttachmentReference;
 
         if (!renderPassAttachments.empty()) // should render pass be created?
         {
@@ -440,8 +441,8 @@ namespace VulkanAbstractionLayer
             subpassDescription
                 .setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
                 .setColorAttachments(attachmentReferences)
-                .setPDepthStencilAttachment(depthStencilAttachmentReference.has_value() ?
-                    std::addressof(depthStencilAttachmentReference.value()) : nullptr
+                .setPDepthStencilAttachment(depthStencilAttachmentReference != vk::AttachmentReference{ } ?
+                    std::addressof(depthStencilAttachmentReference) : nullptr
                 );
 
             // TODO
@@ -762,7 +763,8 @@ namespace VulkanAbstractionLayer
                     attachment.ImageHeight == 0 ? surfaceHeight : attachment.ImageHeight,
                     attachment.ImageFormat,
                     attachmentUsage,
-                    MemoryUsage::GPU_ONLY
+                    MemoryUsage::GPU_ONLY,
+                    Mipmapping::NO_MIPMAPS
                 ));
             }
         }
@@ -812,7 +814,7 @@ namespace VulkanAbstractionLayer
         for (const auto& imageDeclaration : imageDeclarations)
         {
             assert(this->externalImages.find(imageDeclaration.ImageNativeHandle) == this->externalImages.end());
-            this->externalImages[imageDeclaration.ImageNativeHandle] = { imageDeclaration.InitialUsage, imageDeclaration.ImageFormat };
+            this->externalImages[imageDeclaration.ImageNativeHandle] = { imageDeclaration.InitialUsage, imageDeclaration.ImageFormat, imageDeclaration.MipLevelCount };
         }
 
         auto& attachmentDeclarations = pipelineState.GetAttachmentDeclarations();
@@ -820,7 +822,7 @@ namespace VulkanAbstractionLayer
         {
             auto attachmentNativeHandle = AttachmentNameToImageHandle(attachmentDeclaration.Name);
             assert(this->externalImages.find(attachmentNativeHandle) == this->externalImages.end());
-            this->externalImages[attachmentNativeHandle] = { ImageUsage::UNKNOWN, attachmentDeclaration.ImageFormat };
+            this->externalImages[attachmentNativeHandle] = { ImageUsage::UNKNOWN, attachmentDeclaration.ImageFormat, 1 };
         }
     }
 

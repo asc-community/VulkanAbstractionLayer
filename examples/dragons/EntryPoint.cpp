@@ -76,13 +76,15 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
             texture.Width,
             texture.Height,
             Format::R8G8B8A8_UNORM,
-            ImageUsage::TRANSFER_DISTINATION | ImageUsage::SHADER_READ,
-            MemoryUsage::GPU_ONLY
+            ImageUsage::TRANSFER_DISTINATION | ImageUsage::TRANSFER_SOURCE | ImageUsage::SHADER_READ,
+            MemoryUsage::GPU_ONLY,
+            Mipmapping::USE_MIPMAPS
         );
 
         auto textureAllocation = stageBuffer.Submit(texture.ByteData.data(), texture.ByteData.size());
 
         commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), textureAllocation.Offset, image, ImageUsage::UNKNOWN, textureAllocation.Size);
+        commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
     }
 
     stageBuffer.Flush();

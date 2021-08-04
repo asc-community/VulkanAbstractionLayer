@@ -96,7 +96,10 @@ namespace VulkanAbstractionLayer
 			.setAddressModeU(AddressToNative(uvwAddress))
 			.setAddressModeV(AddressToNative(uvwAddress))
 			.setAddressModeW(AddressToNative(uvwAddress))
-			.setMipmapMode(MipmapToNative(mipFilter));
+			.setMipmapMode(MipmapToNative(mipFilter))
+			.setMipLodBias(0)
+			.setMinLod(0)
+			.setMaxLod(1000);
 
 		this->handle = GetCurrentVulkanContext().GetDevice().createSampler(samplerCreateInfo);
 	}

@@ -78,7 +78,8 @@ void LoadLookupTextures(Image& lookupLTCMatrix, Image& lookupLTCAmplitude)
         lookupMatrixTexture.Height,
         Format::R32G32B32A32_SFLOAT,
         ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
-        MemoryUsage::GPU_ONLY
+        MemoryUsage::GPU_ONLY,
+        Mipmapping::NO_MIPMAPS
     );
     auto lookupMatrixAllocation = stageBuffer.Submit(MakeView(lookupMatrixTexture.ByteData));
     commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), lookupMatrixAllocation.Offset, lookupLTCMatrix, ImageUsage::UNKNOWN, lookupMatrixAllocation.Size);
@@ -88,7 +89,8 @@ void LoadLookupTextures(Image& lookupLTCMatrix, Image& lookupLTCAmplitude)
         lookupAmplitudeTexture.Height,
         Format::R32G32_SFLOAT,
         ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
-        MemoryUsage::GPU_ONLY
+        MemoryUsage::GPU_ONLY,
+        Mipmapping::NO_MIPMAPS
     );
     auto lookupAmplitudeAllocation = stageBuffer.Submit(MakeView(lookupAmplitudeTexture.ByteData));
     commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), lookupAmplitudeAllocation.Offset, lookupLTCAmplitude, ImageUsage::UNKNOWN, lookupAmplitudeAllocation.Size);
@@ -99,16 +101,33 @@ void LoadLookupTextures(Image& lookupLTCMatrix, Image& lookupLTCAmplitude)
     stageBuffer.Reset();
 }
 
-void LoadSponzaModel(Mesh& mesh)
+void LoadMaterialImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imageData)
 {
-    auto sponza = ModelLoader::LoadFromGltf("resources/Sponza/glTF/Sponza.gltf");
+    auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+
+    image.Init(
+        imageData.Width,
+        imageData.Height,
+        Format::R8G8B8A8_UNORM,
+        ImageUsage::SHADER_READ | ImageUsage::TRANSFER_SOURCE | ImageUsage::TRANSFER_DISTINATION,
+        MemoryUsage::GPU_ONLY,
+        Mipmapping::USE_MIPMAPS
+    );
+    auto albedoAllocation = stageBuffer.Submit(MakeView(imageData.ByteData));
+    commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), albedoAllocation.Offset, image, ImageUsage::UNKNOWN, albedoAllocation.Size);
+    commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
+}
+
+void LoadModelGLTF(Mesh& mesh, const std::string& filepath)
+{
+    auto model = ModelLoader::LoadFromGltf(filepath);
    
     auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
     auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
 
     commandBuffer.Begin();
 
-    for (const auto& shape : sponza.Shapes)
+    for (const auto& shape : model.Shapes)
     {
         auto& submesh = mesh.Submeshes.emplace_back();
         submesh.VertexBuffer.Init(
@@ -129,45 +148,16 @@ void LoadSponzaModel(Mesh& mesh)
     stageBuffer.Reset();
 
     uint32_t textureIndex = 0;
-    for (const auto& material : sponza.Materials)
+    for (const auto& material : model.Materials)
     {
         commandBuffer.Begin();
 
-        auto& albedoImage = mesh.Textures.emplace_back();
-        albedoImage.Init(
-            material.AlbedoTexture.Width,
-            material.AlbedoTexture.Height,
-            Format::R8G8B8A8_UNORM,
-            ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
-            MemoryUsage::GPU_ONLY
-        );
-        auto albedoAllocation = stageBuffer.Submit(MakeView(material.AlbedoTexture.ByteData));
-        commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), albedoAllocation.Offset, albedoImage, ImageUsage::UNKNOWN, albedoAllocation.Size);
+        LoadMaterialImage(commandBuffer, mesh.Textures.emplace_back(), material.AlbedoTexture);
+        LoadMaterialImage(commandBuffer, mesh.Textures.emplace_back(), material.NormalTexture);
+        LoadMaterialImage(commandBuffer, mesh.Textures.emplace_back(), material.MetallicRoughness);
 
-        auto& normalImage = mesh.Textures.emplace_back();
-        normalImage.Init(
-            material.NormalTexture.Width,
-            material.NormalTexture.Height,
-            Format::R8G8B8A8_UNORM,
-            ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
-            MemoryUsage::GPU_ONLY
-        );
-        auto normalAllocation = stageBuffer.Submit(MakeView(material.NormalTexture.ByteData));
-        commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), normalAllocation.Offset, normalImage, ImageUsage::UNKNOWN, normalAllocation.Size);
-
-        auto& metallicRoughnessImage = mesh.Textures.emplace_back();
-        metallicRoughnessImage.Init(
-            material.MetallicRoughness.Width,
-            material.MetallicRoughness.Height,
-            Format::R8G8B8A8_UNORM,
-            ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
-            MemoryUsage::GPU_ONLY
-        );
-        auto metallicRoughnessAllocation = stageBuffer.Submit(MakeView(material.MetallicRoughness.ByteData));
-        commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), metallicRoughnessAllocation.Offset, metallicRoughnessImage, ImageUsage::UNKNOWN, metallicRoughnessAllocation.Size);
-
-        const float appliedRoughnessScale = 0.5f;
-        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, appliedRoughnessScale * material.RoughnessScale });
+        constexpr float AppliedRoughnessScale = 0.5f;
+        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, AppliedRoughnessScale * material.RoughnessScale });
         textureIndex += 3;
 
         stageBuffer.Flush();
@@ -431,7 +421,7 @@ int main()
         { }, // ltc amplitude lookup
     };
 
-    LoadSponzaModel(sharedResources.Sponza);
+    LoadModelGLTF(sharedResources.Sponza, "resources/Sponza/glTF/Sponza.gltf");
     Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
     LoadLookupTextures(sharedResources.LookupLTCMatrix, sharedResources.LookupLTCAmplitude);
 
