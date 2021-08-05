@@ -183,15 +183,16 @@ public:
         Matrix3x4 Matrix;
     } ModelUniform;
 
-    struct LightUniformData
+    struct LightData
     {
+        Matrix3x4 Rotation;
         Vector3 Position;
         float Width;
-        Vector3 Rotation;
-        float Height;
         Vector3 Color;
-        float Intensity;
-    } LightUniform;
+        float Height;
+    };
+    constexpr static size_t MaxLightCount = 3;
+    std::array<LightData, MaxLightCount> LightUniformArray;
 
     UniformSubmitRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
@@ -232,7 +233,7 @@ public:
 
         FillUniform(this->CameraUniform, this->sharedResources.CameraUniformBuffer);
         FillUniform(this->ModelUniform, this->sharedResources.ModelUniformBuffer);
-        FillUniform(this->LightUniform, this->sharedResources.LightUniformBuffer);
+        FillUniformArray(this->LightUniformArray, this->sharedResources.LightUniformBuffer);
         FillUniformArray(this->sharedResources.Sponza.Materials, this->sharedResources.MaterialUniformBuffer);
     }
 };
@@ -289,7 +290,7 @@ public:
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
-        depedencies.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
+        depedencies.AddAttachment("Output"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
         depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
 
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
@@ -412,10 +413,10 @@ int main()
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
     SharedResources sharedResources{
-        Buffer{ sizeof(UniformSubmitRenderPass::CameraUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(UniformSubmitRenderPass::ModelUniform),   BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(UniformSubmitRenderPass::CameraUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(UniformSubmitRenderPass::ModelUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(Mesh::Material) * Mesh::MaxMaterialCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(UniformSubmitRenderPass::LightUniform),   BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(UniformSubmitRenderPass::LightData) * UniformSubmitRenderPass::MaxLightCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // sponza
         { }, // ltc matrix lookup
         { }, // ltc amplitude lookup
@@ -429,11 +430,26 @@ int main()
 
     Camera camera;
     Vector3 modelRotation{ 0.0f, HalfPi, 0.0f };
-    Vector3 lightColor{ 0.7f, 0.7f, 0.7f };
-    Vector3 lightRotation{ 0.0f, 0.0f, 0.0f };
-    Vector3 lightPosition{ -45.0f, 200.0f, -1000.0f };
-    Vector2 lightSize{ 200.0f, 200.0f };
-    float lightIntensity = 1.0f;
+
+    auto& lightArray = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id).LightUniformArray;
+
+    lightArray[0].Color = Vector3{ 1.0f, 1.0f, 1.0f };
+    lightArray[0].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
+    lightArray[0].Position = Vector3{ -45.0f, 200.0f, -1000.0f };
+    lightArray[0].Height = 300.0f;
+    lightArray[0].Width = 50.0f;
+
+    lightArray[1].Color = Vector3{ 1.0f, 0.0f, 0.0f };
+    lightArray[1].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
+    lightArray[1].Position = Vector3{ -45.0f, 200.0f, 1100.0f };
+    lightArray[1].Height = 200.0f;
+    lightArray[1].Width = 200.0f;
+
+    lightArray[2].Color = Vector3{ 0.0f, 0.0f, 1.0f };
+    lightArray[2].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
+    lightArray[2].Position = Vector3{ -45.0f, 200.0f, 1000.0f };
+    lightArray[2].Height = 200.0f;
+    lightArray[2].Width = 200.0f;
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
@@ -474,6 +490,7 @@ int main()
             ImGuiVulkanContext::StartFrame();
 
             auto dt = ImGui::GetIO().DeltaTime;
+            auto& uniformSubmitPass = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);
 
             auto mouseMovement = ImGui::GetMouseDragDelta(MouseButton::RIGHT, 0.0f);
             ImGui::ResetMouseDragDelta(MouseButton::RIGHT);
@@ -503,16 +520,36 @@ int main()
             ImGui::DragFloat("fov", &camera.Fov);
             ImGui::End();
 
+            uniformSubmitPass.CameraUniform.Matrix = camera.GetMatrix();
+            uniformSubmitPass.CameraUniform.Position = camera.Position;
+
+
             ImGui::Begin("Model");
             ImGui::DragFloat3("rotation", &modelRotation[0], 0.01f);
             ImGui::End();
 
-            ImGui::Begin("Light");
-            ImGui::ColorEdit3("color", &lightColor[0], ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
-            ImGui::DragFloat3("rotation", &lightRotation[0], 0.01f);
-            ImGui::DragFloat3("position", &lightPosition[0]);
-            ImGui::DragFloat2("size", &lightSize[0]);
-            ImGui::DragFloat("intensity", &lightIntensity, 0.01f);
+            uniformSubmitPass.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
+
+            int lightIndex = 0;
+            ImGui::Begin("Lights");
+            for (auto& lightUniform : uniformSubmitPass.LightUniformArray)
+            {
+                ImGui::PushID(lightIndex++);
+                if (ImGui::TreeNode(("light_" + std::to_string(lightIndex)).c_str()))
+                {
+                    auto rotation = MakeRotationAngles((Matrix4x4)lightUniform.Rotation);
+
+                    ImGui::ColorEdit3("color", &lightUniform.Color[0], ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
+                    ImGui::DragFloat3("rotation", &rotation[0], 0.01f);
+                    ImGui::DragFloat3("position", &lightUniform.Position[0]);
+                    ImGui::DragFloat("width", &lightUniform.Width);
+                    ImGui::DragFloat("height", &lightUniform.Height);
+                    ImGui::TreePop();
+
+                    lightUniform.Rotation = MakeRotationMatrix(rotation);
+                }
+                ImGui::PopID();
+            }
             ImGui::End();
 
             ImGui::Begin("Performace");
@@ -548,17 +585,6 @@ int main()
                 ImGui::PopID();
             }
             ImGui::End();
-
-            auto& uniformSubmitPass = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);
-            uniformSubmitPass.CameraUniform.Matrix = camera.GetMatrix();
-            uniformSubmitPass.CameraUniform.Position = camera.Position;
-            uniformSubmitPass.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
-            uniformSubmitPass.LightUniform.Color = lightColor;
-            uniformSubmitPass.LightUniform.Rotation = lightRotation;
-            uniformSubmitPass.LightUniform.Position = lightPosition;
-            uniformSubmitPass.LightUniform.Width = lightSize.x;
-            uniformSubmitPass.LightUniform.Height = lightSize.y;
-            uniformSubmitPass.LightUniform.Intensity = lightIntensity;
 
             renderGraph->Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph->Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());

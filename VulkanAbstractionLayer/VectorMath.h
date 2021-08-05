@@ -87,6 +87,13 @@ namespace VulkanAbstractionLayer
         return glm::yawPitchRoll(rotations.y, rotations.x, rotations.z);
     }
 
+    inline Vector3 MakeRotationAngles(const Matrix4x4& matrix)
+    {
+        Vector3 result{ 0.0f, 0.0f, 0.0f };
+        glm::extractEulerAngleYXZ(matrix, result.x, result.y, result.z);
+        return result;
+    }
+
     inline Matrix4x4 MakePerspectiveMatrix(float fov, float aspect, float znear, float zfar)
     {
         return glm::perspective(fov, aspect, znear, zfar);

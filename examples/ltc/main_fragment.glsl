@@ -30,11 +30,17 @@ layout(push_constant) uniform uMaterialConstant
     uint uMaterialIndex;
 };
 
-layout(set = 0, binding = 3) uniform uLightBuffer
+struct LightData
 {
-    vec4 uLightPosition_Width;
-    vec4 uLightRotation_Height;
-    vec4 uLightColor_Intensity;
+    mat3 Rotation;
+    vec4 Position_Width;
+    vec4 Color_Height;
+};
+
+#define LIGHT_COUNT 3
+layout(set = 0, binding = 3) uniform uLightArray
+{
+    LightData uLights[LIGHT_COUNT];
 };
 
 layout(set = 0, binding = 4) uniform texture2D uTextures[512];
@@ -133,9 +139,6 @@ struct Fragment
 //     return totalColor;
 // }
 
-// Tracing and intersection
-///////////////////////////
-
 struct Ray
 {
     vec3 origin;
@@ -176,51 +179,6 @@ bool RayRectIntersect(Ray ray, Rect rect, out float t)
 
     return intersect;
 }
-
-vec3 mul(mat3 m, vec3 v)
-{
-    return m * v;
-}
-
-mat3 mul(mat3 m1, mat3 m2)
-{
-    return m1 * m2;
-}
-
-vec3 rotationX(vec3 v, float a)
-{
-    vec3 r;
-    r.x = v.x;
-    r.y = v.y * cos(a) - v.z * sin(a);
-    r.z = v.y * sin(a) + v.z * cos(a);
-    return r;
-}
-
-vec3 rotationY(vec3 v, float a)
-{
-    vec3 r;
-    r.x = v.x * cos(a) + v.z * sin(a);
-    r.y = v.y;
-    r.z = -v.x * sin(a) + v.z * cos(a);
-    return r;
-}
-
-vec3 rotationZ(vec3 v, float a)
-{
-    vec3 r;
-    r.x = v.x * cos(a) - v.y * sin(a);
-    r.y = v.x * sin(a) + v.y * cos(a);
-    r.z = v.z;
-    return r;
-}
-
-vec3 rotationYXZ(vec3 v, vec3 rot)
-{
-    return rotationZ(rotationX(rotationY(v, rot.y), rot.x), rot.z);
-}
-
-// Linearly Transformed Cosines
-///////////////////////////////
 
 float IntegrateEdge(vec3 v1, vec3 v2)
 {
@@ -367,15 +325,14 @@ vec3 LTC_Evaluate(
     T2 = cross(N, T1);
 
     // rotate area light in (T1, T2, N) basis
-    Minv = mul(Minv, transpose(mat3(T1, T2, N)));
+    Minv = Minv * transpose(mat3(T1, T2, N));
 
     // polygon (allocate 5 vertices for clipping)
     vec3 L[5];
-    L[0] = mul(Minv, points[0] - P);
-    L[1] = mul(Minv, points[1] - P);
-    L[2] = mul(Minv, points[2] - P);
-    L[3] = mul(Minv, points[3] - P);
-    L[4] = L[3]; // avoid warning
+    L[0] = Minv * (points[0] - P);
+    L[1] = Minv * (points[1] - P);
+    L[2] = Minv * (points[2] - P);
+    L[3] = Minv * (points[3] - P);
 
     int n;
     ClipQuadToHorizon(L, n);
@@ -411,10 +368,10 @@ vec3 LTC_Evaluate(
 // Scene helpers
 ////////////////
 
-void InitRect(out Rect rect, vec3 position, vec3 rotation, float width, float height)
+void InitRect(out Rect rect, vec3 position, mat3 rotation, float width, float height)
 {
-    rect.dirx = rotationYXZ(vec3(1, 0, 0), rotation);
-    rect.diry = rotationYXZ(vec3(0, 1, 0), rotation);
+    rect.dirx = rotation * vec3(1, 0, 0);
+    rect.diry = rotation * vec3(0, 1, 0);
 
     rect.center = position;
     rect.halfx = 0.5 * width;
@@ -453,12 +410,6 @@ void main()
 
     vec3 viewDirection = normalize(uCameraPosition - vPosition);
 
-    Rect rect;
-    InitRect(rect, uLightPosition_Width.xyz, uLightRotation_Height.xyz, uLightPosition_Width.w, uLightRotation_Height.w);
-    vec3 points[4];
-    InitRectPoints(rect, points);
-
-    vec3 lightColor = vec3(uLightColor_Intensity.rgb * uLightColor_Intensity.a);
     vec3 diffuseColor = fragment.Albedo * (1.0 - fragment.Metallic);
     vec3 specularColor = fragment.Albedo;
 
@@ -476,22 +427,63 @@ void main()
         vec3(0, t.z, 0),
         vec3(t.w, 0, t.x)
     );
-
-    vec3 specular = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, Minv, points, twoSided);
-
     vec2 schlick = texture(uLookupLTCAmplitude, uv).xy;
 
-    specularColor = specularColor * schlick.x + (1.0 - specularColor) * schlick.y;
+    Rect lightRects[LIGHT_COUNT];
+    vec3 totalColor = vec3(0.0);
 
-    vec3 diffuse = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, mat3(1), points, twoSided);
+    Ray reflectRay;
+    reflectRay.origin = vPosition;
+    reflectRay.dir = reflect(-viewDirection, fragment.Normal);
+    float minDistanceReflection = 1e9;
+    int reflectionRectIndex = -1;
+    for (int i = 0; i < LIGHT_COUNT; i++)
+    {
+        float distanceToRect;
+        if (RayRectIntersect(reflectRay, lightRects[i], distanceToRect))
+        {
+            if (distanceToRect < minDistanceReflection)
+            {
+                minDistanceReflection = distanceToRect;
+                reflectionRectIndex = i;
+            }
+        }
+    }
 
-    vec3 totalColor = lightColor * (specularColor * specular + diffuseColor * diffuse);
-    totalColor /= (2.0 * PI);
+    for (int i = 0; i < LIGHT_COUNT; i++)
+    {            
+        InitRect(lightRects[i], uLights[i].Position_Width.xyz, uLights[i].Rotation, uLights[i].Position_Width.w, uLights[i].Color_Height.w);
+        vec3 points[4];
+        InitRectPoints(lightRects[i], points);
 
-    float distanceToRect;
-    if (RayRectIntersect(ray, rect, distanceToRect))
-        if ((distanceToRect < length(vPosition - uCameraPosition)))
-            totalColor = lightColor;
+        vec3 lightColor = pow(uLights[i].Color_Height.rgb, vec3(GAMMA));
+        vec3 specular = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, Minv, points, twoSided);
+        specularColor = specularColor * schlick.x + (1.0 - specularColor) * schlick.y;
+        vec3 diffuse = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, mat3(1), points, twoSided);
+        vec3 color = lightColor * (specularColor * specular + diffuseColor * diffuse) / (2.0 * PI);
+
+        if (reflectionRectIndex != -1 && reflectionRectIndex != i)
+        {
+            float blend = smoothstep(0.25, 0.45, fragment.Roughness);
+            color *= pow(blend, 0.4);
+        }
+            
+        totalColor += color;
+    }
+    
+    float minDistanceToRect = 1e9;
+    for (int i = 0; i < LIGHT_COUNT; i++)
+    {
+        float distanceToRect;
+        if (RayRectIntersect(ray, lightRects[i], distanceToRect))
+        {
+            if (distanceToRect < minDistanceToRect && distanceToRect < length(vPosition - uCameraPosition))
+            {
+                minDistanceToRect = distanceToRect;
+                totalColor = pow(uLights[i].Color_Height.rgb, vec3(GAMMA));
+            }
+        }
+    }
 
     oColor = vec4(pow(totalColor, vec3(1.0 / GAMMA)), 1.0);
 }
