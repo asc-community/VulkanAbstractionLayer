@@ -181,18 +181,22 @@ namespace VulkanAbstractionLayer
         {
             auto properties = device.getProperties();
 
-            options.InfoCallback(properties.deviceName);
+            options.InfoCallback("checking " + std::string(properties.deviceName) + "...");
 
             if (properties.apiVersion < this->apiVersion)
             {
-                options.InfoCallback("skipping device as its Vulkan API version is less than required");
+                options.InfoCallback(std::string(properties.deviceName) + ": skipping device as its Vulkan API version is less than required");
+                options.InfoCallback("    " +
+                    std::to_string(VK_VERSION_MAJOR(properties.apiVersion)) + "." + std::to_string(VK_VERSION_MINOR(properties.apiVersion)) + " < " +
+                    std::to_string(VK_VERSION_MAJOR(this->apiVersion)) + "." + std::to_string(VK_VERSION_MINOR(this->apiVersion))
+                );
                 continue;
             }
 
             auto queueFamilyIndex = DetermineQueueFamilyIndex(this->instance, device, this->surface);
             if (!queueFamilyIndex.has_value())
             {
-                options.InfoCallback("skipping device as its queue families does not satisfy the requirements");
+                options.InfoCallback(std::string(properties.deviceName) + ": skipping device as its queue families does not satisfy the requirements");
                 continue;
             }
 
