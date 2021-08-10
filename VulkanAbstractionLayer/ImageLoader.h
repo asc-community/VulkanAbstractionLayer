@@ -32,15 +32,16 @@
 #include <string>
 #include <vector>
 
+#include "ShaderReflection.h"
+
 namespace VulkanAbstractionLayer
 {
     struct ImageData
     {
         std::vector<uint8_t> ByteData;
+        Format ImageFormat = Format::UNDEFINED;
         uint32_t Width = 0;
         uint32_t Height = 0;
-        uint32_t Channels = 0;
-        uint32_t ChannelSize = 0;
     };
 
     class ImageLoader

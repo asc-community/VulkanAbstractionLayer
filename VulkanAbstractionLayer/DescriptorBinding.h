@@ -74,8 +74,11 @@ namespace VulkanAbstractionLayer
 		DescriptorBinding& Bind(uint32_t binding, const Image& image, const Sampler& sampler, UniformType type, ImageView view);
 
 		DescriptorBinding& Bind(uint32_t binding, ArrayView<BufferReference> buffers, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, ArrayView<Buffer> buffers, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, ArrayView<Image> images, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, ArrayView<SamplerReference> samplers, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, ArrayView<Sampler> samplers, UniformType type);
 
 		DescriptorBinding& Bind(uint32_t binding, StringId attachment, UniformType type, ImageView view);
 		DescriptorBinding& Bind(uint32_t binding, StringId attachment, const Sampler& sampler, UniformType type, ImageView view);

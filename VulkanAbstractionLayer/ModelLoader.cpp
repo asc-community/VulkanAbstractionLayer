@@ -49,7 +49,7 @@ namespace VulkanAbstractionLayer
 
     static ImageData CreateStubTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
     {
-        return ImageData{ std::vector{ r, g, b, a }, 1, 1, 4, sizeof(uint8_t) };
+        return ImageData{ std::vector{ r, g, b, a }, Format::R8G8B8A8_UNORM, 1, 1 };
     }
 
     static auto ComputeTangentsBitangents(const tinyobj::mesh_t& mesh, const tinyobj::attrib_t& attrib)
@@ -263,10 +263,9 @@ namespace VulkanAbstractionLayer
                 const auto& albedoTexture = model.images[model.textures[material.pbrMetallicRoughness.baseColorTexture.index].source];
                 resultMaterial.AlbedoTexture = ImageData{ 
                     albedoTexture.image, 
+                    Format::R8G8B8A8_UNORM,
                     (uint32_t)albedoTexture.width, 
                     (uint32_t)albedoTexture.height, 
-                    (uint32_t)albedoTexture.component, 
-                    (uint32_t)albedoTexture.bits / 8 
                 };
             }
             else
@@ -279,10 +278,9 @@ namespace VulkanAbstractionLayer
                 const auto& normalTexture = model.images[model.textures[material.normalTexture.index].source];
                 resultMaterial.NormalTexture = ImageData{ 
                     normalTexture.image, 
+                    Format::R8G8B8A8_UNORM,
                     (uint32_t)normalTexture.width, 
                     (uint32_t)normalTexture.height, 
-                    (uint32_t)normalTexture.component, 
-                    (uint32_t)normalTexture.bits / 8 
                 };
             }
             else
@@ -295,10 +293,9 @@ namespace VulkanAbstractionLayer
                 const auto& metallicRoughnessTexture = model.images[model.textures[material.pbrMetallicRoughness.metallicRoughnessTexture.index].source];
                 resultMaterial.MetallicRoughness = ImageData{
                     metallicRoughnessTexture.image,
+                    Format::R8G8B8A8_UNORM,
                     (uint32_t)metallicRoughnessTexture.width,
                     (uint32_t)metallicRoughnessTexture.height,
-                    (uint32_t)metallicRoughnessTexture.component,
-                    (uint32_t)metallicRoughnessTexture.bits / 8
                 };
             }
             else

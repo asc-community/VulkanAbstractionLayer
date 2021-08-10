@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "ArrayUtils.h"
 #include "GraphicShader.h"
 #include "DescriptorBinding.h"
 #include "StringId.h"
@@ -70,8 +71,10 @@ namespace VulkanAbstractionLayer
         void DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage);
         void DeclareImage(const Image& image, ImageUsage::Bits oldUsage);
 
-        void DeclareBuffers(const std::vector<BufferReference>& buffers, BufferUsage::Bits oldUsage);
-        void DeclareImages(const std::vector<ImageReference>& images, ImageUsage::Bits oldUsage);
+        void DeclareBuffers(ArrayView<BufferReference> buffers, BufferUsage::Bits oldUsage);
+        void DeclareBuffers(ArrayView<Buffer> buffers, BufferUsage::Bits oldUsage);
+        void DeclareImages(ArrayView<ImageReference> images, ImageUsage::Bits oldUsage);
+        void DeclareImages(ArrayView<Image> images, ImageUsage::Bits oldUsage);
 
         void DeclareAttachment(StringId name, Format format);
         void DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height);

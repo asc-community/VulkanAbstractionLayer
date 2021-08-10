@@ -75,7 +75,7 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
         image.Init(
             texture.Width,
             texture.Height,
-            Format::R8G8B8A8_UNORM,
+            texture.ImageFormat,
             ImageUsage::TRANSFER_DISTINATION | ImageUsage::TRANSFER_SOURCE | ImageUsage::SHADER_READ,
             MemoryUsage::GPU_ONLY,
             Mipmapping::USE_MIPMAPS
@@ -137,11 +137,11 @@ Mesh CreateDragonMesh(uint32_t& globalTextureIndex)
     };
 
     std::array textures = {
-        ImageData{ std::move(textureData[0]), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ std::move(textureData[1]), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ std::move(textureData[2]), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ std::move(textureData[3]), 1, 1, 4, sizeof(uint8_t) },
-        ImageData{ std::move(textureData[4]), 1, 1, 4, sizeof(uint8_t) },
+        ImageData{ std::move(textureData[0]), Format::R8G8B8A8_UNORM, 1, 1 },
+        ImageData{ std::move(textureData[1]), Format::R8G8B8A8_UNORM, 1, 1 },
+        ImageData{ std::move(textureData[2]), Format::R8G8B8A8_UNORM, 1, 1 },
+        ImageData{ std::move(textureData[3]), Format::R8G8B8A8_UNORM, 1, 1 },
+        ImageData{ std::move(textureData[4]), Format::R8G8B8A8_UNORM, 1, 1 },
     };
 
     return CreateMesh(vertices, instances, textures);

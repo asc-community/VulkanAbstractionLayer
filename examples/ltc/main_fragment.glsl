@@ -35,18 +35,22 @@ struct LightData
     mat3 Rotation;
     vec4 Position_Width;
     vec4 Color_Height;
+    uint TextureIndex;
 };
 
-#define LIGHT_COUNT 3
+#define LIGHT_COUNT 4
+#define MATERIAL_TEXTURE_COUNT 512
+
 layout(set = 0, binding = 3) uniform uLightArray
 {
     LightData uLights[LIGHT_COUNT];
 };
 
-layout(set = 0, binding = 4) uniform texture2D uTextures[512];
+layout(set = 0, binding = 4) uniform texture2D uTextures[MATERIAL_TEXTURE_COUNT];
 layout(set = 0, binding = 5) uniform sampler uTextureSampler;
 layout(set = 0, binding = 6) uniform sampler2D uLookupLTCMatrix;
 layout(set = 0, binding = 7) uniform sampler2D uLookupLTCAmplitude;
+layout(set = 0, binding = 8) uniform texture2D uLightTextures[LIGHT_COUNT];
 
 struct Fragment
 {
@@ -156,15 +160,47 @@ struct Rect
     vec4  plane;
 };
 
+vec3 FetchDiffuseFilteredTexture(texture2D texLightFiltered, sampler texLightSampler, vec3 p1_, vec3 p2_, vec3 p3_, vec3 p4_)
+{
+    // area light plane basis
+    vec3 V1 = p2_ - p1_;
+    vec3 V2 = p4_ - p1_;
+    vec3 planeOrtho = (cross(V1, V2));
+    float planeAreaSquared = dot(planeOrtho, planeOrtho);
+    float planeDistxPlaneArea = dot(planeOrtho, p1_);
+    // orthonormal projection of (0,0,0) in area light space
+    vec3 P = planeDistxPlaneArea * planeOrtho / planeAreaSquared - p1_;
+
+    // find tex coords of P
+    float dot_V1_V2 = dot(V1, V2);
+    float inv_dot_V1_V1 = 1.0 / dot(V1, V1);
+    vec3 V2_ = V2 - V1 * dot_V1_V2 * inv_dot_V1_V1;
+    vec2 Puv;
+    Puv.y = dot(V2_, P) / dot(V2_, V2_);
+    Puv.x = dot(V1, P) * inv_dot_V1_V1 - dot_V1_V2 * inv_dot_V1_V1 * Puv.y;
+
+    // LOD
+    float d = abs(planeDistxPlaneArea) / pow(planeAreaSquared, 0.75);
+    vec2 size = textureSize(sampler2D(texLightFiltered, texLightSampler), 0);
+
+    return texture(sampler2D(texLightFiltered, texLightSampler), vec2(0.125, 0.125) + 0.75 * Puv, log(size.x * d) / log(3.0)).rgb;
+}
+
+vec3 FetchDiffuseTexture(texture2D texLightFiltered, sampler texLightSampler, vec2 uv)
+{
+    return texture(sampler2D(texLightFiltered, texLightSampler), 0.75 * uv + 0.125).rgb;
+}
+
 bool RayPlaneIntersect(Ray ray, vec4 plane, out float t)
 {
     t = -dot(plane, vec4(ray.origin, 1.0)) / dot(plane.xyz, ray.dir);
     return t > 0.0;
 }
 
-bool RayRectIntersect(Ray ray, Rect rect, out float t)
+bool RayRectIntersect(Ray ray, Rect rect, out vec2 uv, out float t)
 {
     bool intersect = RayPlaneIntersect(ray, rect.plane, t);
+    uv = vec2(0.0);
     if (intersect)
     {
         vec3 pos = ray.origin + ray.dir * t;
@@ -175,6 +211,8 @@ bool RayRectIntersect(Ray ray, Rect rect, out float t)
 
         if (abs(x) > rect.halfx || abs(y) > rect.halfy)
             intersect = false;
+        else
+            uv = 0.5 * vec2(x, y) / vec2(rect.halfx, rect.halfy) + 0.5;
     }
 
     return intersect;
@@ -317,7 +355,7 @@ vec2 LTC_Coords(float cosTheta, float roughness)
 
 
 vec3 LTC_Evaluate(
-    vec3 N, vec3 V, vec3 P, mat3 Minv, vec3 points[4], bool twoSided)
+    vec3 N, vec3 V, vec3 P, mat3 Minv, vec3 points[4], texture2D texFilteredMap, sampler texSampler, bool twoSided)
 {
     // construct orthonormal basis around N
     vec3 T1, T2;
@@ -333,6 +371,9 @@ vec3 LTC_Evaluate(
     L[1] = Minv * (points[1] - P);
     L[2] = Minv * (points[2] - P);
     L[3] = Minv * (points[3] - P);
+
+    vec3 lightTexture = FetchDiffuseFilteredTexture(texFilteredMap, texSampler, L[0], L[1], L[2], L[3]);
+    lightTexture = pow(lightTexture, vec3(GAMMA));
 
     int n;
     ClipQuadToHorizon(L, n);
@@ -360,13 +401,10 @@ vec3 LTC_Evaluate(
 
     sum = twoSided ? abs(sum) : max(0.0, sum);
 
-    vec3 Lo_i = vec3(sum, sum, sum);
+    vec3 Lo_i = sum * lightTexture;
 
     return Lo_i;
 }
-
-// Scene helpers
-////////////////
 
 void InitRect(out Rect rect, vec3 position, mat3 rotation, float width, float height)
 {
@@ -435,17 +473,20 @@ void main()
     Ray reflectRay;
     reflectRay.origin = vPosition;
     reflectRay.dir = reflect(-viewDirection, fragment.Normal);
-    float minDistanceReflection = 1e9;
-    int reflectionRectIndex = -1;
+
+    float minDistanceToRect = 1e9;
+    int nearestRectIndex = -1;
+
     for (int i = 0; i < LIGHT_COUNT; i++)
     {
         float distanceToRect;
-        if (RayRectIntersect(reflectRay, lightRects[i], distanceToRect))
+        vec2 uv;
+        if (RayRectIntersect(reflectRay, lightRects[i], uv, distanceToRect))
         {
-            if (distanceToRect < minDistanceReflection)
+            if (distanceToRect < minDistanceToRect)
             {
-                minDistanceReflection = distanceToRect;
-                reflectionRectIndex = i;
+                minDistanceToRect = distanceToRect;
+                nearestRectIndex = i;
             }
         }
     }
@@ -457,12 +498,12 @@ void main()
         InitRectPoints(lightRects[i], points);
 
         vec3 lightColor = pow(uLights[i].Color_Height.rgb, vec3(GAMMA));
-        vec3 specular = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, Minv, points, twoSided);
+        vec3 specular = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, Minv, points, uLightTextures[uLights[i].TextureIndex], uTextureSampler, twoSided);
         specularColor = specularColor * schlick.x + (1.0 - specularColor) * schlick.y;
-        vec3 diffuse = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, mat3(1), points, twoSided);
+        vec3 diffuse = LTC_Evaluate(fragment.Normal, viewDirection, vPosition, mat3(1), points, uLightTextures[uLights[i].TextureIndex], uTextureSampler, twoSided);
         vec3 color = lightColor * (specularColor * specular + diffuseColor * diffuse) / (2.0 * PI);
 
-        if (reflectionRectIndex != -1 && reflectionRectIndex != i)
+        if (nearestRectIndex != -1 && nearestRectIndex != i)
         {
             float blend = smoothstep(0.25, 0.45, fragment.Roughness);
             color *= pow(blend, 0.4);
@@ -471,18 +512,29 @@ void main()
         totalColor += color;
     }
     
-    float minDistanceToRect = 1e9;
+    minDistanceToRect = 1e9;
+    nearestRectIndex = -1;
+    vec2 intersectUV = vec2(0.0);
     for (int i = 0; i < LIGHT_COUNT; i++)
     {
         float distanceToRect;
-        if (RayRectIntersect(ray, lightRects[i], distanceToRect))
+        vec2 uv;
+        if (RayRectIntersect(ray, lightRects[i], uv, distanceToRect))
         {
             if (distanceToRect < minDistanceToRect && distanceToRect < length(vPosition - uCameraPosition))
             {
                 minDistanceToRect = distanceToRect;
-                totalColor = pow(uLights[i].Color_Height.rgb, vec3(GAMMA));
+                nearestRectIndex = i;
+                intersectUV = uv;
             }
         }
+    }
+
+    if (nearestRectIndex != -1)
+    {
+        LightData light = uLights[nearestRectIndex];
+        vec3 lightColor = light.Color_Height.rgb * FetchDiffuseTexture(uLightTextures[light.TextureIndex], uTextureSampler, intersectUV);
+        totalColor = pow(lightColor, vec3(GAMMA));
     }
 
     oColor = vec4(pow(totalColor, vec3(1.0 / GAMMA)), 1.0);

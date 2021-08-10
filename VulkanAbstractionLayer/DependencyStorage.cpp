@@ -43,6 +43,12 @@ namespace VulkanAbstractionLayer
 			this->AddBuffer(buffer.get(), usage);
 	}
 
+	void DependencyStorage::AddBuffers(ArrayView<Buffer> buffers, BufferUsage::Bits usage)
+	{
+		for (const auto& buffer : buffers)
+			this->AddBuffer(buffer, usage);
+	}
+
 	void DependencyStorage::AddImage(const Image& image, ImageUsage::Bits usage)
 	{
 		this->imageDependencies.push_back({ (VkImage)image.GetNativeHandle(), usage });
@@ -57,6 +63,12 @@ namespace VulkanAbstractionLayer
 	{
 		for (const auto& image : images)
 			this->AddImage(image.get(), usage);
+	}
+
+	void DependencyStorage::AddImages(ArrayView<Image> images, ImageUsage::Bits usage)
+	{
+		for (const auto& image : images)
+			this->AddImage(image, usage);
 	}
 
 	void DependencyStorage::AddImages(ArrayView<StringId> images, ImageUsage::Bits usage)

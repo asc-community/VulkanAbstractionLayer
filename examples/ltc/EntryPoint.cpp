@@ -30,6 +30,9 @@ void WindowErrorCallback(const std::string& message)
     std::cerr << "[ERROR Window]: " << message << std::endl;
 }
 
+constexpr size_t MaxLightCount = 4;
+constexpr size_t MaxMaterialCount = 256;
+
 struct Mesh
 {
     struct Material
@@ -39,7 +42,6 @@ struct Mesh
         uint32_t MetallicRoughnessIndex;
         float RoughnessScale;
     };
-    constexpr static size_t MaxMaterialCount = 256;
 
     struct Submesh
     {
@@ -61,61 +63,39 @@ struct SharedResources
     Mesh Sponza;
     Image LookupLTCMatrix;
     Image LookupLTCAmplitude;
+    std::vector<Image> LightTextures;
 };
 
-void LoadLookupTextures(Image& lookupLTCMatrix, Image& lookupLTCAmplitude)
-{
-    auto lookupMatrixTexture = ImageLoader::LoadFromFile("resources/lookup/ltc_matrix.dds");
-    auto lookupAmplitudeTexture = ImageLoader::LoadFromFile("resources/lookup/ltc_amplitude.dds");
-
-    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
-    auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
-
-    commandBuffer.Begin();
-
-    lookupLTCMatrix.Init(
-        lookupMatrixTexture.Width,
-        lookupMatrixTexture.Height,
-        Format::R32G32B32A32_SFLOAT,
-        ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
-        MemoryUsage::GPU_ONLY,
-        Mipmapping::NO_MIPMAPS
-    );
-    auto lookupMatrixAllocation = stageBuffer.Submit(MakeView(lookupMatrixTexture.ByteData));
-    commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), lookupMatrixAllocation.Offset, lookupLTCMatrix, ImageUsage::UNKNOWN, lookupMatrixAllocation.Size);
-
-    lookupLTCAmplitude.Init(
-        lookupAmplitudeTexture.Width,
-        lookupAmplitudeTexture.Height,
-        Format::R32G32_SFLOAT,
-        ImageUsage::SHADER_READ | ImageUsage::TRANSFER_DISTINATION,
-        MemoryUsage::GPU_ONLY,
-        Mipmapping::NO_MIPMAPS
-    );
-    auto lookupAmplitudeAllocation = stageBuffer.Submit(MakeView(lookupAmplitudeTexture.ByteData));
-    commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), lookupAmplitudeAllocation.Offset, lookupLTCAmplitude, ImageUsage::UNKNOWN, lookupAmplitudeAllocation.Size);
-
-    stageBuffer.Flush();
-    commandBuffer.End();
-    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
-    stageBuffer.Reset();
-}
-
-void LoadMaterialImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imageData)
+void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imageData, Mipmapping mipmapping)
 {
     auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
 
     image.Init(
         imageData.Width,
         imageData.Height,
-        Format::R8G8B8A8_UNORM,
+        imageData.ImageFormat,
         ImageUsage::SHADER_READ | ImageUsage::TRANSFER_SOURCE | ImageUsage::TRANSFER_DISTINATION,
         MemoryUsage::GPU_ONLY,
-        Mipmapping::USE_MIPMAPS
+        mipmapping
     );
-    auto albedoAllocation = stageBuffer.Submit(MakeView(imageData.ByteData));
-    commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), albedoAllocation.Offset, image, ImageUsage::UNKNOWN, albedoAllocation.Size);
-    commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
+    auto allocation = stageBuffer.Submit(MakeView(imageData.ByteData));
+    commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), allocation.Offset, image, ImageUsage::UNKNOWN, allocation.Size);
+    if(mipmapping == Mipmapping::USE_MIPMAPS)
+        commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
+}
+
+void LoadImage(Image& image, const std::string& filepath, Mipmapping mipmapping)
+{
+    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
+    auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+    commandBuffer.Begin();
+
+    LoadImage(commandBuffer, image, ImageLoader::LoadFromFile(filepath), mipmapping);
+
+    stageBuffer.Flush();
+    commandBuffer.End();
+    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
+    stageBuffer.Reset();
 }
 
 void LoadModelGLTF(Mesh& mesh, const std::string& filepath)
@@ -152,9 +132,9 @@ void LoadModelGLTF(Mesh& mesh, const std::string& filepath)
     {
         commandBuffer.Begin();
 
-        LoadMaterialImage(commandBuffer, mesh.Textures.emplace_back(), material.AlbedoTexture);
-        LoadMaterialImage(commandBuffer, mesh.Textures.emplace_back(), material.NormalTexture);
-        LoadMaterialImage(commandBuffer, mesh.Textures.emplace_back(), material.MetallicRoughness);
+        LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.AlbedoTexture, Mipmapping::USE_MIPMAPS);
+        LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.NormalTexture, Mipmapping::USE_MIPMAPS);
+        LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.MetallicRoughness, Mipmapping::USE_MIPMAPS);
 
         constexpr float AppliedRoughnessScale = 0.5f;
         mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, AppliedRoughnessScale * material.RoughnessScale });
@@ -190,8 +170,9 @@ public:
         float Width;
         Vector3 Color;
         float Height;
+        uint32_t TextureIndex;
+        uint32_t Padding[3];
     };
-    constexpr static size_t MaxLightCount = 3;
     std::array<LightData, MaxLightCount> LightUniformArray;
 
     UniformSubmitRenderPass(SharedResources& sharedResources)
@@ -276,6 +257,7 @@ public:
         pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareImage(this->sharedResources.LookupLTCMatrix, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareImage(this->sharedResources.LookupLTCAmplitude, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImages(this->sharedResources.LightTextures, ImageUsage::TRANSFER_DISTINATION);
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
@@ -285,7 +267,8 @@ public:
             .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
             .Bind(5, this->TextureSampler, UniformType::SAMPLER)
             .Bind(6, this->sharedResources.LookupLTCMatrix, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(7, this->sharedResources.LookupLTCAmplitude, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(7, this->sharedResources.LookupLTCAmplitude, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(8, this->sharedResources.LightTextures, UniformType::SAMPLED_IMAGE);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -300,6 +283,7 @@ public:
         depedencies.AddImages(this->textureArray, ImageUsage::SHADER_READ);
         depedencies.AddImage(this->sharedResources.LookupLTCMatrix, ImageUsage::SHADER_READ);
         depedencies.AddImage(this->sharedResources.LookupLTCAmplitude, ImageUsage::SHADER_READ);
+        depedencies.AddImages(this->sharedResources.LightTextures, ImageUsage::SHADER_READ);
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -415,8 +399,8 @@ int main()
     SharedResources sharedResources{
         Buffer{ sizeof(UniformSubmitRenderPass::CameraUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(UniformSubmitRenderPass::ModelUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(Mesh::Material) * Mesh::MaxMaterialCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(UniformSubmitRenderPass::LightData) * UniformSubmitRenderPass::MaxLightCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(Mesh::Material) * MaxMaterialCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(UniformSubmitRenderPass::LightData) * MaxLightCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // sponza
         { }, // ltc matrix lookup
         { }, // ltc amplitude lookup
@@ -424,7 +408,10 @@ int main()
 
     LoadModelGLTF(sharedResources.Sponza, "resources/Sponza/glTF/Sponza.gltf");
     Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
-    LoadLookupTextures(sharedResources.LookupLTCMatrix, sharedResources.LookupLTCAmplitude);
+    LoadImage(sharedResources.LookupLTCMatrix, "resources/lookup/ltc_matrix.dds", Mipmapping::NO_MIPMAPS);
+    LoadImage(sharedResources.LookupLTCAmplitude, "resources/lookup/ltc_amplitude.dds", Mipmapping::NO_MIPMAPS);
+    LoadImage(sharedResources.LightTextures.emplace_back(), "resources/textures/white_filtered.dds", Mipmapping::USE_MIPMAPS);
+    LoadImage(sharedResources.LightTextures.emplace_back(), "resources/textures/stained_glass_filtered.dds", Mipmapping::USE_MIPMAPS);
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 
@@ -435,21 +422,31 @@ int main()
 
     lightArray[0].Color = Vector3{ 1.0f, 1.0f, 1.0f };
     lightArray[0].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
-    lightArray[0].Position = Vector3{ -45.0f, 200.0f, -1000.0f };
+    lightArray[0].Position = Vector3{ -400.0f, 200.0f, 0.0f };
     lightArray[0].Height = 300.0f;
     lightArray[0].Width = 50.0f;
+    lightArray[0].TextureIndex = 0;
 
     lightArray[1].Color = Vector3{ 1.0f, 0.0f, 0.0f };
     lightArray[1].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
     lightArray[1].Position = Vector3{ -45.0f, 200.0f, 1100.0f };
     lightArray[1].Height = 200.0f;
     lightArray[1].Width = 200.0f;
+    lightArray[1].TextureIndex = 0;
 
     lightArray[2].Color = Vector3{ 0.0f, 0.0f, 1.0f };
     lightArray[2].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
     lightArray[2].Position = Vector3{ -45.0f, 200.0f, 1000.0f };
     lightArray[2].Height = 200.0f;
     lightArray[2].Width = 200.0f;
+    lightArray[2].TextureIndex = 0;
+
+    lightArray[3].Color = Vector3{ 1.0f, 1.0f, 1.0f };
+    lightArray[3].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
+    lightArray[3].Position = Vector3{ -45.0f, 200.0f, -1000.0f };
+    lightArray[3].Height = 300.0f;
+    lightArray[3].Width = 300.0f;
+    lightArray[3].TextureIndex = 1;
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
@@ -532,6 +529,7 @@ int main()
 
             int lightIndex = 0;
             ImGui::Begin("Lights");
+
             for (auto& lightUniform : uniformSubmitPass.LightUniformArray)
             {
                 ImGui::PushID(lightIndex++);

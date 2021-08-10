@@ -142,6 +142,22 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Buffer> buffers, UniformType type)
+	{
+		size_t index = 0;
+		for (const auto& buffer : buffers)
+			index = this->AllocateBinding(buffer);
+
+		this->descriptorWrites.push_back({ 
+			type,
+			binding,
+			uint32_t(index + 1 - buffers.size()),
+			uint32_t(buffers.size())
+		});
+
+		return *this;
+	}
+
 	void DescriptorBinding::ResolveAttachments(const std::unordered_map<StringId, Image>& mappings)
 	{
 		for (const auto& attachmentInfo : this->descriptorAttachmentInfos)
@@ -176,11 +192,43 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Image> images, UniformType type)
+	{
+		size_t index = 0;
+		for (const auto& image : images)
+			index = this->AllocateBinding(image, ImageView::NATIVE);
+
+		this->descriptorWrites.push_back({
+			type,
+			binding,
+			uint32_t(index + 1 - images.size()),
+			uint32_t(images.size())
+		});
+
+		return *this;
+	}
+
 	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<SamplerReference> samplers, UniformType type)
 	{
 		size_t index = 0;
 		for (const auto& sampler : samplers)
 			index = this->AllocateBinding(sampler.get());
+
+		this->descriptorWrites.push_back({
+			type,
+			binding,
+			uint32_t(index + 1 - samplers.size()),
+			uint32_t(samplers.size())
+		});
+
+		return *this;
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Sampler> samplers, UniformType type)
+	{
+		size_t index = 0;
+		for (const auto& sampler : samplers)
+			index = this->AllocateBinding(sampler);
 
 		this->descriptorWrites.push_back({
 			type,
