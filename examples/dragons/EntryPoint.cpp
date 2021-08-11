@@ -66,8 +66,16 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
     result.InstanceBuffer.Init(instanceAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
     result.VertexBuffer.Init(vertexAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
 
-    commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), instanceAllocation.Offset, result.InstanceBuffer, 0, instanceAllocation.Size);
-    commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), vertexAllocation.Offset, result.VertexBuffer, 0, vertexAllocation.Size);
+    commandBuffer.CopyBuffer(
+        BufferInfo{ stageBuffer.GetBuffer(), instanceAllocation.Offset }, 
+        BufferInfo{ result.InstanceBuffer, 0 }, 
+        instanceAllocation.Size
+    );
+    commandBuffer.CopyBuffer(
+        BufferInfo{ stageBuffer.GetBuffer(), vertexAllocation.Offset }, 
+        BufferInfo{ result.VertexBuffer, 0 }, 
+        vertexAllocation.Size
+    );
 
     for (const auto& texture : textures)
     {
@@ -83,7 +91,10 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
 
         auto textureAllocation = stageBuffer.Submit(texture.ByteData.data(), texture.ByteData.size());
 
-        commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), textureAllocation.Offset, image, ImageUsage::UNKNOWN, textureAllocation.Size);
+        commandBuffer.CopyBufferToImage(
+            BufferInfo{ stageBuffer.GetBuffer(), textureAllocation.Offset }, 
+            ImageInfo{ image, ImageUsage::UNKNOWN, 0 }
+        );
         commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
     }
 
@@ -197,7 +208,11 @@ public:
         {
             auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
             auto uniformAllocation = stageBuffer.Submit(&uniformData);
-            state.Commands.CopyBuffer(stageBuffer.GetBuffer(), uniformAllocation.Offset, uniformBuffer, 0, uniformAllocation.Size);
+            state.Commands.CopyBuffer(
+                BufferInfo{ stageBuffer.GetBuffer(), uniformAllocation.Offset }, 
+                BufferInfo{ uniformBuffer, 0 }, 
+                uniformAllocation.Size
+            );
         };
 
         FillUniform(this->CameraUniform, this->sharedResources.CameraUniformBuffer);

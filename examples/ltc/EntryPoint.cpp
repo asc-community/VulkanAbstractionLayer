@@ -54,6 +54,28 @@ struct Mesh
     std::vector<Image> Textures;
 };
 
+struct CameraUniformData
+{
+    Matrix4x4 Matrix;
+    Vector3 Position;
+};
+
+struct ModelUniformData
+{
+    Matrix3x4 Matrix;
+};
+
+struct LightUniformData
+{
+    Matrix3x4 Rotation;
+    Vector3 Position;
+    float Width;
+    Vector3 Color;
+    float Height;
+    uint32_t TextureIndex;
+    uint32_t Padding[3];
+};
+
 struct SharedResources
 {
     Buffer CameraUniformBuffer;
@@ -64,6 +86,9 @@ struct SharedResources
     Image LookupLTCMatrix;
     Image LookupLTCAmplitude;
     std::vector<Image> LightTextures;
+    CameraUniformData CameraUniform;
+    ModelUniformData ModelUniform;
+    std::array<LightUniformData, MaxLightCount> LightUniformArray;
 };
 
 void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imageData, Mipmapping mipmapping)
@@ -79,9 +104,30 @@ void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imag
         mipmapping
     );
     auto allocation = stageBuffer.Submit(MakeView(imageData.ByteData));
-    commandBuffer.CopyBufferToImage(stageBuffer.GetBuffer(), allocation.Offset, image, ImageUsage::UNKNOWN, allocation.Size);
-    if(mipmapping == Mipmapping::USE_MIPMAPS)
-        commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
+    commandBuffer.CopyBufferToImage(
+        BufferInfo{ stageBuffer.GetBuffer(), allocation.Offset }, 
+        ImageInfo{ image, ImageUsage::UNKNOWN, 0 }
+    );
+    if (mipmapping == Mipmapping::USE_MIPMAPS)
+    {
+        if (imageData.MipLevels.empty())
+        {
+            commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
+        }
+        else
+        {
+            uint32_t mipLevel = 1;
+            for (const auto& mipData : imageData.MipLevels)
+            {
+                auto allocation = stageBuffer.Submit(MakeView(mipData));
+                commandBuffer.CopyBufferToImage(
+                    BufferInfo{ stageBuffer.GetBuffer(), allocation.Offset },
+                    ImageInfo{ image, ImageUsage::TRANSFER_DISTINATION, mipLevel }
+                );
+                mipLevel++;
+            }
+        }
+    }
 }
 
 void LoadImage(Image& image, const std::string& filepath, Mipmapping mipmapping)
@@ -117,7 +163,11 @@ void LoadModelGLTF(Mesh& mesh, const std::string& filepath)
         );
 
         auto allocation = stageBuffer.Submit(MakeView(shape.Vertices));
-        commandBuffer.CopyBuffer(stageBuffer.GetBuffer(), allocation.Offset, submesh.VertexBuffer, 0, allocation.Size);
+        commandBuffer.CopyBuffer(
+            BufferInfo{ stageBuffer.GetBuffer(), allocation.Offset }, 
+            BufferInfo{ submesh.VertexBuffer, 0 }, 
+            allocation.Size
+        );
 
         submesh.MaterialIndex = shape.MaterialIndex;
     }
@@ -152,29 +202,6 @@ class UniformSubmitRenderPass : public RenderPass
     SharedResources& sharedResources;
 
 public:
-    struct CameraUniformData
-    {
-        Matrix4x4 Matrix;
-        Vector3 Position;
-    } CameraUniform;
-
-    struct ModelUniformData
-    {
-        Matrix3x4 Matrix;
-    } ModelUniform;
-
-    struct LightData
-    {
-        Matrix3x4 Rotation;
-        Vector3 Position;
-        float Width;
-        Vector3 Color;
-        float Height;
-        uint32_t TextureIndex;
-        uint32_t Padding[3];
-    };
-    std::array<LightData, MaxLightCount> LightUniformArray;
-
     UniformSubmitRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
@@ -203,18 +230,26 @@ public:
         {
             auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
             auto uniformAllocation = stageBuffer.Submit(&uniformData);
-            state.Commands.CopyBuffer(stageBuffer.GetBuffer(), uniformAllocation.Offset, uniformBuffer, 0, uniformAllocation.Size);
+            state.Commands.CopyBuffer(
+                BufferInfo{ stageBuffer.GetBuffer(), uniformAllocation.Offset }, 
+                BufferInfo{ uniformBuffer, 0 },
+                uniformAllocation.Size
+            );
         };
         auto FillUniformArray = [&state](const auto& uniformArray, const auto& uniformBuffer) mutable
         {
             auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
             auto uniformAllocation = stageBuffer.Submit(MakeView(uniformArray));
-            state.Commands.CopyBuffer(stageBuffer.GetBuffer(), uniformAllocation.Offset, uniformBuffer, 0, uniformAllocation.Size);
+            state.Commands.CopyBuffer(
+                BufferInfo{ stageBuffer.GetBuffer(), uniformAllocation.Offset }, 
+                BufferInfo{ uniformBuffer, 0 }, 
+                uniformAllocation.Size
+            );
         };
 
-        FillUniform(this->CameraUniform, this->sharedResources.CameraUniformBuffer);
-        FillUniform(this->ModelUniform, this->sharedResources.ModelUniformBuffer);
-        FillUniformArray(this->LightUniformArray, this->sharedResources.LightUniformBuffer);
+        FillUniform(this->sharedResources.CameraUniform, this->sharedResources.CameraUniformBuffer);
+        FillUniform(this->sharedResources.ModelUniform, this->sharedResources.ModelUniformBuffer);
+        FillUniformArray(this->sharedResources.LightUniformArray, this->sharedResources.LightUniformBuffer);
         FillUniformArray(this->sharedResources.Sponza.Materials, this->sharedResources.MaterialUniformBuffer);
     }
 };
@@ -397,10 +432,10 @@ int main()
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
     SharedResources sharedResources{
-        Buffer{ sizeof(UniformSubmitRenderPass::CameraUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(UniformSubmitRenderPass::ModelUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(CameraUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(ModelUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(Mesh::Material) * MaxMaterialCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(UniformSubmitRenderPass::LightData) * MaxLightCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(LightUniformData) * MaxLightCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // sponza
         { }, // ltc matrix lookup
         { }, // ltc amplitude lookup
@@ -418,7 +453,7 @@ int main()
     Camera camera;
     Vector3 modelRotation{ 0.0f, HalfPi, 0.0f };
 
-    auto& lightArray = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id).LightUniformArray;
+    auto& lightArray = sharedResources.LightUniformArray;
 
     lightArray[0].Color = Vector3{ 1.0f, 1.0f, 1.0f };
     lightArray[0].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
@@ -487,7 +522,6 @@ int main()
             ImGuiVulkanContext::StartFrame();
 
             auto dt = ImGui::GetIO().DeltaTime;
-            auto& uniformSubmitPass = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);
 
             auto mouseMovement = ImGui::GetMouseDragDelta(MouseButton::RIGHT, 0.0f);
             ImGui::ResetMouseDragDelta(MouseButton::RIGHT);
@@ -517,20 +551,20 @@ int main()
             ImGui::DragFloat("fov", &camera.Fov);
             ImGui::End();
 
-            uniformSubmitPass.CameraUniform.Matrix = camera.GetMatrix();
-            uniformSubmitPass.CameraUniform.Position = camera.Position;
+            sharedResources.CameraUniform.Matrix = camera.GetMatrix();
+            sharedResources.CameraUniform.Position = camera.Position;
 
 
             ImGui::Begin("Model");
             ImGui::DragFloat3("rotation", &modelRotation[0], 0.01f);
             ImGui::End();
 
-            uniformSubmitPass.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
+            sharedResources.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
 
             int lightIndex = 0;
             ImGui::Begin("Lights");
 
-            for (auto& lightUniform : uniformSubmitPass.LightUniformArray)
+            for (auto& lightUniform : sharedResources.LightUniformArray)
             {
                 ImGui::PushID(lightIndex++);
                 if (ImGui::TreeNode(("light_" + std::to_string(lightIndex)).c_str()))

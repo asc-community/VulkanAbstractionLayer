@@ -315,6 +315,14 @@ namespace VulkanAbstractionLayer
         image.ByteData.resize(imageData->m_memSlicePitch);
         std::copy((const uint8_t*)imageData->m_mem, (const uint8_t*)imageData->m_mem + imageData->m_memSlicePitch, image.ByteData.begin());
 
+        for (uint32_t i = 1; i < dds.GetMipCount(); i++)
+        {
+            auto& mipLevelData = image.MipLevels.emplace_back();
+            auto mipImageData = dds.GetImageData(i);
+            mipLevelData.resize(mipImageData->m_memSlicePitch);
+            std::copy((const uint8_t*)mipImageData->m_mem, (const uint8_t*)mipImageData->m_mem + mipImageData->m_memSlicePitch, mipLevelData.begin());
+        }
+
         return image;
     }
 

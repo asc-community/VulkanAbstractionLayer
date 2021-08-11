@@ -148,6 +148,17 @@ namespace VulkanAbstractionLayer
         };
     }
 
+    vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image, uint32_t mipLevel)
+    {
+        auto subresourceRange = GetDefaultImageSubresourceRange(image);
+        return vk::ImageSubresourceLayers{
+            subresourceRange.aspectMask,
+            mipLevel,
+            subresourceRange.baseArrayLayer,
+            subresourceRange.layerCount
+        };
+    }
+
     vk::ImageSubresourceRange GetDefaultImageSubresourceRange(const Image& image)
     {
         return vk::ImageSubresourceRange{
@@ -314,5 +325,17 @@ namespace VulkanAbstractionLayer
             assert(false);
             return this->imageViews.NativeView;
         }
+    }
+
+    uint32_t Image::GetMipLevelWidth(uint32_t mipLevel) const
+    {
+        auto safeWidth = std::max(this->GetWidth(), 1u << mipLevel);
+        return safeWidth >> mipLevel;
+    }
+
+    uint32_t Image::GetMipLevelHeight(uint32_t mipLevel) const
+    {
+        auto safeHeight = std::max(this->GetHeight(), 1u << mipLevel);
+        return safeHeight >> mipLevel;
     }
 }

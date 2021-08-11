@@ -103,6 +103,8 @@ namespace VulkanAbstractionLayer
         void Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, Mipmapping mipmapping);
 
         vk::ImageView GetNativeView(ImageView view) const;
+        uint32_t GetMipLevelWidth(uint32_t mipLevel) const;
+        uint32_t GetMipLevelHeight(uint32_t mipLevel) const;
 
         vk::Image GetNativeHandle() const { return this->handle; }
         Format GetFormat() const { return this->format; }
@@ -112,6 +114,7 @@ namespace VulkanAbstractionLayer
     };
 
     vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image);
+    vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image, uint32_t mipLevel);
     vk::ImageSubresourceRange GetDefaultImageSubresourceRange(const Image& image);
 
     using ImageReference = std::reference_wrapper<const Image>;

@@ -164,4 +164,8 @@ while (!window.ShouldClose())
 
 ## Some Examples
 ![instanced-dragons](preview/instanced-dragons.png)
+*simple shadow mapping*
 ![ltc-rectange](preview/ltc-rectangle.png)
+*area light from [LTC paper](https://eheitzresearch.wordpress.com/415-2/)*
+![ltc-textured](preview/ltc-textured.png)
+*textured light from [LTC paper](https://eheitzresearch.wordpress.com/415-2/)*

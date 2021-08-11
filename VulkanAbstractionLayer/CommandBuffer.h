@@ -77,6 +77,19 @@ namespace VulkanAbstractionLayer
         CUBIC,
     };
 
+    struct ImageInfo
+    {
+        ImageReference Resource;
+        ImageUsage::Bits Usage = ImageUsage::UNKNOWN;
+        uint32_t MipLevel = 0;
+    };
+
+    struct BufferInfo
+    {
+        BufferReference Resource;
+        uint32_t Offset = 0;
+    };
+
     class CommandBuffer
     {
         vk::CommandBuffer handle;
@@ -99,16 +112,10 @@ namespace VulkanAbstractionLayer
 
         void PushConstants(const RenderPassNative& renderPass, const uint8_t* data, size_t size);
         
-        void CopyImage(const Image& source, ImageUsage::Bits sourceUsage, const Image& distance, ImageUsage::Bits distanceUsage);
-        
-        void CopyBufferToImage(const Buffer& source, const Image& distance, ImageUsage::Bits distanceUsage);
-        void CopyBufferToImage(const Buffer& source, size_t sourceOffset, const Image& distance, ImageUsage::Bits distanceUsage, size_t byteSize);
-        
-        void CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, const Buffer& distance);
-        void CopyImageToBuffer(const Image& source, ImageUsage::Bits sourceUsage, const Buffer& distance, size_t distanceOffset, size_t byteSize);
-        
-        void CopyBuffer(const Buffer& source, const Buffer& distance);
-        void CopyBuffer(const Buffer& source, size_t sourceOffset, const Buffer& distance,size_t distanceOffset, size_t byteSize);
+        void CopyImage(const ImageInfo& source, const ImageInfo& distance);
+        void CopyBufferToImage(const BufferInfo& source, const ImageInfo& distance);
+        void CopyImageToBuffer(const ImageInfo& source, const BufferInfo& distance);
+        void CopyBuffer(const BufferInfo& source, const BufferInfo& distance, size_t byteSize);
         
         void BlitImage(const Image& source, ImageUsage::Bits sourceUsage, const Image& distance, ImageUsage::Bits distanceUsage, BlitFilter filter);
         void GenerateMipLevels(const Image& image, ImageUsage::Bits initialUsage, BlitFilter filter);

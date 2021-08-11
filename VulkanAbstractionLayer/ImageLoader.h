@@ -42,6 +42,7 @@ namespace VulkanAbstractionLayer
         Format ImageFormat = Format::UNDEFINED;
         uint32_t Width = 0;
         uint32_t Height = 0;
+        std::vector<std::vector<uint8_t>> MipLevels;
     };
 
     class ImageLoader

@@ -183,12 +183,12 @@ vec3 FetchDiffuseFilteredTexture(texture2D texLightFiltered, sampler texLightSam
     float d = abs(planeDistxPlaneArea) / pow(planeAreaSquared, 0.75);
     vec2 size = textureSize(sampler2D(texLightFiltered, texLightSampler), 0);
 
-    return texture(sampler2D(texLightFiltered, texLightSampler), vec2(0.125, 0.125) + 0.75 * Puv, log(size.x * d) / log(3.0)).rgb;
+    return textureLod(sampler2D(texLightFiltered, texLightSampler), vec2(0.125, 0.125) + 0.75 * Puv, log(size.x * d) / log(3.0)).rgb;
 }
 
 vec3 FetchDiffuseTexture(texture2D texLightFiltered, sampler texLightSampler, vec2 uv)
 {
-    return texture(sampler2D(texLightFiltered, texLightSampler), 0.75 * uv + 0.125).rgb;
+    return texture(sampler2D(texLightFiltered, texLightSampler), 0.75 * uv + 0.125, -1.25).rgb;
 }
 
 bool RayPlaneIntersect(Ray ray, vec4 plane, out float t)
