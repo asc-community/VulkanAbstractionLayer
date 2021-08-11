@@ -90,7 +90,7 @@ namespace VulkanAbstractionLayer
     inline Vector3 MakeRotationAngles(const Matrix4x4& matrix)
     {
         Vector3 result{ 0.0f, 0.0f, 0.0f };
-        glm::extractEulerAngleYXZ(matrix, result.x, result.y, result.z);
+        glm::extractEulerAngleXYZ(matrix, result.x, result.y, result.z);
         return result;
     }
 
