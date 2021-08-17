@@ -32,6 +32,14 @@
 
 namespace VulkanAbstractionLayer
 {
+    vk::ImageViewType GetImageViewType(const Image& image)
+    {
+        if (image.GetLayerCount() == 1)
+            return vk::ImageViewType::e2D;
+        else
+            return vk::ImageViewType::eCube;
+    }
+
     vk::ImageAspectFlags ImageFormatToImageAspect(Format format)
     {
         switch (format)
@@ -148,14 +156,13 @@ namespace VulkanAbstractionLayer
         };
     }
 
-    vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image, uint32_t mipLevel)
+    vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image, uint32_t mipLevel, uint32_t layer)
     {
-        auto subresourceRange = GetDefaultImageSubresourceRange(image);
         return vk::ImageSubresourceLayers{
-            subresourceRange.aspectMask,
+            ImageFormatToImageAspect(image.GetFormat()),
             mipLevel,
-            subresourceRange.baseArrayLayer,
-            subresourceRange.layerCount
+            layer,
+            1
         };
     }
 
@@ -166,7 +173,7 @@ namespace VulkanAbstractionLayer
             0, // base mip level
             image.GetMipLevelCount(),
             0, // base layer
-            1  // layer count
+            image.GetLayerCount()
         };
     }
 
@@ -202,7 +209,7 @@ namespace VulkanAbstractionLayer
         vk::ImageViewCreateInfo imageViewCreateInfo;
         imageViewCreateInfo
             .setImage(this->handle)
-            .setViewType(vk::ImageViewType::e2D)
+            .setViewType(GetImageViewType(*this))
             .setFormat(ToNative(format))
             .setComponents(vk::ComponentMapping{
                 vk::ComponentSwizzle::eIdentity,
@@ -231,9 +238,9 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    Image::Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, Mipmapping mipmapping)
+    Image::Image(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, ImageOptions::Value options)
     {
-        this->Init(width, height, format, usage, memoryUsage, mipmapping);
+        this->Init(width, height, format, usage, memoryUsage, options);
     }
 
     Image::Image(vk::Image image, uint32_t width, uint32_t height, Format format)
@@ -286,12 +293,17 @@ namespace VulkanAbstractionLayer
         this->Destroy();
     }
 
-    void Image::Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, Mipmapping mipmapping)
+    void Image::Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, ImageOptions::Value options)
     {
-        if (mipmapping == Mipmapping::USE_MIPMAPS)
+        if (options & ImageOptions::MIPMAPS)
             this->mipLevelCount = (uint32_t)std::floor(std::log2(std::max(width, height))) + 1;
         else
             this->mipLevelCount = 1;
+
+        if (options & ImageOptions::CUBEMAP)
+            this->layerCount = 6;
+        else
+            this->layerCount = 1;
 
         vk::ImageCreateInfo imageCreateInfo;
         imageCreateInfo
@@ -300,11 +312,14 @@ namespace VulkanAbstractionLayer
             .setExtent(vk::Extent3D{ width, height, 1 })
             .setSamples(vk::SampleCountFlagBits::e1)
             .setMipLevels(this->GetMipLevelCount())
-            .setArrayLayers(1)
+            .setArrayLayers(this->layerCount)
             .setTiling(vk::ImageTiling::eOptimal)
             .setUsage((vk::ImageUsageFlags)usage)
             .setSharingMode(vk::SharingMode::eExclusive)
             .setInitialLayout(vk::ImageLayout::eUndefined);
+
+        if (options & ImageOptions::CUBEMAP)
+            imageCreateInfo.setFlags(vk::ImageCreateFlagBits::eCubeCompatible);
         
         this->extent = vk::Extent2D{ (uint32_t)width, (uint32_t)height };
         this->allocation = AllocateImage(imageCreateInfo, memoryUsage, &this->handle);

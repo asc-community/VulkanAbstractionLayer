@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- 
+     This is a Microsoft natvis file, which allows visualization of complex variables in the
+     Microsoft debugger starting with VS2012. It's a successor to the AutoExp.dat file format. 
+
+     This file needs to go into your C:\Users\<user>\Documents\Visual Studio XXXX\Visualizers\
+     folder.
+
+     You don't need to restart Visual Studio to use it, you just need to restart the debug 
+     session. You can have multiple .natvis files and they will all be used.
+
+     VS2017 natvis documentation:
+    https://docs.microsoft.com/en-us/visualstudio/debugger/create-custom-views-of-native-objects
+-->
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+<Type Name="tcb::span&lt;*, *&gt;">
+  <DisplayString Condition="storage_.size == 0">{{ }}</DisplayString>
+  <DisplayString Condition="storage_.size == 1">{{ {*storage_.ptr} }}</DisplayString>
+  <DisplayString Condition="storage_.size == 2">{{ {*storage_.ptr}, {*(storage_.ptr + 1)} }}</DisplayString>
+  <DisplayString Condition="storage_.size == 3">{{ {*storage_.ptr}, {*(storage_.ptr + 1)}, {*(storage_.ptr + 2)} }}</DisplayString>
+  <Expand>
+    <Item Name="[size]">storage_.size</Item>
+    <Item Name="[ptr]">storage_.ptr</Item>
+    <ArrayItems>
+      <Size>storage_.size</Size>
+      <ValuePointer>storage_.ptr</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+
+</AutoVisualizer>

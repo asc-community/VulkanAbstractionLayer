@@ -62,6 +62,8 @@ namespace VulkanAbstractionLayer
 
         this->vertexAttributes = vertex.InputAttributes;
         // TODO: support multiple descriptor sets
+        assert(vertex.DescriptorSets.size() < 2);
+        assert(fragment.DescriptorSets.size() < 2);
         this->shaderUniforms = std::vector{
             ShaderUniforms{ vertex.DescriptorSets[0], ShaderType::VERTEX },
             ShaderUniforms{ fragment.DescriptorSets[0], ShaderType::FRAGMENT },

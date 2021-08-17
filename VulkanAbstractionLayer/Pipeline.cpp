@@ -33,12 +33,21 @@ namespace VulkanAbstractionLayer
 {
 	void Pipeline::DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage)
 	{
-		this->bufferDeclarations.push_back({ (VkBuffer)buffer.GetNativeHandle(), oldUsage });
+		this->bufferDeclarations.push_back(BufferDeclaration{ 
+			(VkBuffer)buffer.GetNativeHandle(), 
+			oldUsage 
+		});
 	}
 
 	void Pipeline::DeclareImage(const Image& image, ImageUsage::Bits oldUsage)
 	{
-		this->imageDeclarations.push_back({ (VkImage)image.GetNativeHandle(), oldUsage, image.GetFormat(), image.GetMipLevelCount() });
+		this->imageDeclarations.push_back(ImageDeclaration{ 
+			(VkImage)image.GetNativeHandle(), 
+			oldUsage, 
+			image.GetFormat(), 
+			image.GetMipLevelCount(),
+			image.GetLayerCount()
+		});
 	}
 
 	void Pipeline::DeclareBuffers(ArrayView<BufferReference> buffers, BufferUsage::Bits oldUsage)

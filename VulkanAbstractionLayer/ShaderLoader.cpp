@@ -289,7 +289,10 @@ namespace VulkanAbstractionLayer
         std::sort(inputAttributes.begin(), inputAttributes.end(), [](const auto& v1, const auto& v2) { return v1->location < v2->location; });
         for (const auto& inputAttribute : inputAttributes)
         {
-            result.InputAttributes.push_back(GetTypeByReflection(*inputAttribute->type_description));
+            if (inputAttribute->built_in == (SpvBuiltIn)-1) // ignore build-ins
+            {
+                result.InputAttributes.push_back(GetTypeByReflection(*inputAttribute->type_description));
+            }
         }
 
         uint32_t descriptorBindingCount = 0;

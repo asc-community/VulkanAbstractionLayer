@@ -48,7 +48,44 @@ struct SharedResources
     Buffer LightUniformBuffer;
     std::vector<Mesh> Meshes;
     std::vector<ImageReference> MeshTextures;
+    Image Skybox;
 };
+
+void LoadCubemap(Image& image, const std::string& filepath)
+{
+    auto& vulkanContext = GetCurrentVulkanContext();
+    auto& stageBuffer = vulkanContext.GetCurrentStageBuffer();
+    auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
+
+    commandBuffer.Begin();
+
+    auto cubemapData = ImageLoader::LoadCubemapImageFromFile(filepath);
+    image.Init(
+        cubemapData.FaceWidth,
+        cubemapData.FaceHeight,
+        cubemapData.FaceFormat,
+        ImageUsage::TRANSFER_DISTINATION | ImageUsage::SHADER_READ,
+        MemoryUsage::GPU_ONLY,
+        ImageOptions::CUBEMAP
+    );
+
+    for (uint32_t layer = 0; layer < cubemapData.Faces.size(); layer++)
+    {
+        const auto& face = cubemapData.Faces[layer];
+        auto textureAllocation = stageBuffer.Submit(face.data(), face.size());
+
+        commandBuffer.CopyBufferToImage(
+            BufferInfo{ stageBuffer.GetBuffer(), textureAllocation.Offset },
+            ImageInfo{ image, ImageUsage::UNKNOWN, 0, layer }
+        );
+    }
+
+    stageBuffer.Flush();
+    commandBuffer.End();
+    
+    vulkanContext.SubmitCommandsImmediate(commandBuffer);
+    stageBuffer.Reset();
+}
 
 Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vector<InstanceData>& instances, ArrayView<ImageData> textures)
 {
@@ -86,14 +123,14 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
             texture.ImageFormat,
             ImageUsage::TRANSFER_DISTINATION | ImageUsage::TRANSFER_SOURCE | ImageUsage::SHADER_READ,
             MemoryUsage::GPU_ONLY,
-            Mipmapping::USE_MIPMAPS
+            ImageOptions::MIPMAPS
         );
 
         auto textureAllocation = stageBuffer.Submit(texture.ByteData.data(), texture.ByteData.size());
 
         commandBuffer.CopyBufferToImage(
             BufferInfo{ stageBuffer.GetBuffer(), textureAllocation.Offset }, 
-            ImageInfo{ image, ImageUsage::UNKNOWN, 0 }
+            ImageInfo{ image, ImageUsage::UNKNOWN, 0, 0 }
         );
         commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
     }
@@ -121,7 +158,7 @@ Mesh CreatePlaneMesh(uint32_t& globalTextureIndex)
         InstanceData{ { 0.0f, 0.0f, 0.0f }, globalTextureIndex++ },
     };
 
-    auto texture = ImageLoader::LoadFromFile("models/sand.png");
+    auto texture = ImageLoader::LoadImageFromFile("models/sand.png");
 
     return CreateMesh(vertices, instances, MakeView(std::array{ texture }));
 }
@@ -350,6 +387,51 @@ public:
     }
 };
 
+class SkyboxRenderPass : public RenderPass
+{
+    SharedResources& sharedResources;
+    Sampler skyboxSampler;
+public:
+    SkyboxRenderPass(SharedResources& sharedResources)
+        : sharedResources(sharedResources)
+    {
+        this->skyboxSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::CLAMP_TO_EDGE, Sampler::MipFilter::LINEAR);
+    }
+
+    virtual void SetupPipeline(PipelineState pipeline) override
+    {
+        pipeline.Shader = GraphicShader{
+            ShaderLoader::LoadFromSourceFile("skybox_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSourceFile("skybox_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL),
+        };
+
+        pipeline.DeclareImage(this->sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION);
+
+        pipeline.DescriptorBindings
+            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+    }
+
+    virtual void SetupDependencies(DependencyState depedencies) override
+    {
+        depedencies.AddAttachment("Output"_id, AttachmentState::LOAD_COLOR);
+        depedencies.AddAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+
+        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+
+        depedencies.AddImage(this->sharedResources.Skybox, ImageUsage::SHADER_READ);
+    }
+
+    virtual void OnRender(RenderPassState state) override
+    {
+        auto& output = state.GetAttachment("Output"_id);
+        state.Commands.SetRenderArea(output);
+
+        constexpr uint32_t SkyboxVertexCount = 36;
+        state.Commands.Draw(SkyboxVertexCount, 1);
+    }
+};
+
 auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value options)
 {
     RenderGraphBuilder renderGraphBuilder;
@@ -357,6 +439,7 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
         .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
         .AddRenderPass("ShadowPass"_id, std::make_unique<ShadowRenderPass>(resources))
         .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("SkyboxPass"_id, std::make_unique<SkyboxRenderPass>(resources))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .SetOptions(options)
         .SetOutputName("Output"_id);
@@ -372,8 +455,8 @@ struct Camera
     float MovementSpeed = 250.0f;
     float RotationMovementSpeed = 2.5f;
     float AspectRatio = 16.0f / 9.0f;
-    float ZNear = 0.001f;
-    float ZFar = 10000.0f;
+    float ZNear = 0.1f;
+    float ZFar = 100000.0f;
 
     void Rotate(const Vector2& delta)
     {
@@ -452,7 +535,10 @@ int main()
         Buffer{ sizeof(UniformSubmitRenderPass::LightUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // meshes
         { }, // mesh textures
+        Image{ } // skybox
     };
+
+    LoadCubemap(sharedResources.Skybox, "textures/skybox.png");
 
     uint32_t textureCount = 0;
     sharedResources.Meshes.push_back(CreateDragonMesh(textureCount));

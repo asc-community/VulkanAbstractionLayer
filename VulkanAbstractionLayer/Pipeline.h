@@ -50,6 +50,7 @@ namespace VulkanAbstractionLayer
             ImageUsage::Bits InitialUsage;
             Format ImageFormat;
             uint32_t MipLevelCount;
+            uint32_t LayerCount;
         };
 
         struct AttachmentDeclaration

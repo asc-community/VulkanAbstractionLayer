@@ -91,7 +91,7 @@ struct SharedResources
     std::array<LightUniformData, MaxLightCount> LightUniformArray;
 };
 
-void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imageData, Mipmapping mipmapping)
+void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imageData, ImageOptions::Value options)
 {
     auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
 
@@ -101,14 +101,14 @@ void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imag
         imageData.ImageFormat,
         ImageUsage::SHADER_READ | ImageUsage::TRANSFER_SOURCE | ImageUsage::TRANSFER_DISTINATION,
         MemoryUsage::GPU_ONLY,
-        mipmapping
+        options
     );
     auto allocation = stageBuffer.Submit(MakeView(imageData.ByteData));
     commandBuffer.CopyBufferToImage(
         BufferInfo{ stageBuffer.GetBuffer(), allocation.Offset }, 
-        ImageInfo{ image, ImageUsage::UNKNOWN, 0 }
+        ImageInfo{ image, ImageUsage::UNKNOWN, 0, 0 }
     );
-    if (mipmapping == Mipmapping::USE_MIPMAPS)
+    if (options & ImageOptions::MIPMAPS)
     {
         if (imageData.MipLevels.empty())
         {
@@ -122,7 +122,7 @@ void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imag
                 auto allocation = stageBuffer.Submit(MakeView(mipData));
                 commandBuffer.CopyBufferToImage(
                     BufferInfo{ stageBuffer.GetBuffer(), allocation.Offset },
-                    ImageInfo{ image, ImageUsage::TRANSFER_DISTINATION, mipLevel }
+                    ImageInfo{ image, ImageUsage::TRANSFER_DISTINATION, mipLevel, 0 }
                 );
                 mipLevel++;
             }
@@ -130,13 +130,13 @@ void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imag
     }
 }
 
-void LoadImage(Image& image, const std::string& filepath, Mipmapping mipmapping)
+void LoadImage(Image& image, const std::string& filepath, ImageOptions::Value options)
 {
     auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
     auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
     commandBuffer.Begin();
 
-    LoadImage(commandBuffer, image, ImageLoader::LoadFromFile(filepath), mipmapping);
+    LoadImage(commandBuffer, image, ImageLoader::LoadImageFromFile(filepath), options);
 
     stageBuffer.Flush();
     commandBuffer.End();
@@ -182,9 +182,9 @@ void LoadModelGLTF(Mesh& mesh, const std::string& filepath)
     {
         commandBuffer.Begin();
 
-        LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.AlbedoTexture, Mipmapping::USE_MIPMAPS);
-        LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.NormalTexture, Mipmapping::USE_MIPMAPS);
-        LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.MetallicRoughness, Mipmapping::USE_MIPMAPS);
+        LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.AlbedoTexture, ImageOptions::MIPMAPS);
+        LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.NormalTexture, ImageOptions::MIPMAPS);
+        LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.MetallicRoughness, ImageOptions::MIPMAPS);
 
         constexpr float AppliedRoughnessScale = 0.5f;
         mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, AppliedRoughnessScale * material.RoughnessScale });
@@ -443,10 +443,10 @@ int main()
 
     LoadModelGLTF(sharedResources.Sponza, "resources/Sponza/glTF/Sponza.gltf");
     Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
-    LoadImage(sharedResources.LookupLTCMatrix, "resources/lookup/ltc_matrix.dds", Mipmapping::NO_MIPMAPS);
-    LoadImage(sharedResources.LookupLTCAmplitude, "resources/lookup/ltc_amplitude.dds", Mipmapping::NO_MIPMAPS);
-    LoadImage(sharedResources.LightTextures.emplace_back(), "resources/textures/white_filtered.dds", Mipmapping::USE_MIPMAPS);
-    LoadImage(sharedResources.LightTextures.emplace_back(), "resources/textures/stained_glass_filtered.dds", Mipmapping::USE_MIPMAPS);
+    LoadImage(sharedResources.LookupLTCMatrix, "resources/lookup/ltc_matrix.dds", ImageOptions::DEFAULT);
+    LoadImage(sharedResources.LookupLTCAmplitude, "resources/lookup/ltc_amplitude.dds", ImageOptions::DEFAULT);
+    LoadImage(sharedResources.LightTextures.emplace_back(), "resources/textures/white_filtered.dds", ImageOptions::MIPMAPS);
+    LoadImage(sharedResources.LightTextures.emplace_back(), "resources/textures/stained_glass_filtered.dds", ImageOptions::MIPMAPS);
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 

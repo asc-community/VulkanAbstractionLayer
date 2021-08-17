@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <array>
 
 #include "ShaderReflection.h"
 
@@ -45,9 +46,18 @@ namespace VulkanAbstractionLayer
         std::vector<std::vector<uint8_t>> MipLevels;
     };
 
+    struct CubemapData
+    {
+        std::array<std::vector<uint8_t>, 6> Faces;
+        Format FaceFormat = Format::UNDEFINED;
+        uint32_t FaceWidth = 0;
+        uint32_t FaceHeight = 0;
+    };
+
     class ImageLoader
     {
     public:
-        static ImageData LoadFromFile(const std::string& filepath);
+        static ImageData LoadImageFromFile(const std::string& filepath);
+        static CubemapData LoadCubemapImageFromFile(const std::string& filepath);
     };
 }

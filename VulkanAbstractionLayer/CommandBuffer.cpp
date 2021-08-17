@@ -189,8 +189,8 @@ namespace VulkanAbstractionLayer
             );
         }
 
-        auto sourceLayers = GetDefaultImageSubresourceLayers(source.Resource.get(), source.MipLevel);
-        auto distanceLayers = GetDefaultImageSubresourceLayers(distance.Resource.get(), distance.MipLevel);
+        auto sourceLayers = GetDefaultImageSubresourceLayers(source.Resource.get(), source.MipLevel, source.Layer);
+        auto distanceLayers = GetDefaultImageSubresourceLayers(distance.Resource.get(), distance.MipLevel, distance.Layer);
 
         vk::ImageCopy imageCopyInfo;
         imageCopyInfo
@@ -240,7 +240,7 @@ namespace VulkanAbstractionLayer
             );
         }
 
-        auto sourceLayers = GetDefaultImageSubresourceLayers(source.Resource.get(), source.MipLevel);
+        auto sourceLayers = GetDefaultImageSubresourceLayers(source.Resource.get(), source.MipLevel, source.Layer);
 
         vk::BufferImageCopy imageToBufferCopyInfo;
         imageToBufferCopyInfo
@@ -288,7 +288,7 @@ namespace VulkanAbstractionLayer
             );
         }
 
-        auto distanceLayers = GetDefaultImageSubresourceLayers(distance.Resource.get(), distance.MipLevel);
+        auto distanceLayers = GetDefaultImageSubresourceLayers(distance.Resource.get(), distance.MipLevel, distance.Layer);
 
         vk::BufferImageCopy bufferToImageCopyInfo;
         bufferToImageCopyInfo

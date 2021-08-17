@@ -75,6 +75,19 @@ namespace VulkanAbstractionLayer
             BufferUsage::Bits FinalUsage;
         };
 
+        struct ExternalImage
+        {
+            ImageUsage::Bits InitialUsage;
+            Format ImageFormat;
+            uint32_t MipLevelCount;
+            uint32_t LayerCount;
+        };
+
+        struct ExternalBuffer
+        {
+            BufferUsage::Bits InitialUsage;
+        };
+
         struct ResourceTransitions
         {
             using RenderPassNameId = StringId;
@@ -96,18 +109,6 @@ namespace VulkanAbstractionLayer
             std::unordered_map<VkImage, RenderPassNameId> FirstImageUsages;
             std::unordered_map<VkBuffer, RenderPassNameId> LastBufferUsages;
             std::unordered_map<VkImage, RenderPassNameId> LastImageUsages;
-        };
-
-        struct ExternalImage
-        {
-            ImageUsage::Bits InitialUsage;
-            Format ImageFormat;
-            uint32_t MipLevelCount;
-        };
-
-        struct ExternalBuffer
-        {
-            BufferUsage::Bits InitialUsage;
         };
 
         using AttachmentHashMap = std::unordered_map<StringId, Image>;

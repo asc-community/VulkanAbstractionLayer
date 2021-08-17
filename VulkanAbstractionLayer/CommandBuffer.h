@@ -82,6 +82,7 @@ namespace VulkanAbstractionLayer
         ImageReference Resource;
         ImageUsage::Bits Usage = ImageUsage::UNKNOWN;
         uint32_t MipLevel = 0;
+        uint32_t Layer = 0;
     };
 
     struct BufferInfo

@@ -178,12 +178,12 @@ namespace VulkanAbstractionLayer
             resultMaterial.Name = material.name;
 
             if (!material.diffuse_texname.empty())
-                resultMaterial.AlbedoTexture = ImageLoader::LoadFromFile(GetAbsolutePathToObjResource(filepath, material.diffuse_texname));
+                resultMaterial.AlbedoTexture = ImageLoader::LoadImageFromFile(GetAbsolutePathToObjResource(filepath, material.diffuse_texname));
             else
                 resultMaterial.AlbedoTexture = CreateStubTexture(255, 255, 255, 255);
 
             if (!material.normal_texname.empty())
-                resultMaterial.NormalTexture = ImageLoader::LoadFromFile(GetAbsolutePathToObjResource(filepath, material.normal_texname));
+                resultMaterial.NormalTexture = ImageLoader::LoadImageFromFile(GetAbsolutePathToObjResource(filepath, material.normal_texname));
             else
                 resultMaterial.NormalTexture = CreateStubTexture(127, 127, 255, 255);
 
