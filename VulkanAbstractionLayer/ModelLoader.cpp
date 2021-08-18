@@ -239,6 +239,78 @@ namespace VulkanAbstractionLayer
         return result;
     }
 
+    static Format ImageFormatFromGLTFImage(const tinygltf::Image& image)
+    {
+        constexpr int UNSIGNED_BYTE = 5121;
+        constexpr int BYTE = 5120;
+        constexpr int SHORT = 5122;
+        constexpr int UNSIGNED_SHORT = 5123;
+        constexpr int UNSIGNED_INT = 5125;
+        constexpr int FLOAT = 5126;
+
+        if (image.component == 1)
+        {
+            if (image.pixel_type == UNSIGNED_BYTE)
+                return Format::R8_UNORM;
+            if (image.pixel_type == BYTE)
+                return Format::R8_SNORM;
+            if (image.pixel_type == UNSIGNED_SHORT)
+                return Format::R16_UINT;
+            if (image.pixel_type == SHORT)
+                return Format::R16_SINT;
+            if (image.pixel_type == UNSIGNED_INT)
+                return Format::R32_UINT;
+            if (image.pixel_type == FLOAT)
+                return Format::R32_SFLOAT;
+        }
+        if (image.component == 2)
+        {
+            if (image.pixel_type == UNSIGNED_BYTE)
+                return Format::R8G8_UNORM;
+            if (image.pixel_type == BYTE)
+                return Format::R8G8_SNORM;
+            if (image.pixel_type == UNSIGNED_SHORT)
+                return Format::R16G16_UINT;
+            if (image.pixel_type == SHORT)
+                return Format::R16G16_SINT;
+            if (image.pixel_type == UNSIGNED_INT)
+                return Format::R32G32_UINT;
+            if (image.pixel_type == FLOAT)
+                return Format::R32G32_SFLOAT;
+        }
+        if (image.component == 3)
+        {
+            if (image.pixel_type == UNSIGNED_BYTE)
+                return Format::R8G8B8_UNORM;
+            if (image.pixel_type == BYTE)
+                return Format::R8G8B8_SNORM;
+            if (image.pixel_type == UNSIGNED_SHORT)
+                return Format::R16G16B16_UINT;
+            if (image.pixel_type == SHORT)
+                return Format::R16G16B16_SINT;
+            if (image.pixel_type == UNSIGNED_INT)
+                return Format::R32G32B32_UINT;
+            if (image.pixel_type == FLOAT)
+                return Format::R32G32B32_SFLOAT;
+        }
+        if (image.component == 4)
+        {
+            if (image.pixel_type == UNSIGNED_BYTE)
+                return Format::R8G8B8A8_UNORM;
+            if (image.pixel_type == BYTE)
+                return Format::R8G8B8A8_SNORM;
+            if (image.pixel_type == UNSIGNED_SHORT)
+                return Format::R16G16B16A16_UINT;
+            if (image.pixel_type == SHORT)
+                return Format::R16G16B16A16_SINT;
+            if (image.pixel_type == UNSIGNED_INT)
+                return Format::R32G32B32A32_UINT;
+            if (image.pixel_type == FLOAT)
+                return Format::R32G32B32A32_SFLOAT;
+        }
+        return Format::UNDEFINED;
+    }
+
     ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
     {
         ModelData result;
@@ -263,7 +335,7 @@ namespace VulkanAbstractionLayer
                 const auto& albedoTexture = model.images[model.textures[material.pbrMetallicRoughness.baseColorTexture.index].source];
                 resultMaterial.AlbedoTexture = ImageData{ 
                     albedoTexture.image, 
-                    Format::R8G8B8A8_UNORM,
+                    ImageFormatFromGLTFImage(albedoTexture),
                     (uint32_t)albedoTexture.width, 
                     (uint32_t)albedoTexture.height, 
                 };
@@ -278,7 +350,7 @@ namespace VulkanAbstractionLayer
                 const auto& normalTexture = model.images[model.textures[material.normalTexture.index].source];
                 resultMaterial.NormalTexture = ImageData{ 
                     normalTexture.image, 
-                    Format::R8G8B8A8_UNORM,
+                    ImageFormatFromGLTFImage(normalTexture),
                     (uint32_t)normalTexture.width, 
                     (uint32_t)normalTexture.height, 
                 };
@@ -293,7 +365,7 @@ namespace VulkanAbstractionLayer
                 const auto& metallicRoughnessTexture = model.images[model.textures[material.pbrMetallicRoughness.metallicRoughnessTexture.index].source];
                 resultMaterial.MetallicRoughness = ImageData{
                     metallicRoughnessTexture.image,
-                    Format::R8G8B8A8_UNORM,
+                    ImageFormatFromGLTFImage(metallicRoughnessTexture),
                     (uint32_t)metallicRoughnessTexture.width,
                     (uint32_t)metallicRoughnessTexture.height,
                 };
