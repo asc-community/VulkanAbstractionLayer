@@ -32,22 +32,33 @@ struct Mesh
 {
     Buffer VertexBuffer;
     Buffer InstanceBuffer;
-    std::vector<Image> Textures;
 };
 
 struct InstanceData
 {
     Vector3 Position;
-    uint32_t AlbedoTextureIndex;
+    uint32_t MaterialIndex;
 };
+
+struct MaterialData
+{
+    uint32_t AlbedoTextureIndex;
+    uint32_t NormalTextureIndex;
+    float MetallicFactor;
+    float RoughnessFactor;
+};
+
+constexpr size_t MaxMaterialCount = 256;
 
 struct SharedResources
 {
     Buffer CameraUniformBuffer;
     Buffer ModelUniformBuffer;
     Buffer LightUniformBuffer;
+    Buffer MaterialUniformBuffer;
     std::vector<Mesh> Meshes;
-    std::vector<ImageReference> MeshTextures;
+    std::vector<Image> Textures;
+    std::vector<MaterialData> Materials;
     Image Skybox;
 };
 
@@ -87,7 +98,7 @@ void LoadCubemap(Image& image, const std::string& filepath)
     stageBuffer.Reset();
 }
 
-Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vector<InstanceData>& instances, ArrayView<ImageData> textures)
+Mesh CreateMesh(ArrayView<ModelData::Vertex> vertices, ArrayView<InstanceData> instances, ArrayView<ImageData> textures, std::vector<Image>& images)
 {
     Mesh result;
 
@@ -116,7 +127,7 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
 
     for (const auto& texture : textures)
     {
-        auto& image = result.Textures.emplace_back();
+        auto& image = images.emplace_back();
         image.Init(
             texture.Width,
             texture.Height,
@@ -144,7 +155,7 @@ Mesh CreateMesh(const std::vector<ModelData::Vertex>& vertices, const std::vecto
     return result;
 }
 
-Mesh CreatePlaneMesh(uint32_t& globalTextureIndex)
+Mesh CreatePlaneMesh(std::vector<MaterialData>& globalMaterials, std::vector<Image>& globalImages)
 {
     std::vector vertices = {
         ModelData::Vertex{ { -500.0f, -500.0f, -0.01f }, { -15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
@@ -155,28 +166,36 @@ Mesh CreatePlaneMesh(uint32_t& globalTextureIndex)
         ModelData::Vertex{ {  500.0f, -500.0f, -0.01f }, {  15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
     };
     std::vector instances = {
-        InstanceData{ { 0.0f, 0.0f, 0.0f }, globalTextureIndex++ },
+        InstanceData{ { 0.0f, 0.0f, 0.0f }, (uint32_t)globalMaterials.size() },
     };
 
-    auto texture = ImageLoader::LoadImageFromFile("models/sand.png");
+    globalMaterials.push_back(MaterialData{
+        (uint32_t)globalImages.size() + 0,
+        (uint32_t)globalImages.size() + 1,
+        0.0f, // metallic
+        0.9f, // roughness
+    });
 
-    return CreateMesh(vertices, instances, MakeView(std::array{ texture }));
+    auto albedoTexture = ImageLoader::LoadImageFromFile("textures/sand_albedo.jpg");
+    auto normalTexture = ImageLoader::LoadImageFromFile("textures/sand_normal.jpg");
+
+    return CreateMesh(vertices, instances, MakeView(std::array{ albedoTexture, normalTexture }), globalImages);
 }
 
-Mesh CreateDragonMesh(uint32_t& globalTextureIndex)
+Mesh CreateDragonMesh(std::vector<MaterialData>& globalMaterials, std::vector<Image>& globalImages)
 {
     std::vector instances = {
-        InstanceData{ { 0.0f, 0.0f, -40.0f }, globalTextureIndex++ },
-        InstanceData{ { 0.0f, 0.0f, -20.0f }, globalTextureIndex++ },
-        InstanceData{ { 0.0f, 0.0f,   0.0f }, globalTextureIndex++ },
-        InstanceData{ { 0.0f, 0.0f,  20.0f }, globalTextureIndex++ },
-        InstanceData{ { 0.0f, 0.0f,  40.0f }, globalTextureIndex++ },
+        InstanceData{ { 0.0f, 0.0f, -40.0f }, (uint32_t)globalMaterials.size() + 0 },
+        InstanceData{ { 0.0f, 0.0f, -20.0f }, (uint32_t)globalMaterials.size() + 1 },
+        InstanceData{ { 0.0f, 0.0f,   0.0f }, (uint32_t)globalMaterials.size() + 2 },
+        InstanceData{ { 0.0f, 0.0f,  20.0f }, (uint32_t)globalMaterials.size() + 3 },
+        InstanceData{ { 0.0f, 0.0f,  40.0f }, (uint32_t)globalMaterials.size() + 4 },
     };
 
     auto model = ModelLoader::LoadFromObj("models/dragon.obj");
     auto& vertices = model.Shapes.front().Vertices;
 
-    std::array textureData = {
+    std::array albedoTextures = {
         std::vector<uint8_t>{ 255, 255, 255, 255 },
         std::vector<uint8_t>{ 150, 225, 100, 255 },
         std::vector<uint8_t>{ 100, 150, 225, 255 },
@@ -184,15 +203,51 @@ Mesh CreateDragonMesh(uint32_t& globalTextureIndex)
         std::vector<uint8_t>{ 150, 150, 150, 255 },
     };
 
-    std::array textures = {
-        ImageData{ std::move(textureData[0]), Format::R8G8B8A8_UNORM, 1, 1 },
-        ImageData{ std::move(textureData[1]), Format::R8G8B8A8_UNORM, 1, 1 },
-        ImageData{ std::move(textureData[2]), Format::R8G8B8A8_UNORM, 1, 1 },
-        ImageData{ std::move(textureData[3]), Format::R8G8B8A8_UNORM, 1, 1 },
-        ImageData{ std::move(textureData[4]), Format::R8G8B8A8_UNORM, 1, 1 },
+    std::array normalTextures = {
+        std::vector < uint8_t>{ 127, 127, 255, 255 }
     };
 
-    return CreateMesh(vertices, instances, textures);
+    std::array textures = {
+        ImageData{ std::move(normalTextures[0]), Format::R8G8B8A8_UNORM, 1, 1 },
+        ImageData{ std::move(albedoTextures[0]), Format::R8G8B8A8_UNORM, 1, 1 },
+        ImageData{ std::move(albedoTextures[1]), Format::R8G8B8A8_UNORM, 1, 1 },
+        ImageData{ std::move(albedoTextures[2]), Format::R8G8B8A8_UNORM, 1, 1 },
+        ImageData{ std::move(albedoTextures[3]), Format::R8G8B8A8_UNORM, 1, 1 },
+        ImageData{ std::move(albedoTextures[4]), Format::R8G8B8A8_UNORM, 1, 1 },
+    };
+
+    globalMaterials.push_back(MaterialData{
+        (uint32_t)globalImages.size() + 1,
+        (uint32_t)globalImages.size(), // default normal
+        0.2f, // metallic
+        0.2f, // roughness
+    });
+    globalMaterials.push_back(MaterialData{
+        (uint32_t)globalImages.size() + 2,
+        (uint32_t)globalImages.size(), // default normal
+        0.2f, // metallic
+        0.2f, // roughness
+    });
+    globalMaterials.push_back(MaterialData{
+        (uint32_t)globalImages.size() + 3,
+        (uint32_t)globalImages.size(), // default normal
+        0.2f, // metallic
+        0.2f, // roughness
+    });
+    globalMaterials.push_back(MaterialData{
+        (uint32_t)globalImages.size() + 4,
+        (uint32_t)globalImages.size(), // default normal
+        0.2f, // metallic
+        0.2f, // roughness
+    });
+    globalMaterials.push_back(MaterialData{
+        (uint32_t)globalImages.size() + 5,
+        (uint32_t)globalImages.size(), // default normal
+        0.2f, // metallic
+        0.2f, // roughness
+    });
+
+    return CreateMesh(vertices, instances, textures, globalImages);
 }
 
 class UniformSubmitRenderPass : public RenderPass
@@ -230,6 +285,7 @@ public:
         pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNKNOWN);
         pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNKNOWN);
         pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNKNOWN);
+        pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::UNKNOWN);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -237,6 +293,7 @@ public:
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -252,9 +309,21 @@ public:
             );
         };
 
+        auto FillUniformArray = [&state](const auto& uniformData, const auto& uniformBuffer) mutable
+        {
+            auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+            auto uniformAllocation = stageBuffer.Submit(MakeView(uniformData));
+            state.Commands.CopyBuffer(
+                BufferInfo{ stageBuffer.GetBuffer(), uniformAllocation.Offset },
+                BufferInfo{ uniformBuffer, 0 },
+                uniformAllocation.Size
+            );
+        };
+
         FillUniform(this->CameraUniform, this->sharedResources.CameraUniformBuffer);
         FillUniform(this->ModelUniform, this->sharedResources.ModelUniformBuffer);
         FillUniform(this->LightUniform, this->sharedResources.LightUniformBuffer);
+        FillUniformArray(this->sharedResources.Materials, this->sharedResources.MaterialUniformBuffer);
     }
 };
 
@@ -346,7 +415,7 @@ public:
             },
         };
 
-        pipeline.DeclareImages(this->sharedResources.MeshTextures, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImages(this->sharedResources.Textures, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
         pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
 
@@ -354,9 +423,10 @@ public:
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(3, this->textureSampler, UniformType::SAMPLER)
-            .Bind(4, this->sharedResources.MeshTextures, UniformType::SAMPLED_IMAGE)
-            .Bind(5, "ShadowDepth"_id, this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH);
+            .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(4, this->textureSampler, UniformType::SAMPLER)
+            .Bind(5, this->sharedResources.Textures, UniformType::SAMPLED_IMAGE)
+            .Bind(6, "ShadowDepth"_id, this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -367,8 +437,9 @@ public:
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
         depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::UNIFORM_BUFFER);
 
-        depedencies.AddImages(this->sharedResources.MeshTextures, ImageUsage::SHADER_READ);
+        depedencies.AddImages(this->sharedResources.Textures, ImageUsage::SHADER_READ);
         depedencies.AddImage("ShadowDepth"_id, ImageUsage::SHADER_READ);
     }
     
@@ -533,19 +604,17 @@ int main()
         Buffer{ sizeof(UniformSubmitRenderPass::CameraUniform), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(UniformSubmitRenderPass::ModelUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(UniformSubmitRenderPass::LightUniform),  BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(MaterialData) * MaxMaterialCount,        BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // meshes
         { }, // mesh textures
+        { }, // materials
         Image{ } // skybox
     };
 
     LoadCubemap(sharedResources.Skybox, "textures/skybox.png");
 
-    uint32_t textureCount = 0;
-    sharedResources.Meshes.push_back(CreateDragonMesh(textureCount));
-    sharedResources.Meshes.push_back(CreatePlaneMesh(textureCount));
-    for (const auto& mesh : sharedResources.Meshes)
-        for (const auto& texture : mesh.Textures)
-            sharedResources.MeshTextures.push_back(std::ref(texture));
+    sharedResources.Meshes.push_back(CreatePlaneMesh(sharedResources.Materials, sharedResources.Textures));
+    sharedResources.Meshes.push_back(CreateDragonMesh(sharedResources.Materials, sharedResources.Textures));
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 
@@ -564,6 +633,26 @@ int main()
     });
     
     ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
+
+    std::unordered_map<uint32_t, ImTextureID> imguiMappings;
+    Sampler imguiSampler = Sampler{ Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::CLAMP_TO_EDGE, Sampler::MipFilter::LINEAR };
+    for (const auto& material : sharedResources.Materials)
+    {
+        if (imguiMappings.find(material.AlbedoTextureIndex) == imguiMappings.end())
+        {
+            imguiMappings.emplace(
+                material.AlbedoTextureIndex,
+                ImGuiVulkanContext::RegisterImage(sharedResources.Textures[material.AlbedoTextureIndex], imguiSampler)
+            );
+        }
+        if (imguiMappings.find(material.NormalTextureIndex) == imguiMappings.end())
+        {
+            imguiMappings.emplace(
+                material.NormalTextureIndex,
+                ImGuiVulkanContext::RegisterImage(sharedResources.Textures[material.NormalTextureIndex], imguiSampler)
+            );
+        }
+    }
 
     while (!window.ShouldClose())
     {
@@ -613,6 +702,34 @@ int main()
             ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
             ImGui::DragFloat("bounds", &lightBounds, 0.1f);
             ImGui::DragFloat("ambient intensity", &lightAmbientIntensity, 0.01f);
+            ImGui::End();
+
+            int materialIndex = 0;
+            ImGui::Begin("Materials");
+            for (auto& material : sharedResources.Materials)
+            {
+                ImGui::PushID(materialIndex++);
+
+                ImGui::BeginTable(("material_" + std::to_string(materialIndex)).c_str(), 3);
+
+                ImGui::TableSetupColumn("parameters");
+                ImGui::TableSetupColumn("albedo image");
+                ImGui::TableSetupColumn("normal image");
+                ImGui::TableHeadersRow();
+
+                ImGui::TableNextColumn();
+                ImGui::DragFloat("metallic", &material.MetallicFactor, 0.01f, 0.0f, 1.0f);
+                ImGui::DragFloat("roughness", &material.RoughnessFactor, 0.01f, 0.0f, 1.0f);
+                ImGui::TableNextColumn();
+                ImGui::Image(imguiMappings.at(material.AlbedoTextureIndex), { 128.0f, 128.0f });
+                ImGui::TableNextColumn();
+                ImGui::Image(imguiMappings.at(material.NormalTextureIndex), { 128.0f, 128.0f });
+
+                ImGui::EndTable();
+
+                ImGui::Separator();
+                ImGui::PopID();
+            }
             ImGui::End();
 
             ImGui::Begin("Performace");
