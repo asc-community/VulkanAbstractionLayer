@@ -241,23 +241,26 @@ namespace VulkanAbstractionLayer
 
     static Format ImageFormatFromGLTFImage(const tinygltf::Image& image)
     {
-        constexpr int UNSIGNED_BYTE = 5121;
         constexpr int BYTE = 5120;
+        constexpr int UNSIGNED_BYTE = 5121;
         constexpr int SHORT = 5122;
         constexpr int UNSIGNED_SHORT = 5123;
+        constexpr int INT = 5124;
         constexpr int UNSIGNED_INT = 5125;
         constexpr int FLOAT = 5126;
 
         if (image.component == 1)
         {
-            if (image.pixel_type == UNSIGNED_BYTE)
-                return Format::R8_UNORM;
             if (image.pixel_type == BYTE)
                 return Format::R8_SNORM;
-            if (image.pixel_type == UNSIGNED_SHORT)
-                return Format::R16_UINT;
+            if (image.pixel_type == UNSIGNED_BYTE)
+                return Format::R8_UNORM;
             if (image.pixel_type == SHORT)
                 return Format::R16_SINT;
+            if (image.pixel_type == UNSIGNED_SHORT)
+                return Format::R16_UINT;
+            if (image.pixel_type == INT)
+                return Format::R32_SINT;
             if (image.pixel_type == UNSIGNED_INT)
                 return Format::R32_UINT;
             if (image.pixel_type == FLOAT)
@@ -265,14 +268,16 @@ namespace VulkanAbstractionLayer
         }
         if (image.component == 2)
         {
-            if (image.pixel_type == UNSIGNED_BYTE)
-                return Format::R8G8_UNORM;
             if (image.pixel_type == BYTE)
                 return Format::R8G8_SNORM;
-            if (image.pixel_type == UNSIGNED_SHORT)
-                return Format::R16G16_UINT;
+            if (image.pixel_type == UNSIGNED_BYTE)
+                return Format::R8G8_UNORM;
             if (image.pixel_type == SHORT)
                 return Format::R16G16_SINT;
+            if (image.pixel_type == UNSIGNED_SHORT)
+                return Format::R16G16_UINT;
+            if (image.pixel_type == INT)
+                return Format::R32G32_SINT;
             if (image.pixel_type == UNSIGNED_INT)
                 return Format::R32G32_UINT;
             if (image.pixel_type == FLOAT)
@@ -280,14 +285,16 @@ namespace VulkanAbstractionLayer
         }
         if (image.component == 3)
         {
-            if (image.pixel_type == UNSIGNED_BYTE)
-                return Format::R8G8B8_UNORM;
             if (image.pixel_type == BYTE)
                 return Format::R8G8B8_SNORM;
-            if (image.pixel_type == UNSIGNED_SHORT)
-                return Format::R16G16B16_UINT;
+            if (image.pixel_type == UNSIGNED_BYTE)
+                return Format::R8G8B8_UNORM;
             if (image.pixel_type == SHORT)
                 return Format::R16G16B16_SINT;
+            if (image.pixel_type == UNSIGNED_SHORT)
+                return Format::R16G16B16_UINT;
+            if (image.pixel_type == INT)
+                return Format::R32G32B32_SINT;
             if (image.pixel_type == UNSIGNED_INT)
                 return Format::R32G32B32_UINT;
             if (image.pixel_type == FLOAT)
@@ -295,14 +302,16 @@ namespace VulkanAbstractionLayer
         }
         if (image.component == 4)
         {
-            if (image.pixel_type == UNSIGNED_BYTE)
-                return Format::R8G8B8A8_UNORM;
             if (image.pixel_type == BYTE)
                 return Format::R8G8B8A8_SNORM;
-            if (image.pixel_type == UNSIGNED_SHORT)
-                return Format::R16G16B16A16_UINT;
+            if (image.pixel_type == UNSIGNED_BYTE)
+                return Format::R8G8B8A8_UNORM;
             if (image.pixel_type == SHORT)
                 return Format::R16G16B16A16_SINT;
+            if (image.pixel_type == UNSIGNED_SHORT)
+                return Format::R16G16B16A16_UINT;
+            if (image.pixel_type == INT)
+                return Format::R32G32B32A32_SINT;
             if (image.pixel_type == UNSIGNED_INT)
                 return Format::R32G32B32A32_UINT;
             if (image.pixel_type == FLOAT)
