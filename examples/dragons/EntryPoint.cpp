@@ -59,7 +59,9 @@ struct SharedResources
     std::vector<Mesh> Meshes;
     std::vector<Image> Textures;
     std::vector<MaterialData> Materials;
+    Image BRDFLUT;
     Image Skybox;
+    Image SkyboxIrradiance;
 };
 
 void LoadCubemap(Image& image, const std::string& filepath)
@@ -75,9 +77,9 @@ void LoadCubemap(Image& image, const std::string& filepath)
         cubemapData.FaceWidth,
         cubemapData.FaceHeight,
         cubemapData.FaceFormat,
-        ImageUsage::TRANSFER_DISTINATION | ImageUsage::SHADER_READ,
+        ImageUsage::TRANSFER_DISTINATION | ImageUsage::TRANSFER_SOURCE | ImageUsage::SHADER_READ,
         MemoryUsage::GPU_ONLY,
-        ImageOptions::CUBEMAP
+        ImageOptions::CUBEMAP | ImageOptions::MIPMAPS
     );
 
     for (uint32_t layer = 0; layer < cubemapData.Faces.size(); layer++)
@@ -91,9 +93,43 @@ void LoadCubemap(Image& image, const std::string& filepath)
         );
     }
 
+    commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
+
     stageBuffer.Flush();
     commandBuffer.End();
     
+    vulkanContext.SubmitCommandsImmediate(commandBuffer);
+    stageBuffer.Reset();
+}
+
+void LoadImage(Image& image, const std::string& filepath)
+{
+    auto& vulkanContext = GetCurrentVulkanContext();
+    auto& stageBuffer = vulkanContext.GetCurrentStageBuffer();
+    auto& commandBuffer = vulkanContext.GetCurrentCommandBuffer();
+
+    commandBuffer.Begin();
+
+    auto imageData = ImageLoader::LoadImageFromFile(filepath);
+    image.Init(
+        imageData.Width,
+        imageData.Height,
+        imageData.ImageFormat,
+        ImageUsage::TRANSFER_DISTINATION | ImageUsage::SHADER_READ,
+        MemoryUsage::GPU_ONLY,
+        ImageOptions::DEFAULT
+    );
+
+    auto textureAllocation = stageBuffer.Submit(imageData.ByteData.data(), imageData.ByteData.size());
+
+    commandBuffer.CopyBufferToImage(
+        BufferInfo{ stageBuffer.GetBuffer(), textureAllocation.Offset },
+        ImageInfo{ image, ImageUsage::UNKNOWN, 0, 0 }
+    );
+
+    stageBuffer.Flush();
+    commandBuffer.End();
+
     vulkanContext.SubmitCommandsImmediate(commandBuffer);
     stageBuffer.Reset();
 }
@@ -219,32 +255,32 @@ Mesh CreateDragonMesh(std::vector<MaterialData>& globalMaterials, std::vector<Im
     globalMaterials.push_back(MaterialData{
         (uint32_t)globalImages.size() + 1,
         (uint32_t)globalImages.size(), // default normal
-        0.2f, // metallic
-        0.2f, // roughness
+        0.0f, // metallic
+        1.0f, // roughness
     });
     globalMaterials.push_back(MaterialData{
         (uint32_t)globalImages.size() + 2,
         (uint32_t)globalImages.size(), // default normal
-        0.2f, // metallic
-        0.2f, // roughness
+        1.0f, // metallic
+        0.7f, // roughness
     });
     globalMaterials.push_back(MaterialData{
         (uint32_t)globalImages.size() + 3,
         (uint32_t)globalImages.size(), // default normal
-        0.2f, // metallic
-        0.2f, // roughness
+        0.0f, // metallic
+        0.0f, // roughness
     });
     globalMaterials.push_back(MaterialData{
         (uint32_t)globalImages.size() + 4,
         (uint32_t)globalImages.size(), // default normal
-        0.2f, // metallic
-        0.2f, // roughness
+        1.0f, // metallic
+        0.0f, // roughness
     });
     globalMaterials.push_back(MaterialData{
         (uint32_t)globalImages.size() + 5,
         (uint32_t)globalImages.size(), // default normal
-        0.2f, // metallic
-        0.2f, // roughness
+        0.8f, // metallic
+        0.5f, // roughness
     });
 
     return CreateMesh(vertices, instances, textures, globalImages);
@@ -416,6 +452,9 @@ public:
         };
 
         pipeline.DeclareImages(this->sharedResources.Textures, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.BRDFLUT, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.SkyboxIrradiance, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
         pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
 
@@ -426,7 +465,10 @@ public:
             .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureSampler, UniformType::SAMPLER)
             .Bind(5, this->sharedResources.Textures, UniformType::SAMPLED_IMAGE)
-            .Bind(6, "ShadowDepth"_id, this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH);
+            .Bind(6, "ShadowDepth"_id, this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH)
+            .Bind(7, this->sharedResources.BRDFLUT, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(8, this->sharedResources.Skybox, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(9, this->sharedResources.SkyboxIrradiance, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -441,6 +483,9 @@ public:
 
         depedencies.AddImages(this->sharedResources.Textures, ImageUsage::SHADER_READ);
         depedencies.AddImage("ShadowDepth"_id, ImageUsage::SHADER_READ);
+        depedencies.AddImage(this->sharedResources.BRDFLUT, ImageUsage::SHADER_READ);
+        depedencies.AddImage(this->sharedResources.Skybox, ImageUsage::SHADER_READ);
+        depedencies.AddImage(this->sharedResources.SkyboxIrradiance, ImageUsage::SHADER_READ);
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -476,11 +521,9 @@ public:
             ShaderLoader::LoadFromSourceFile("skybox_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL),
         };
 
-        pipeline.DeclareImage(this->sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION);
-
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(8, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -608,10 +651,14 @@ int main()
         { }, // meshes
         { }, // mesh textures
         { }, // materials
-        Image{ } // skybox
+        Image{ }, // brdf lut
+        Image{ }, // skybox
+        Image{ }, // skybox irradiance
     };
 
+    LoadImage(sharedResources.BRDFLUT, "textures/brdf_lut.dds");
     LoadCubemap(sharedResources.Skybox, "textures/skybox.png");
+    LoadCubemap(sharedResources.SkyboxIrradiance, "textures/skybox_irradiance.png");
 
     sharedResources.Meshes.push_back(CreatePlaneMesh(sharedResources.Materials, sharedResources.Textures));
     sharedResources.Meshes.push_back(CreateDragonMesh(sharedResources.Materials, sharedResources.Textures));
@@ -701,7 +748,7 @@ int main()
             ImGui::ColorEdit3("color", &lightColor[0], ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
             ImGui::DragFloat3("direction", &lightDirection[0], 0.01f);
             ImGui::DragFloat("bounds", &lightBounds, 0.1f);
-            ImGui::DragFloat("ambient intensity", &lightAmbientIntensity, 0.01f);
+            ImGui::DragFloat("ambient intensity", &lightAmbientIntensity, 0.01f, 0.0f, 1.0f);
             ImGui::End();
 
             int materialIndex = 0;
@@ -748,7 +795,7 @@ int main()
             uniformSubmitPass.LightUniform.Direction = Normalize(lightDirection);
             uniformSubmitPass.LightUniform.Projection =
                 MakeOrthographicMatrix(low.x, high.x, low.y, high.y, low.z, high.z) *
-                MakeLookAtMatrix(camera.Position, -lightDirection, Vector3{ 0.001f, 1.0f, 0.001f });
+                MakeLookAtMatrix(Vector3{ 0.0f, 0.0f, 0.0f }, -lightDirection, Vector3{ 0.001f, 1.0f, 0.001f });
 
             renderGraph->Execute(Vulkan.GetCurrentCommandBuffer());
             renderGraph->Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());

@@ -4,7 +4,7 @@ layout(location = 0) in vec3 vPosition;
 
 layout(location = 0) out vec4 oColor;
 
-layout(set = 0, binding = 1) uniform samplerCube uSkyboxCubemap;
+layout(set = 0, binding = 8) uniform samplerCube uSkyboxCubemap;
 
 void main()
 {
