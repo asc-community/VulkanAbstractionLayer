@@ -10,8 +10,8 @@
 #include "VulkanAbstractionLayer/ModelLoader.h"
 #include "VulkanAbstractionLayer/ImageLoader.h"
 #include "VulkanAbstractionLayer/ImGuiRenderPass.h"
-#include "imgui.h"
-#include "backends/imgui_impl_vulkan.h"
+#include "VulkanAbstractionLayer/GraphicShader.h"
+#include "VulkanAbstractionLayer/ComputeShader.h"
 
 using namespace VulkanAbstractionLayer;
 
@@ -91,12 +91,14 @@ public:
     ComputeRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
-
+        
     }
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
+        pipeline.Shader = std::make_unique<ComputeShader>(
+            ShaderLoader::LoadFromSourceFile("main_compute.glsl", ShaderType::COMPUTE, ShaderLanguage::GLSL)
+        );
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -110,13 +112,43 @@ public:
     }
 };
 
+class OpaqueRenderPass : public RenderPass
+{
+    SharedResources& sharedResources;
+public:
+
+    OpaqueRenderPass(SharedResources& sharedResources)
+        : sharedResources(sharedResources)
+    {
+        
+    }
+
+    virtual void SetupPipeline(PipelineState pipeline) override
+    {
+        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
+        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
+    }
+
+    virtual void SetupDependencies(DependencyState depedencies) override
+    {
+        depedencies.AddAttachment("Output"_id, ClearColor{ 0.7f, 0.5f, 0.0f });
+        depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
+    }
+
+    virtual void OnRender(RenderPassState state) override
+    {
+
+    }
+};
+
 auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value options)
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
         .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
         .AddRenderPass("ComputePass"_id, std::make_unique<ComputeRenderPass>(resources))
-        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id, AttachmentState::CLEAR_COLOR))
+        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .SetOptions(options)
         .SetOutputName("Output"_id);
 

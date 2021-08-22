@@ -10,8 +10,7 @@
 #include "VulkanAbstractionLayer/ModelLoader.h"
 #include "VulkanAbstractionLayer/ImageLoader.h"
 #include "VulkanAbstractionLayer/ImGuiRenderPass.h"
-#include "imgui.h"
-#include "backends/imgui_impl_vulkan.h"
+#include "VulkanAbstractionLayer/GraphicShader.h"
 
 using namespace VulkanAbstractionLayer;
 
@@ -274,10 +273,10 @@ public:
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.Shader = GraphicShader{
+        pipeline.Shader = std::make_unique<GraphicShader>(
             ShaderLoader::LoadFromSourceFile("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
-            ShaderLoader::LoadFromSourceFile("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL),
-        };
+            ShaderLoader::LoadFromSourceFile("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
+        );
 
         pipeline.VertexBindings = {
             VertexBinding{

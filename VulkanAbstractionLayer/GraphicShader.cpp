@@ -32,6 +32,11 @@
 
 namespace VulkanAbstractionLayer
 {
+    GraphicShader::~GraphicShader()
+    {
+        this->Destroy();
+    }
+
     void GraphicShader::Destroy()
     {
         auto& vulkan = GetCurrentVulkanContext();
@@ -60,7 +65,7 @@ namespace VulkanAbstractionLayer
         fragmentShaderInfo.setCode(fragment.Bytecode);
         this->fragmentShader = vulkan.GetDevice().createShaderModule(fragmentShaderInfo);
 
-        this->vertexAttributes = vertex.InputAttributes;
+        this->inputAttributes = vertex.InputAttributes;
         // TODO: support multiple descriptor sets
         assert(vertex.DescriptorSets.size() < 2);
         assert(fragment.DescriptorSets.size() < 2);
@@ -74,7 +79,7 @@ namespace VulkanAbstractionLayer
     {
         this->vertexShader = other.vertexShader;
         this->fragmentShader = other.fragmentShader;
-        this->vertexAttributes = std::move(other.vertexAttributes);
+        this->inputAttributes = std::move(other.inputAttributes);
         this->shaderUniforms = std::move(other.shaderUniforms);
 
         other.vertexShader = vk::ShaderModule{ };
@@ -87,7 +92,7 @@ namespace VulkanAbstractionLayer
 
         this->vertexShader = other.vertexShader;
         this->fragmentShader = other.fragmentShader;
-        this->vertexAttributes = std::move(other.vertexAttributes);
+        this->inputAttributes = std::move(other.inputAttributes);
         this->shaderUniforms = std::move(other.shaderUniforms);
 
         other.vertexShader = vk::ShaderModule{ };
@@ -96,9 +101,14 @@ namespace VulkanAbstractionLayer
         return *this;
     }
 
-    GraphicShader::~GraphicShader()
+    ArrayView<const TypeSPIRV> GraphicShader::GetInputAttributes() const
     {
-        this->Destroy();
+        return this->inputAttributes;
+    }
+
+    ArrayView<const ShaderUniforms> GraphicShader::GetShaderUniforms() const
+    {
+        return this->shaderUniforms;
     }
 
     const vk::ShaderModule& GraphicShader::GetNativeShader(ShaderType type) const
@@ -113,5 +123,10 @@ namespace VulkanAbstractionLayer
             assert(false);
             return this->fragmentShader;
         }
+    }
+
+    bool GraphicShader::IsEmpty() const
+    {
+        return !(bool)this->vertexShader || !(bool)this->fragmentShader;
     }
 }

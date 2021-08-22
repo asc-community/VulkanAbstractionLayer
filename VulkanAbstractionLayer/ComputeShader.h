@@ -28,23 +28,20 @@
 
 #pragma once
 
-#include "ShaderLoader.h"
-#include "DescriptorCache.h"
+#include "Shader.h"
 
 namespace VulkanAbstractionLayer
 {
-    class VulkanContext;
-
-    class ComputeShader
+    class ComputeShader : public Shader
     {
         vk::ShaderModule computeShader;
-
         std::vector<ShaderUniforms> shaderUniforms;
 
         void Destroy();
     public:
         ComputeShader() = default;
         ComputeShader(const ShaderData& computeData);
+        ~ComputeShader();
 
         void Init(const ShaderData& computeData);
 
@@ -52,10 +49,10 @@ namespace VulkanAbstractionLayer
         ComputeShader(ComputeShader&& other) noexcept;
         ComputeShader& operator=(const ComputeShader& other) = delete;
         ComputeShader& operator=(ComputeShader&& other) noexcept;
-        ~ComputeShader();
 
-        const auto& GetShaderUniforms() const { return this->shaderUniforms; }
-
-        const vk::ShaderModule& GetNativeShader(ShaderType type) const;
+        ArrayView<const TypeSPIRV> GetInputAttributes() const override;
+        ArrayView<const ShaderUniforms> GetShaderUniforms() const override;
+        virtual const vk::ShaderModule& GetNativeShader(ShaderType type) const override;
+        virtual bool IsEmpty() const override;
     };
 }

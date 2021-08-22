@@ -31,10 +31,25 @@
 
 namespace VulkanAbstractionLayer
 {
+    ArrayView<const TypeSPIRV> ComputeShader::GetInputAttributes() const
+    {
+        return { };
+    }
+
+    ArrayView<const ShaderUniforms> ComputeShader::GetShaderUniforms() const
+    {
+        return this->shaderUniforms;
+    }
+
     const vk::ShaderModule& ComputeShader::GetNativeShader(ShaderType type) const
     {
         assert(type == ShaderType::COMPUTE);
         return this->computeShader;
+    }
+
+    bool ComputeShader::IsEmpty() const
+    {
+        return !(bool)this->computeShader;
     }
 
     void ComputeShader::Destroy()
@@ -49,6 +64,11 @@ namespace VulkanAbstractionLayer
     ComputeShader::ComputeShader(const ShaderData& computeData)
     {
         this->Init(computeData);
+    }
+
+    ComputeShader::~ComputeShader()
+    {
+        this->Destroy();
     }
 
     void ComputeShader::Init(const ShaderData& computeData)
@@ -84,10 +104,5 @@ namespace VulkanAbstractionLayer
         other.computeShader = vk::ShaderModule{ };
 
         return *this;
-    }
-
-    ComputeShader::~ComputeShader()
-    {
-        this->Destroy();
     }
 }

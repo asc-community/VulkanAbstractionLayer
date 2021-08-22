@@ -28,8 +28,7 @@
 
 #pragma once
 
-#include "ArrayUtils.h"
-#include "GraphicShader.h"
+#include "Shader.h"
 #include "DescriptorBinding.h"
 #include "StringId.h"
 #include <optional>
@@ -65,7 +64,7 @@ namespace VulkanAbstractionLayer
         std::vector<ImageDeclaration> imageDeclarations;
         std::vector<AttachmentDeclaration> attachmentDeclarations;
     public:
-        GraphicShader Shader;
+        std::unique_ptr<Shader> Shader;
         std::vector<VertexBinding> VertexBindings;
         DescriptorBinding DescriptorBindings;
 

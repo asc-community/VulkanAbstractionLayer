@@ -28,34 +28,27 @@
 
 #pragma once
 
-#include "Shader.h"
+#include "ArrayUtils.h"
+#include "ShaderLoader.h"
+#include "DescriptorCache.h"
+
+namespace vk
+{
+    class ShaderModule;
+}
 
 namespace VulkanAbstractionLayer
 {
-    class GraphicShader : public Shader
+    class VulkanContext;
+
+    class Shader
     {
-        vk::ShaderModule vertexShader;
-        vk::ShaderModule fragmentShader;
-        std::vector<ShaderUniforms> shaderUniforms;
-        std::vector<TypeSPIRV> inputAttributes;
-
-        void Destroy();
     public:
-        GraphicShader() = default;
-        GraphicShader(const ShaderData& vertex, const ShaderData& fragment);
-        ~GraphicShader();
+        virtual ~Shader() = default;
 
-        void Init(const ShaderData& vertex, const ShaderData& fragment);
-
-        GraphicShader(const GraphicShader& other) = delete;
-        GraphicShader(GraphicShader&& other) noexcept;
-        GraphicShader& operator=(const GraphicShader& other) = delete;
-        GraphicShader& operator=(GraphicShader&& other) noexcept;
-
-
-        ArrayView<const TypeSPIRV> GetInputAttributes() const override;
-        ArrayView<const ShaderUniforms> GetShaderUniforms() const override;
-        virtual const vk::ShaderModule& GetNativeShader(ShaderType type) const override;
-        virtual bool IsEmpty() const override;
+        virtual ArrayView<const TypeSPIRV> GetInputAttributes() const = 0;
+        virtual ArrayView<const ShaderUniforms> GetShaderUniforms() const = 0;
+        virtual const vk::ShaderModule& GetNativeShader(ShaderType type) const = 0;
+        virtual bool IsEmpty() const = 0;
     };
 }

@@ -29,6 +29,8 @@
 #include "RenderGraphBuilder.h"
 #include "CommandBuffer.h"
 #include "VulkanContext.h"
+#include "GraphicShader.h"
+#include "ComputeShader.h"
 
 namespace VulkanAbstractionLayer
 {
@@ -516,27 +518,27 @@ namespace VulkanAbstractionLayer
 
             renderPassNative.RenderArea = vk::Rect2D{ vk::Offset2D{ 0u, 0u }, vk::Extent2D{ renderAreaWidth, renderAreaHeight } };
 
-            if ((bool)renderPassPipeline.Shader.GetNativeShader(ShaderType::VERTEX))
+            if (dynamic_cast<GraphicShader*>(renderPassPipeline.Shader.get()) != nullptr)
             {
-                auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(renderPassPipeline.Shader.GetShaderUniforms());
+                auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(renderPassPipeline.Shader->GetShaderUniforms());
                 renderPassNative.DescriptorSet = descriptor.Set;
 
                 std::array shaderStageCreateInfos = {
                     vk::PipelineShaderStageCreateInfo {
                         vk::PipelineShaderStageCreateFlags{ },
                         ToNative(ShaderType::VERTEX),
-                        renderPassPipeline.Shader.GetNativeShader(ShaderType::VERTEX),
+                        renderPassPipeline.Shader->GetNativeShader(ShaderType::VERTEX),
                         "main"
                     },
                     vk::PipelineShaderStageCreateInfo {
                         vk::PipelineShaderStageCreateFlags{ },
                         ToNative(ShaderType::FRAGMENT),
-                        renderPassPipeline.Shader.GetNativeShader(ShaderType::FRAGMENT),
+                        renderPassPipeline.Shader->GetNativeShader(ShaderType::FRAGMENT),
                         "main"
                     }
                 };
 
-                auto& vertexAttributes = renderPassPipeline.Shader.GetVertexAttributes();
+                auto& vertexAttributes = renderPassPipeline.Shader->GetInputAttributes();
                 auto& vertexBindings = renderPassPipeline.VertexBindings;
 
                 std::vector<vk::VertexInputBindingDescription> vertexBindingDescriptions;
@@ -869,6 +871,13 @@ namespace VulkanAbstractionLayer
         }
     }
 
+    void PreWarmDescriptorSets(const Shader& shader)
+    {
+        auto& descriptorCache = GetCurrentVulkanContext().GetDescriptorCache();
+        auto& uniforms = shader.GetShaderUniforms();
+        (void)descriptorCache.GetDescriptor(uniforms);
+    }
+
     RenderGraphBuilder::PipelineHashMap RenderGraphBuilder::CreatePipelines()
     {
         PipelineHashMap pipelines;
@@ -876,20 +885,11 @@ namespace VulkanAbstractionLayer
         {  
             auto& pipeline = pipelines[renderPassReference.Name];
             renderPassReference.Pass->SetupPipeline(pipeline);
-            this->PreWarmDescriptorSets(pipeline);
+            if ((bool)pipeline.Shader) PreWarmDescriptorSets(*pipeline.Shader);
+            
             this->SetupExternalResources(pipeline);
         }
         return pipelines;
-    }
-
-    void RenderGraphBuilder::PreWarmDescriptorSets(const Pipeline& pipelineState)
-    {
-        if ((bool)pipelineState.Shader.GetNativeShader(ShaderType::VERTEX))
-        {
-            auto& descriptorCache = GetCurrentVulkanContext().GetDescriptorCache();
-            auto& uniforms = pipelineState.Shader.GetShaderUniforms();
-            (void)descriptorCache.GetDescriptor(uniforms);
-        }
     }
 
     RenderGraphBuilder::ImageTransition RenderGraphBuilder::GetOutputImageFinalTransition(StringId outputName, const ResourceTransitions& resourceTransitions)

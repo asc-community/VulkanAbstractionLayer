@@ -35,7 +35,7 @@
 
 #include "StringId.h"
 #include "RenderGraph.h"
-#include "GraphicShader.h"
+#include "Shader.h"
 #include "DescriptorBinding.h"
 
 struct VkBuffer_T;
@@ -134,7 +134,6 @@ namespace VulkanAbstractionLayer
         void WriteDescriptorSets(StringId renderPassName, const RenderPassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments);
         void SetupOutputImage(ResourceTransitions& transitions, StringId outputImage);
         PipelineHashMap CreatePipelines();
-        void PreWarmDescriptorSets(const Pipeline& pipelineState);
         void SetupExternalResources(const Pipeline& pipelineState);
         ImageTransition GetOutputImageFinalTransition(StringId outputName, const ResourceTransitions& resourceTransitions);
     public:
