@@ -49,6 +49,8 @@ namespace VulkanAbstractionLayer
         }
     }
 
+    vk::ShaderStageFlags PipelineTypeToShaderStages(vk::PipelineBindPoint pipelineType);
+
     void CommandBuffer::Begin()
     {
         vk::CommandBufferBeginInfo commandBufferBeginInfo;
@@ -139,15 +141,25 @@ namespace VulkanAbstractionLayer
         this->SetScissor(Rect2D{ 0, 0, image.GetWidth(), image.GetHeight() });
     }
 
-    void CommandBuffer::PushConstants(const PassNative& renderPass, const uint8_t* data, size_t size)
+    void CommandBuffer::PushConstants(const PassNative& pass, const uint8_t* data, size_t size)
     {
-        this->GetNativeHandle().pushConstants(
-            renderPass.PipelineLayout,
-            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+        constexpr size_t MaxPushConstantByteSize = 128;
+        std::array<uint8_t, MaxPushConstantByteSize> pushConstants = { };
+
+        std::memcpy(pushConstants.data(), data, size);
+
+        this->handle.pushConstants(
+            pass.PipelineLayout,
+            PipelineTypeToShaderStages(pass.PipelineType),
             0,
-            size,
-            data
+            pushConstants.size(),
+            pushConstants.data()
         );
+    }
+
+    void CommandBuffer::Dispatch(uint32_t x, uint32_t y, uint32_t z)
+    {
+        this->handle.dispatch(x, y, z);
     }
 
     void CommandBuffer::CopyImage(const ImageInfo& source, const ImageInfo& distance)

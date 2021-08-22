@@ -137,11 +137,11 @@ namespace VulkanAbstractionLayer
         case BufferUsage::UNIFORM_TEXEL_BUFFER:
             return vk::PipelineStageFlagBits::eVertexShader; // TODO: from other shader stages?
         case BufferUsage::STORAGE_TEXEL_BUFFER:
-            return vk::PipelineStageFlagBits::eVertexShader;
+            return vk::PipelineStageFlagBits::eComputeShader;
         case BufferUsage::UNIFORM_BUFFER:
             return vk::PipelineStageFlagBits::eVertexShader;
         case BufferUsage::STORAGE_BUFFER:
-            return vk::PipelineStageFlagBits::eVertexShader;
+            return vk::PipelineStageFlagBits::eComputeShader;
         case BufferUsage::INDEX_BUFFER:
             return vk::PipelineStageFlagBits::eVertexInput;
         case BufferUsage::VERTEX_BUFFER:
@@ -181,11 +181,11 @@ namespace VulkanAbstractionLayer
         case BufferUsage::UNIFORM_TEXEL_BUFFER:
             return vk::AccessFlagBits::eShaderRead;
         case BufferUsage::STORAGE_TEXEL_BUFFER:
-            return vk::AccessFlagBits::eShaderRead;
+            return vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
         case BufferUsage::UNIFORM_BUFFER:
             return vk::AccessFlagBits::eShaderRead;
         case BufferUsage::STORAGE_BUFFER:
-            return vk::AccessFlagBits::eShaderRead;
+            return vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
         case BufferUsage::INDEX_BUFFER:
             return vk::AccessFlagBits::eIndexRead;
         case BufferUsage::VERTEX_BUFFER:
@@ -212,7 +212,22 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    bool BufferHasWriteDependency(BufferUsage::Bits usage)
+    bool HasImageWriteDependency(ImageUsage::Bits usage)
+    {
+        switch (usage)
+        {
+        case ImageUsage::TRANSFER_DISTINATION:
+        case ImageUsage::STORAGE:
+        case ImageUsage::COLOR_ATTACHMENT:
+        case ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+        case ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool HasBufferWriteDependency(BufferUsage::Bits usage)
     {
         switch (usage)
         {
@@ -223,17 +238,10 @@ namespace VulkanAbstractionLayer
         case BufferUsage::TRANSFORM_FEEDBACK_BUFFER:
         case BufferUsage::TRANSFORM_FEEDBACK_COUNTER_BUFFER:
         case BufferUsage::ACCELERATION_STRUCTURE_STORAGE:
-            return true; // TODO: think if it always a write to a buffer
+            return true;
         default:
             return false;
         }
-    }
-
-    bool BufferHasDataDependency(BufferUsage::Bits oldUsage, BufferUsage::Bits newUsage)
-    {
-        bool isOldWrite = BufferHasWriteDependency(oldUsage);
-        bool isNewWrite = BufferHasWriteDependency(newUsage);
-        return isOldWrite || isNewWrite; // two reads do not need barriers
     }
 
     vk::ImageMemoryBarrier CreateImageMemoryBarrier(VkImage image, ImageUsage::Bits oldUsage, ImageUsage::Bits newUsage, Format format, uint32_t mipLevelCount, uint32_t layerCount)
@@ -336,7 +344,7 @@ namespace VulkanAbstractionLayer
         std::vector<vk::BufferMemoryBarrier> bufferBarriers;
         for (const auto& [bufferHandle, bufferTransition] : bufferTransitions)
         {
-            if (!BufferHasDataDependency(bufferTransition.InitialUsage, bufferTransition.FinalUsage))
+            if (!HasBufferWriteDependency(bufferTransition.InitialUsage))
                 continue;
 
             bufferBarriers.push_back(CreateBufferMemoryBarrier((VkBuffer)bufferHandle, bufferTransition.InitialUsage, bufferTransition.FinalUsage));
@@ -359,7 +367,7 @@ namespace VulkanAbstractionLayer
             if (IsAttachmentName(imageHandle) && attachments.find(ImageHandleToAttachmentName(imageHandle)) != attachments.end())
                 imageNativeHandle = attachments.at(ImageHandleToAttachmentName(imageHandle)).GetNativeHandle();
 
-            if (imageTransition.InitialUsage == imageTransition.FinalUsage)
+            if (imageTransition.InitialUsage == imageTransition.FinalUsage && !HasImageWriteDependency(imageTransition.InitialUsage))
                 continue;
 
             imageBarriers.push_back(CreateImageMemoryBarrier(imageNativeHandle, imageTransition.InitialUsage, imageTransition.FinalUsage, externalImage.ImageFormat, externalImage.MipLevelCount, externalImage.LayerCount));

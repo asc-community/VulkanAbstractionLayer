@@ -77,7 +77,7 @@ namespace VulkanAbstractionLayer
         // TODO: support multiple descriptor sets
         assert(computeData.DescriptorSets.size() < 2);
         this->shaderUniforms = std::vector{
-            ShaderUniforms{ computeData.DescriptorSets[0], ShaderType::VERTEX }
+            ShaderUniforms{ computeData.DescriptorSets[0], ShaderType::COMPUTE }
         };
     }
 

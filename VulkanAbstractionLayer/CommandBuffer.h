@@ -112,6 +112,7 @@ namespace VulkanAbstractionLayer
         void SetRenderArea(const Image& image);
 
         void PushConstants(const PassNative& renderPass, const uint8_t* data, size_t size);
+        void Dispatch(uint32_t x, uint32_t y, uint32_t z);
         
         void CopyImage(const ImageInfo& source, const ImageInfo& distance);
         void CopyBufferToImage(const BufferInfo& source, const ImageInfo& distance);
