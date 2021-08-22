@@ -369,6 +369,38 @@ namespace VulkanAbstractionLayer
         return InternalCallback{ std::move(callback) };
     }
 
+    static void DefaultOnPresentCallback(CommandBuffer&, const Image&, const Image&) { }
+
+    RenderGraphBuilder::PresentCallback RenderGraphBuilder::CreateOnPresentCallback(StringId outputName, const ResourceTransitions& transitions)
+    {
+        auto outputImageTransition = this->GetOutputImageFinalTransition(this->outputName, transitions);
+        return [outputImageTransition](CommandBuffer& commandBuffer, const Image& outputImage, const Image& presentImage)
+        {
+            commandBuffer.BlitImage(outputImage, outputImageTransition.InitialUsage, presentImage, ImageUsage::UNKNOWN, BlitFilter::LINEAR);
+            auto subresourceRange = GetDefaultImageSubresourceRange(outputImage);
+            if (outputImageTransition.FinalUsage != ImageUsage::TRANSFER_SOURCE)
+            {
+                commandBuffer.GetNativeHandle().pipelineBarrier(
+                    vk::PipelineStageFlagBits::eTransfer,
+                    ImageUsageToPipelineStage(outputImageTransition.FinalUsage),
+                    { }, // dependencies
+                    { }, // memory barriers
+                    { }, // buffer barriers
+                    vk::ImageMemoryBarrier{
+                        vk::AccessFlagBits::eTransferRead,
+                        ImageUsageToAccessFlags(outputImageTransition.FinalUsage),
+                        vk::ImageLayout::eTransferSrcOptimal,
+                        ImageUsageToImageLayout(outputImageTransition.FinalUsage),
+                        VK_QUEUE_FAMILY_IGNORED,
+                        VK_QUEUE_FAMILY_IGNORED,
+                        outputImage.GetNativeHandle(),
+                        subresourceRange
+                    }
+                );
+            }
+        };
+    }
+
     RenderPassNative RenderGraphBuilder::BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions)
     {
         RenderPassNative renderPassNative;
@@ -877,7 +909,7 @@ namespace VulkanAbstractionLayer
         DependencyHashMap dependencies = this->AcquireRenderPassDependencies();
         PipelineHashMap pipelines = this->CreatePipelines();
         ResourceTransitions resourceTransitions = this->ResolveResourceTransitions(dependencies);
-        this->SetupOutputImage(resourceTransitions, this->outputName);
+        if (this->outputName != StringId{ }) this->SetupOutputImage(resourceTransitions, this->outputName);
         AttachmentHashMap attachments = this->AllocateAttachments(pipelines, resourceTransitions, dependencies);
 
         std::vector<RenderGraphNode> nodes;
@@ -895,34 +927,9 @@ namespace VulkanAbstractionLayer
             });
         }
 
-        auto outputImageTransition = GetOutputImageFinalTransition(this->outputName, resourceTransitions);
-
-        auto OnPresent = [outputImageTransition](CommandBuffer& commandBuffer, const Image& outputImage, const Image& presentImage)
-        {
-            commandBuffer.BlitImage(outputImage, outputImageTransition.InitialUsage, presentImage, ImageUsage::UNKNOWN, BlitFilter::LINEAR);
-            auto subresourceRange = GetDefaultImageSubresourceRange(outputImage);
-            if (outputImageTransition.FinalUsage != ImageUsage::TRANSFER_SOURCE)
-            {
-                commandBuffer.GetNativeHandle().pipelineBarrier(
-                    vk::PipelineStageFlagBits::eTransfer,
-                    ImageUsageToPipelineStage(outputImageTransition.FinalUsage),
-                    { }, // dependencies
-                    { }, // memory barriers
-                    { }, // buffer barriers
-                    vk::ImageMemoryBarrier{
-                        vk::AccessFlagBits::eTransferRead,
-                        ImageUsageToAccessFlags(outputImageTransition.FinalUsage),
-                        vk::ImageLayout::eTransferSrcOptimal,
-                        ImageUsageToImageLayout(outputImageTransition.FinalUsage),
-                        VK_QUEUE_FAMILY_IGNORED,
-                        VK_QUEUE_FAMILY_IGNORED,
-                        outputImage.GetNativeHandle(),
-                        subresourceRange
-                    }
-                );
-            }
-        };
-
+        auto OnPresent = (this->outputName != StringId{ }) ?
+            this->CreateOnPresentCallback(this->outputName, resourceTransitions) :
+            DefaultOnPresentCallback;
         auto OnCreatePipelines = this->CreateOnCreatePipelineCallback(resourceTransitions, attachments);
 
         return std::make_unique<RenderGraph>(

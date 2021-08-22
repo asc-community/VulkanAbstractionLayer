@@ -94,6 +94,7 @@ namespace VulkanAbstractionLayer
         vk::SwapchainKHR swapchain;
         VmaAllocator allocator = { };
         std::vector<Image> swapchainImages;
+        std::vector<ImageUsage::Bits> swapchainImageUsages;
         VirtualFrameProvider virtualFrames;
         DescriptorCache descriptorCache;
         uint32_t queueFamilyIndex = { };
@@ -125,13 +126,14 @@ namespace VulkanAbstractionLayer
         uint32_t GetPresentImageCount() const { return this->presentImageCount; }
         uint32_t GetAPIVersion() const { return this->apiVersion; }
         const VmaAllocator& GetAllocator() const { return this->allocator; }
-        const Image& GetSwapchainImage(size_t index) const { return this->swapchainImages[index]; }
+        const Image& AcquireSwapchainImage(size_t index, ImageUsage::Bits usage);
+        ImageUsage::Bits GetSwapchainImageUsage(size_t index) const;
 
         bool IsRenderingEnabled() const { return this->renderingEnabled; }
         void InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options);
         void RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight);
         void StartFrame();
-        const Image& GetCurrentSwapchainImage() const;
+        const Image& AcquireCurrentSwapchainImage(ImageUsage::Bits usage);
         CommandBuffer& GetCurrentCommandBuffer();
         StageBuffer& GetCurrentStageBuffer();
         void SubmitCommandsImmediate(const CommandBuffer& commands);

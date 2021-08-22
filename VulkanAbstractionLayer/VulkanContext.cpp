@@ -181,11 +181,11 @@ namespace VulkanAbstractionLayer
         {
             auto properties = device.getProperties();
 
-            options.InfoCallback("checking " + std::string(properties.deviceName) + "...");
+            options.InfoCallback("checking " + std::string(properties.deviceName.data()) + "...");
 
             if (properties.apiVersion < this->apiVersion)
             {
-                options.InfoCallback(std::string(properties.deviceName) + ": skipping device as its Vulkan API version is less than required");
+                options.InfoCallback(std::string(properties.deviceName.data()) + ": skipping device as its Vulkan API version is less than required");
                 options.InfoCallback("    " +
                     std::to_string(VK_VERSION_MAJOR(properties.apiVersion)) + "." + std::to_string(VK_VERSION_MINOR(properties.apiVersion)) + " < " +
                     std::to_string(VK_VERSION_MAJOR(this->apiVersion)) + "." + std::to_string(VK_VERSION_MINOR(this->apiVersion))
@@ -196,7 +196,7 @@ namespace VulkanAbstractionLayer
             auto queueFamilyIndex = DetermineQueueFamilyIndex(this->instance, device, this->surface);
             if (!queueFamilyIndex.has_value())
             {
-                options.InfoCallback(std::string(properties.deviceName) + ": skipping device as its queue families does not satisfy the requirements");
+                options.InfoCallback(std::string(properties.deviceName.data()) + ": skipping device as its queue families does not satisfy the requirements");
                 continue;
             }
 
@@ -343,6 +343,7 @@ namespace VulkanAbstractionLayer
         this->presentImageCount = (uint32_t)swapchainImages.size();
         this->swapchainImages.clear();
         this->swapchainImages.reserve(this->presentImageCount);
+        this->swapchainImageUsages.assign(this->presentImageCount, ImageUsage::UNKNOWN);
 
         for (uint32_t i = 0; i <this->presentImageCount; i++)
         {
@@ -355,14 +356,25 @@ namespace VulkanAbstractionLayer
         }
     }
 
+    const Image& VulkanContext::AcquireSwapchainImage(size_t index, ImageUsage::Bits usage)
+    {
+        this->swapchainImageUsages[index] = usage;
+        return this->swapchainImages[index];
+    }
+
+    ImageUsage::Bits VulkanContext::GetSwapchainImageUsage(size_t index) const
+    {
+        return this->swapchainImageUsages[index];
+    }
+
     void VulkanContext::StartFrame()
     {
         this->virtualFrames.StartFrame();
     }
 
-    const Image& VulkanContext::GetCurrentSwapchainImage() const
+    const Image& VulkanContext::AcquireCurrentSwapchainImage(ImageUsage::Bits usage)
     {
-       return this->swapchainImages[this->virtualFrames.GetPresentImageIndex()];
+        return this->AcquireSwapchainImage(this->virtualFrames.GetPresentImageIndex(), usage);
     }
 
     CommandBuffer& VulkanContext::GetCurrentCommandBuffer()

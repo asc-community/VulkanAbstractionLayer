@@ -69,11 +69,11 @@ namespace VulkanAbstractionLayer
         std::vector<VertexBinding> VertexBindings;
         DescriptorBinding DescriptorBindings;
 
-        void DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage);
+        void DeclareBuffer(const Buffer& buffer);
         void DeclareImage(const Image& image, ImageUsage::Bits oldUsage);
 
-        void DeclareBuffers(ArrayView<BufferReference> buffers, BufferUsage::Bits oldUsage);
-        void DeclareBuffers(ArrayView<Buffer> buffers, BufferUsage::Bits oldUsage);
+        void DeclareBuffers(ArrayView<BufferReference> buffers);
+        void DeclareBuffers(ArrayView<Buffer> buffers);
         void DeclareImages(ArrayView<ImageReference> images, ImageUsage::Bits oldUsage);
         void DeclareImages(ArrayView<Image> images, ImageUsage::Bits oldUsage);
 

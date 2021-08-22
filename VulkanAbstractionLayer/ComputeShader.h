@@ -28,31 +28,34 @@
 
 #pragma once
 
-#include "RenderPass.h"
-#include "ImGuiContext.h"
+#include "ShaderLoader.h"
+#include "DescriptorCache.h"
 
 namespace VulkanAbstractionLayer
 {
-	class ImGuiRenderPass : public RenderPass
-	{
-		StringId outputImageName;
-		AttachmentState onLoad;
+    class VulkanContext;
 
-	public:
-		ImGuiRenderPass(StringId outputImageName)
-			: ImGuiRenderPass(outputImageName, AttachmentState::LOAD_COLOR) { }
+    class ComputeShader
+    {
+        vk::ShaderModule computeShader;
 
-		ImGuiRenderPass(StringId outputImageName, AttachmentState onLoad)
-			: outputImageName(outputImageName), onLoad(onLoad) { }
+        std::vector<ShaderUniforms> shaderUniforms;
 
-		virtual void SetupDependencies(DependencyState state) override
-		{
-			state.AddAttachment(this->outputImageName, this->onLoad);
-		}
+        void Destroy();
+    public:
+        ComputeShader() = default;
+        ComputeShader(const ShaderData& computeData);
 
-		virtual void OnRender(RenderPassState state) override
-		{
-			ImGuiVulkanContext::RenderFrame(state.Commands.GetNativeHandle());
-		}
-	};
+        void Init(const ShaderData& computeData);
+
+        ComputeShader(const ComputeShader& other) = delete;
+        ComputeShader(ComputeShader&& other) noexcept;
+        ComputeShader& operator=(const ComputeShader& other) = delete;
+        ComputeShader& operator=(ComputeShader&& other) noexcept;
+        ~ComputeShader();
+
+        const auto& GetShaderUniforms() const { return this->shaderUniforms; }
+
+        const vk::ShaderModule& GetNativeShader(ShaderType type) const;
+    };
 }

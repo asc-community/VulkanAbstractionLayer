@@ -87,22 +87,19 @@ namespace VulkanAbstractionLayer
     {
         auto& frame = this->GetCurrentFrame();
         auto& vulkanContext = GetCurrentVulkanContext();
-        auto& presentImage = vulkanContext.GetSwapchainImage(this->presentImageIndex);
 
-        vk::ImageSubresourceRange subresourceRange{
-            ImageFormatToImageAspect(presentImage.GetFormat()),
-            0, // base mip level
-            1, // level count
-            0, // base layer
-            1  // layer count
-        };
+        auto lastPresentImageUsage = vulkanContext.GetSwapchainImageUsage(this->presentImageIndex);
+        // reset present swapchain usage
+        auto& presentImage = vulkanContext.AcquireSwapchainImage(this->presentImageIndex, ImageUsage::UNKNOWN);
+
+        auto subresourceRange = GetDefaultImageSubresourceRange(presentImage);
 
         // here we assume that present image is not written directly, but transfered from other image
         vk::ImageMemoryBarrier presentImageTransferDstToPresent;
         presentImageTransferDstToPresent
-            .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setSrcAccessMask(ImageUsageToAccessFlags(lastPresentImageUsage))
             .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
-            .setOldLayout(vk::ImageLayout::eTransferDstOptimal)
+            .setOldLayout(ImageUsageToImageLayout(lastPresentImageUsage))
             .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
             .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
             .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
@@ -110,7 +107,7 @@ namespace VulkanAbstractionLayer
             .setSubresourceRange(subresourceRange);
 
         frame.Commands.GetNativeHandle().pipelineBarrier(
-            vk::PipelineStageFlagBits::eTransfer,
+            ImageUsageToPipelineStage(lastPresentImageUsage),
             vk::PipelineStageFlagBits::eBottomOfPipe,
             { }, // dependency flags
             { }, // memory barriers

@@ -507,4 +507,56 @@ namespace VulkanAbstractionLayer
             mipLevelsTransfer
         );
     }
+
+    static vk::ImageMemoryBarrier GetImageMemoryBarrier(const Image& image, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout)
+    {
+        auto subresourceRange = GetDefaultImageSubresourceRange(image);
+        vk::ImageMemoryBarrier barrier;
+        barrier
+            .setSrcAccessMask(ImageUsageToAccessFlags(oldLayout))
+            .setDstAccessMask(ImageUsageToAccessFlags(newLayout))
+            .setOldLayout(ImageUsageToImageLayout(oldLayout))
+            .setNewLayout(ImageUsageToImageLayout(newLayout))
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setImage(image.GetNativeHandle())
+            .setSubresourceRange(subresourceRange);
+
+        return barrier;
+    }
+    
+    void CommandBuffer::TransferLayout(const Image& image, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout)
+    {
+        auto barrier = GetImageMemoryBarrier(image, oldLayout, newLayout);
+
+        this->handle.pipelineBarrier(
+            ImageUsageToPipelineStage(oldLayout),
+            ImageUsageToPipelineStage(newLayout),
+            { }, // dependecies
+            { }, // memory barriers
+            { }, // buffer barriers
+            barrier
+        );
+    }
+
+    void CommandBuffer::TransferLayout(ArrayView<ImageReference> images, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout)
+    {
+        vk::PipelineStageFlags srcPipelineStages = { };
+        std::vector<vk::ImageMemoryBarrier> barriers;
+        barriers.reserve(images.size());
+
+        for (const auto& image : images)
+        {
+            barriers.push_back(GetImageMemoryBarrier(image.get(), oldLayout, newLayout));
+        }
+
+        this->handle.pipelineBarrier(
+            ImageUsageToPipelineStage(oldLayout),
+            ImageUsageToPipelineStage(newLayout),
+            { }, // dependecies
+            { }, // memory barriers
+            { }, // buffer barriers
+            barriers
+        );
+    }
 }

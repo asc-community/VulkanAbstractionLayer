@@ -98,7 +98,6 @@ namespace VulkanAbstractionLayer
             using PerRenderPassImageTransitionHashMap = std::unordered_map<RenderPassNameId, ImageTransitionHashMap>;
             using PerRenderPassBufferTransitionHashMap = std::unordered_map<RenderPassNameId, BufferTransitionHashMap>;
 
-
             PerRenderPassImageTransitionHashMap ImageTransitions;
             PerRenderPassBufferTransitionHashMap BufferTransitions;
 
@@ -114,7 +113,8 @@ namespace VulkanAbstractionLayer
         using AttachmentHashMap = std::unordered_map<StringId, Image>;
         using DependencyHashMap = std::unordered_map<StringId, DependencyStorage>;
         using PipelineHashMap = std::unordered_map<StringId, Pipeline>;
-        using InternalCallback = std::function<void(CommandBuffer)>;
+        using InternalCallback = std::function<void(CommandBuffer&)>;
+        using PresentCallback = std::function<void(CommandBuffer&, const Image&, const Image&)>;
         using ExternalImagesHashMap = std::unordered_map<VkImage, ExternalImage>;
         using ExternalBuffersHashMap = std::unordered_map<VkBuffer, ExternalBuffer>;
 
@@ -128,6 +128,7 @@ namespace VulkanAbstractionLayer
         DependencyHashMap AcquireRenderPassDependencies();
         InternalCallback CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
         InternalCallback CreateOnCreatePipelineCallback(const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
+        PresentCallback CreateOnPresentCallback(StringId outputName, const ResourceTransitions& transitions);
         ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies);
         AttachmentHashMap AllocateAttachments(const PipelineHashMap& pipelines, const ResourceTransitions& transitions, const DependencyHashMap& dependencies);
         void WriteDescriptorSets(StringId renderPassName, const RenderPassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments);

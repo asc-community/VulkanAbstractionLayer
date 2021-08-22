@@ -318,10 +318,10 @@ public:
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNKNOWN);
-        pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNKNOWN);
-        pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNKNOWN);
-        pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::UNKNOWN);
+        pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
+        pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer);
+        pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer);
+        pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -798,7 +798,7 @@ int main()
                 MakeLookAtMatrix(Vector3{ 0.0f, 0.0f, 0.0f }, -lightDirection, Vector3{ 0.001f, 1.0f, 0.001f });
 
             renderGraph->Execute(Vulkan.GetCurrentCommandBuffer());
-            renderGraph->Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());
+            renderGraph->Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.AcquireCurrentSwapchainImage(ImageUsage::TRANSFER_DISTINATION));
 
             ImGuiVulkanContext::EndFrame();
             Vulkan.EndFrame();

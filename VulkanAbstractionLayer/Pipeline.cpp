@@ -31,11 +31,11 @@
 
 namespace VulkanAbstractionLayer
 {
-	void Pipeline::DeclareBuffer(const Buffer& buffer, BufferUsage::Bits oldUsage)
+	void Pipeline::DeclareBuffer(const Buffer& buffer)
 	{
 		this->bufferDeclarations.push_back(BufferDeclaration{ 
 			(VkBuffer)buffer.GetNativeHandle(), 
-			oldUsage 
+			BufferUsage::UNKNOWN 
 		});
 	}
 
@@ -50,11 +50,11 @@ namespace VulkanAbstractionLayer
 		});
 	}
 
-	void Pipeline::DeclareBuffers(ArrayView<BufferReference> buffers, BufferUsage::Bits oldUsage)
+	void Pipeline::DeclareBuffers(ArrayView<BufferReference> buffers)
 	{
 		this->bufferDeclarations.reserve(this->bufferDeclarations.size() + buffers.size());
 		for (const auto& bufferReference : buffers)
-			this->DeclareBuffer(bufferReference.get(), oldUsage);
+			this->DeclareBuffer(bufferReference.get());
 	}
 
 	void Pipeline::DeclareImages(ArrayView<ImageReference> images, ImageUsage::Bits oldUsage)
@@ -64,11 +64,11 @@ namespace VulkanAbstractionLayer
 			this->DeclareImage(imageReference.get(), oldUsage);
 	}
 
-	void Pipeline::DeclareBuffers(ArrayView<Buffer> buffers, BufferUsage::Bits oldUsage)
+	void Pipeline::DeclareBuffers(ArrayView<Buffer> buffers)
 	{
 		this->bufferDeclarations.reserve(this->bufferDeclarations.size() + buffers.size());
 		for (const auto& buffer : buffers)
-			this->DeclareBuffer(buffer, oldUsage);
+			this->DeclareBuffer(buffer);
 	}
 
 	void Pipeline::DeclareImages(ArrayView<Image> images, ImageUsage::Bits oldUsage)

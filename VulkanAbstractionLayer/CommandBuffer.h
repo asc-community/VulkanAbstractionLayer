@@ -121,6 +121,9 @@ namespace VulkanAbstractionLayer
         void BlitImage(const Image& source, ImageUsage::Bits sourceUsage, const Image& distance, ImageUsage::Bits distanceUsage, BlitFilter filter);
         void GenerateMipLevels(const Image& image, ImageUsage::Bits initialUsage, BlitFilter filter);
     
+        void TransferLayout(const Image& image, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout);
+        void TransferLayout(ArrayView<ImageReference> images, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout);
+
         template<typename... Buffers>
         void BindVertexBuffers(const Buffers&... vertexBuffers)
         {
