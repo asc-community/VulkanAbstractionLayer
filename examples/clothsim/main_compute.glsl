@@ -13,7 +13,7 @@ layout(set = 0, binding = 0) buffer uComputeBuffer {
 
 layout(push_constant) uniform uComputeShaderInfo
 {
-    uint uPositionCount;
+    uint uInstanceCount;
     float uTimeDelta;
 };
 
@@ -21,7 +21,7 @@ void main()
 {
     uint id = gl_GlobalInvocationID.x;
 
-    if(id < uPositionCount)
+    if(id < uInstanceCount)
     {
         uInstances[id].Position.x -= 0.1 * float(id) * uTimeDelta;
     }
