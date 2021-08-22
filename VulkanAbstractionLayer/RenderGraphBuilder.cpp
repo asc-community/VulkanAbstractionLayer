@@ -66,6 +66,20 @@ namespace VulkanAbstractionLayer
         }
     }
 
+    vk::ShaderStageFlags PipelineTypeToShaderStages(vk::PipelineBindPoint pipelineType)
+    {
+        switch (pipelineType)
+        {
+        case vk::PipelineBindPoint::eGraphics:
+            return vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
+        case vk::PipelineBindPoint::eCompute:
+            return vk::ShaderStageFlagBits::eCompute;
+        default:
+            assert(false);
+            return vk::ShaderStageFlags{ };
+        }
+    }
+
     vk::AttachmentLoadOp AttachmentStateToLoadOp(AttachmentState state)
     {
         switch (state)
@@ -575,6 +589,22 @@ namespace VulkanAbstractionLayer
         return GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
     }
 
+    static vk::PipelineLayout CreatePipelineLayout(const vk::DescriptorSetLayout& descriptorSetLayout, vk::PipelineBindPoint pipelineType)
+    {
+        vk::PushConstantRange pushConstantRange;
+        pushConstantRange
+            .setOffset(0)
+            .setSize(128)
+            .setStageFlags(PipelineTypeToShaderStages(pipelineType));
+
+        vk::PipelineLayoutCreateInfo layoutCreateInfo;
+        layoutCreateInfo
+            .setSetLayouts(descriptorSetLayout)
+            .setPushConstantRanges(pushConstantRange);
+
+        return GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
+    }
+
     PassNative RenderGraphBuilder::BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions)
     {
         PassNative passNative;
@@ -591,24 +621,6 @@ namespace VulkanAbstractionLayer
         auto& pass = pipelines.at(renderPassReference.Name);
         auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
         auto& attachmentTransitions = resourceTransitions.ImageTransitions.at(renderPassReference.Name);
-
-        if ((bool)pass.Shader)
-        {
-            auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(pass.Shader->GetShaderUniforms());
-            passNative.DescriptorSet = descriptor.Set;
-            vk::PushConstantRange pushConstantRange;
-            pushConstantRange
-                .setOffset(0)
-                .setSize(128)
-                .setStageFlags(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
-
-            vk::PipelineLayoutCreateInfo layoutCreateInfo;
-            layoutCreateInfo
-                .setSetLayouts(descriptor.SetLayout)
-                .setPushConstantRanges(pushConstantRange);
-
-            passNative.PipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
-        }
 
         // should render pass be created?
         if (!renderPassAttachments.empty())
@@ -711,14 +723,20 @@ namespace VulkanAbstractionLayer
         }
 
         if (dynamic_cast<GraphicShader*>(pass.Shader.get()) != nullptr)
-        {
             passNative.PipelineType = vk::PipelineBindPoint::eGraphics;
-            passNative.Pipeline = CreateGraphicPipeline(*pass.Shader, passNative.PipelineLayout, pass.VertexBindings, passNative.RenderPassHandle);
-        }
         else if (dynamic_cast<ComputeShader*>(pass.Shader.get()) != nullptr)
-        {
             passNative.PipelineType = vk::PipelineBindPoint::eCompute;
-            passNative.Pipeline = CreateComputePipeline(*pass.Shader, passNative.PipelineLayout);
+
+        if ((bool)pass.Shader)
+        {
+            auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(pass.Shader->GetShaderUniforms());
+            passNative.DescriptorSet = descriptor.Set;
+            passNative.PipelineLayout = CreatePipelineLayout(descriptor.SetLayout, passNative.PipelineType);
+
+            if(passNative.PipelineType == vk::PipelineBindPoint::eGraphics)
+                passNative.Pipeline = CreateGraphicPipeline(*pass.Shader, passNative.PipelineLayout, pass.VertexBindings, passNative.RenderPassHandle);
+            if(passNative.PipelineType == vk::PipelineBindPoint::eCompute)
+                passNative.Pipeline = CreateComputePipeline(*pass.Shader, passNative.PipelineLayout);
         }
 
         return passNative;
