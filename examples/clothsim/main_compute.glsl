@@ -2,8 +2,13 @@
 
 layout (local_size_x = 256) in;
 
-layout(set = 0, binding = 0) buffer uComputeBuffer{
-    vec3 uPositions[];
+struct InstanceData
+{
+    vec4 Position;
+};
+
+layout(set = 0, binding = 0) buffer uComputeBuffer {
+    InstanceData uInstances[];
 };
 
 layout(push_constant) uniform uComputeShaderInfo
@@ -18,8 +23,6 @@ void main()
 
     if(id < uPositionCount)
     {
-        vec3 position = uPositions[id];
-        position.x -= float(id) * uTimeDelta;
-        uPositions[id] = position;
+        uInstances[id].Position.x -= 0.1 * float(id) * uTimeDelta;
     }
 }

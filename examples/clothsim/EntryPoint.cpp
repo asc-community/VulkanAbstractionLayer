@@ -30,9 +30,6 @@ void WindowErrorCallback(const std::string& message)
     std::cerr << "[ERROR Window]: " << message << std::endl;
 }
 
-constexpr size_t MaxLightCount = 4;
-constexpr size_t MaxMaterialCount = 256;
-
 struct CameraUniformData
 {
     Matrix4x4 Matrix;
@@ -43,7 +40,7 @@ struct MeshData
 {
     struct InstanceData
     {
-        Vector3 Position;
+        Vector4 Position;
     };
 
     Buffer VertexBuffer;
@@ -135,7 +132,7 @@ public:
         computeShaderInfo.TimeDelta = ImGui::GetIO().DeltaTime;
 
         state.Commands.PushConstants(state.Pass, &computeShaderInfo);
-        state.Commands.Dispatch(1, 0, 0);
+        state.Commands.Dispatch(1, 1, 1);
     }
 };
 
@@ -341,7 +338,9 @@ int main()
         ModelData::Vertex{ {  500.0f, 0.0f, -500.0f }, {  500.0f, -500.0f }, { 0.0f, 1.0f, 0.0f } },
         ModelData::Vertex{ { -500.0f, 0.0f, -500.0f }, { -500.0f, -500.0f }, { 0.0f, 1.0f, 0.0f } },
     };
-    std::array planePosition = { Vector3{0.0f, 0.0f, 0.0f} };
+    std::array planePosition = {
+        MeshData::InstanceData{ { 0.0f, 0.0f, 0.0f, 1.0f} }
+    };
 
     auto& planeMesh = sharedResources.Meshes.emplace_back();
     planeMesh.BaseColor = { 0.8f, 0.8f, 0.8f };
@@ -350,11 +349,11 @@ int main()
 
     auto cube = ModelLoader::LoadFromObj("models/cube.obj");
     std::array cubeInstances = {
-        Vector3{ 0.0f, 0.0f, -5.0f },
-        Vector3{ 0.0f, 0.0f, -2.5f },
-        Vector3{ 0.0f, 0.0f, -0.0f },
-        Vector3{ 0.0f, 0.0f,  2.5f },
-        Vector3{ 0.0f, 0.0f,  5.0f },
+        MeshData::InstanceData{ { 0.0f, 0.0f, -5.0f, 1.0f } },
+        MeshData::InstanceData{ { 0.0f, 0.0f, -2.5f, 1.0f } },
+        MeshData::InstanceData{ { 0.0f, 0.0f, -0.0f, 1.0f } },
+        MeshData::InstanceData{ { 0.0f, 0.0f,  2.5f, 1.0f } },
+        MeshData::InstanceData{ { 0.0f, 0.0f,  5.0f, 1.0f } },
     };
 
     for (auto& vertex : cube.Shapes[0].Vertices) vertex.Position.y += 0.5f;

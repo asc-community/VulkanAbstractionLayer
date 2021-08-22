@@ -44,8 +44,8 @@ namespace VulkanAbstractionLayer
         vk::Framebuffer Framebuffer;
         vk::Pipeline Pipeline;
         vk::PipelineLayout PipelineLayout;
-        vk::PipelineBindPoint PipelineType;
-        vk::Rect2D RenderArea;
+        vk::PipelineBindPoint PipelineType = { };
+        vk::Rect2D RenderArea = { };
         std::vector<vk::ClearValue> ClearValues;
     };
 
