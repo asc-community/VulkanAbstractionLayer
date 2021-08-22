@@ -403,6 +403,178 @@ namespace VulkanAbstractionLayer
         };
     }
 
+    static vk::Pipeline CreateComputePipeline(const Shader& shader, const vk::PipelineLayout& layout)
+    {
+        vk::PipelineShaderStageCreateInfo shaderStageCreateInfo{
+            vk::PipelineShaderStageCreateFlags{ },
+            ToNative(ShaderType::COMPUTE),
+            shader.GetNativeShader(ShaderType::COMPUTE),
+            "main"
+        };
+
+        vk::ComputePipelineCreateInfo pipelineCreateInfo;
+        pipelineCreateInfo
+            .setStage(shaderStageCreateInfo)
+            .setLayout(layout)
+            .setBasePipelineHandle(vk::Pipeline{ })
+            .setBasePipelineIndex(0);
+
+        return GetCurrentVulkanContext().GetDevice().createComputePipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
+    }
+
+    static vk::Pipeline CreateGraphicPipeline(const Shader& shader, const vk::PipelineLayout& layout, ArrayView<const VertexBinding> vertexBindings, const vk::RenderPass& renderPass)
+    {
+        std::array shaderStageCreateInfos = {
+            vk::PipelineShaderStageCreateInfo {
+                vk::PipelineShaderStageCreateFlags{ },
+                ToNative(ShaderType::VERTEX),
+                shader.GetNativeShader(ShaderType::VERTEX),
+                "main"
+            },
+            vk::PipelineShaderStageCreateInfo {
+                vk::PipelineShaderStageCreateFlags{ },
+                ToNative(ShaderType::FRAGMENT),
+                shader.GetNativeShader(ShaderType::FRAGMENT),
+                "main"
+            }
+        };
+
+        auto& vertexAttributes = shader.GetInputAttributes();
+
+        std::vector<vk::VertexInputBindingDescription> vertexBindingDescriptions;
+        std::vector<vk::VertexInputAttributeDescription> vertexAttributeDescriptions;
+        uint32_t vertexBindingId = 0, attributeLocationId = 0, vertexBindingOffset = 0;
+        uint32_t attributeLocationOffset = 0;
+
+        for (const auto& attribute : vertexAttributes)
+        {
+            for (size_t i = 0; i < attribute.ComponentCount; i++)
+            {
+                vertexAttributeDescriptions.push_back(
+                    vk::VertexInputAttributeDescription{
+                        attributeLocationId,
+                        vertexBindingId,
+                        ToNative(attribute.LayoutFormat),
+                        vertexBindingOffset,
+                    }
+                );
+                attributeLocationId++;
+                vertexBindingOffset += attribute.ByteSize / attribute.ComponentCount;
+            }
+
+            if (attributeLocationId == attributeLocationOffset + vertexBindings[vertexBindingId].BindingRange)
+            {
+                vertexBindingDescriptions.push_back(
+                    vk::VertexInputBindingDescription{
+                        vertexBindingId,
+                        vertexBindingOffset,
+                        VertexBindingRateToVertexInputRate(vertexBindings[vertexBindingId].InputRate)
+                    });
+                vertexBindingId++;
+                attributeLocationOffset = attributeLocationId;
+                vertexBindingOffset = 0; // vertex binding offset is local to binding
+            }
+        }
+        // move everything else to last vertex buffer
+        if (attributeLocationId != attributeLocationOffset)
+        {
+            vertexBindingDescriptions.push_back(
+                vk::VertexInputBindingDescription{
+                    vertexBindingId,
+                    vertexBindingOffset,
+                    VertexBindingRateToVertexInputRate(vertexBindings[vertexBindingId].InputRate)
+                }
+            );
+        }
+
+        vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo;
+        vertexInputStateCreateInfo
+            .setVertexBindingDescriptions(vertexBindingDescriptions)
+            .setVertexAttributeDescriptions(vertexAttributeDescriptions);
+
+        vk::PipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
+        inputAssemblyStateCreateInfo
+            .setPrimitiveRestartEnable(false)
+            .setTopology(vk::PrimitiveTopology::eTriangleList);
+
+        vk::PipelineViewportStateCreateInfo viewportStateCreateInfo;
+        viewportStateCreateInfo
+            .setViewportCount(1) // defined dynamic
+            .setScissorCount(1); // defined dynamic
+
+        vk::PipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
+        rasterizationStateCreateInfo
+            .setPolygonMode(vk::PolygonMode::eFill)
+            .setCullMode(vk::CullModeFlagBits::eBack)
+            .setFrontFace(vk::FrontFace::eCounterClockwise)
+            .setLineWidth(1.0f);
+
+        vk::PipelineMultisampleStateCreateInfo multisampleStateCreateInfo;
+        multisampleStateCreateInfo
+            .setRasterizationSamples(vk::SampleCountFlagBits::e1)
+            .setMinSampleShading(1.0f);
+
+        vk::PipelineColorBlendAttachmentState colorBlendAttachmentState;
+        colorBlendAttachmentState
+            .setBlendEnable(true)
+            .setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha)
+            .setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha)
+            .setColorBlendOp(vk::BlendOp::eAdd)
+            .setSrcAlphaBlendFactor(vk::BlendFactor::eOne)
+            .setDstAlphaBlendFactor(vk::BlendFactor::eZero)
+            .setAlphaBlendOp(vk::BlendOp::eAdd)
+            .setColorWriteMask(
+                vk::ColorComponentFlagBits::eR |
+                vk::ColorComponentFlagBits::eG |
+                vk::ColorComponentFlagBits::eB |
+                vk::ColorComponentFlagBits::eA
+            );
+
+        vk::PipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
+        colorBlendStateCreateInfo
+            .setLogicOpEnable(false)
+            .setLogicOp(vk::LogicOp::eCopy)
+            .setAttachments(colorBlendAttachmentState)
+            .setBlendConstants({ 0.0f, 0.0f, 0.0f, 0.0f });
+
+        std::array dynamicStates = {
+            vk::DynamicState::eViewport,
+            vk::DynamicState::eScissor,
+        };
+
+        vk::PipelineDepthStencilStateCreateInfo depthSpencilStateCreateInfo;
+        depthSpencilStateCreateInfo
+            .setStencilTestEnable(false)
+            .setDepthTestEnable(true)
+            .setDepthWriteEnable(true)
+            .setDepthBoundsTestEnable(false)
+            .setDepthCompareOp(vk::CompareOp::eLess)
+            .setMinDepthBounds(0.0f)
+            .setMaxDepthBounds(1.0f);
+
+        vk::PipelineDynamicStateCreateInfo dynamicStateCreateInfo;
+        dynamicStateCreateInfo.setDynamicStates(dynamicStates);
+
+        vk::GraphicsPipelineCreateInfo pipelineCreateInfo;
+        pipelineCreateInfo
+            .setStages(shaderStageCreateInfos)
+            .setPVertexInputState(&vertexInputStateCreateInfo)
+            .setPInputAssemblyState(&inputAssemblyStateCreateInfo)
+            .setPViewportState(&viewportStateCreateInfo)
+            .setPRasterizationState(&rasterizationStateCreateInfo)
+            .setPMultisampleState(&multisampleStateCreateInfo)
+            .setPDepthStencilState(&depthSpencilStateCreateInfo)
+            .setPColorBlendState(&colorBlendStateCreateInfo)
+            .setPDynamicState(&dynamicStateCreateInfo)
+            .setLayout(layout)
+            .setRenderPass(renderPass)
+            .setSubpass(0)
+            .setBasePipelineHandle(vk::Pipeline{ })
+            .setBasePipelineIndex(0);
+
+        return GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
+    }
+
     PassNative RenderGraphBuilder::BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions)
     {
         PassNative passNative;
@@ -416,14 +588,32 @@ namespace VulkanAbstractionLayer
         DependencyStorage dependencies;
         renderPassReference.Pass->SetupDependencies(dependencies);
 
-        auto& renderPassPipeline = pipelines.at(renderPassReference.Name);
+        auto& pass = pipelines.at(renderPassReference.Name);
         auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
         auto& attachmentTransitions = resourceTransitions.ImageTransitions.at(renderPassReference.Name);
-        vk::AttachmentReference depthStencilAttachmentReference;
+
+        if ((bool)pass.Shader)
+        {
+            auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(pass.Shader->GetShaderUniforms());
+            passNative.DescriptorSet = descriptor.Set;
+            vk::PushConstantRange pushConstantRange;
+            pushConstantRange
+                .setOffset(0)
+                .setSize(128)
+                .setStageFlags(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
+
+            vk::PipelineLayoutCreateInfo layoutCreateInfo;
+            layoutCreateInfo
+                .setSetLayouts(descriptor.SetLayout)
+                .setPushConstantRanges(pushConstantRange);
+
+            passNative.PipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
+        }
 
         // should render pass be created?
         if (!renderPassAttachments.empty())
         {
+            vk::AttachmentReference depthStencilAttachmentReference;
             for (size_t attachmentIndex = 0; attachmentIndex < renderPassAttachments.size(); attachmentIndex++)
             {
                 const auto& attachment = renderPassAttachments[attachmentIndex];
@@ -518,211 +708,19 @@ namespace VulkanAbstractionLayer
             passNative.Framebuffer = GetCurrentVulkanContext().GetDevice().createFramebuffer(framebufferCreateInfo);
 
             passNative.RenderArea = vk::Rect2D{ vk::Offset2D{ 0u, 0u }, vk::Extent2D{ renderAreaWidth, renderAreaHeight } };
-
-            if (dynamic_cast<GraphicShader*>(renderPassPipeline.Shader.get()) != nullptr)
-            {
-                passNative.PipelineType = vk::PipelineBindPoint::eGraphics;
-                auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(renderPassPipeline.Shader->GetShaderUniforms());
-                passNative.DescriptorSet = descriptor.Set;
-
-                std::array shaderStageCreateInfos = {
-                    vk::PipelineShaderStageCreateInfo {
-                        vk::PipelineShaderStageCreateFlags{ },
-                        ToNative(ShaderType::VERTEX),
-                        renderPassPipeline.Shader->GetNativeShader(ShaderType::VERTEX),
-                        "main"
-                    },
-                    vk::PipelineShaderStageCreateInfo {
-                        vk::PipelineShaderStageCreateFlags{ },
-                        ToNative(ShaderType::FRAGMENT),
-                        renderPassPipeline.Shader->GetNativeShader(ShaderType::FRAGMENT),
-                        "main"
-                    }
-                };
-
-                auto& vertexAttributes = renderPassPipeline.Shader->GetInputAttributes();
-                auto& vertexBindings = renderPassPipeline.VertexBindings;
-
-                std::vector<vk::VertexInputBindingDescription> vertexBindingDescriptions;
-                std::vector<vk::VertexInputAttributeDescription> vertexAttributeDescriptions;
-                uint32_t vertexBindingId = 0, attributeLocationId = 0, vertexBindingOffset = 0;
-                uint32_t attributeLocationOffset = 0;
-
-                for (const auto& attribute : vertexAttributes)
-                {
-                    for (size_t i = 0; i < attribute.ComponentCount; i++)
-                    {
-                        vertexAttributeDescriptions.push_back(
-                            vk::VertexInputAttributeDescription{
-                                attributeLocationId,
-                                vertexBindingId,
-                                ToNative(attribute.LayoutFormat),
-                                vertexBindingOffset,
-                            });
-                        attributeLocationId++;
-                        vertexBindingOffset += attribute.ByteSize / attribute.ComponentCount;
-                    }
-
-                    if (attributeLocationId == attributeLocationOffset + vertexBindings[vertexBindingId].BindingRange)
-                    {
-                        vertexBindingDescriptions.push_back(
-                            vk::VertexInputBindingDescription{
-                                vertexBindingId,
-                                vertexBindingOffset,
-                                VertexBindingRateToVertexInputRate(vertexBindings[vertexBindingId].InputRate)
-                            });
-                        vertexBindingId++;
-                        attributeLocationOffset = attributeLocationId;
-                        vertexBindingOffset = 0; // vertex binding offset is local to binding
-                    }
-                }
-                // move everything else to last vertex buffer
-                if (attributeLocationId != attributeLocationOffset)
-                {
-                    vertexBindingDescriptions.push_back(
-                        vk::VertexInputBindingDescription{
-                            vertexBindingId,
-                            vertexBindingOffset,
-                            VertexBindingRateToVertexInputRate(vertexBindings[vertexBindingId].InputRate)
-                        });
-                }
-
-                vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo;
-                vertexInputStateCreateInfo
-                    .setVertexBindingDescriptions(vertexBindingDescriptions)
-                    .setVertexAttributeDescriptions(vertexAttributeDescriptions);
-
-                vk::PipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
-                inputAssemblyStateCreateInfo
-                    .setPrimitiveRestartEnable(false)
-                    .setTopology(vk::PrimitiveTopology::eTriangleList);
-
-                vk::PipelineViewportStateCreateInfo viewportStateCreateInfo;
-                viewportStateCreateInfo
-                    .setViewportCount(1) // defined dynamic
-                    .setScissorCount(1); // defined dynamic
-
-                vk::PipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
-                rasterizationStateCreateInfo
-                    .setPolygonMode(vk::PolygonMode::eFill)
-                    .setCullMode(vk::CullModeFlagBits::eBack)
-                    .setFrontFace(vk::FrontFace::eCounterClockwise)
-                    .setLineWidth(1.0f);
-
-                vk::PipelineMultisampleStateCreateInfo multisampleStateCreateInfo;
-                multisampleStateCreateInfo
-                    .setRasterizationSamples(vk::SampleCountFlagBits::e1)
-                    .setMinSampleShading(1.0f);
-
-                vk::PipelineColorBlendAttachmentState colorBlendAttachmentState;
-                colorBlendAttachmentState
-                    .setBlendEnable(true)
-                    .setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha)
-                    .setDstColorBlendFactor(vk::BlendFactor::eOneMinusSrcAlpha)
-                    .setColorBlendOp(vk::BlendOp::eAdd)
-                    .setSrcAlphaBlendFactor(vk::BlendFactor::eOne)
-                    .setDstAlphaBlendFactor(vk::BlendFactor::eZero)
-                    .setAlphaBlendOp(vk::BlendOp::eAdd)
-                    .setColorWriteMask(
-                        vk::ColorComponentFlagBits::eR |
-                        vk::ColorComponentFlagBits::eG |
-                        vk::ColorComponentFlagBits::eB |
-                        vk::ColorComponentFlagBits::eA
-                    );
-
-                vk::PipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
-                colorBlendStateCreateInfo
-                    .setLogicOpEnable(false)
-                    .setLogicOp(vk::LogicOp::eCopy)
-                    .setAttachments(colorBlendAttachmentState)
-                    .setBlendConstants({ 0.0f, 0.0f, 0.0f, 0.0f });
-
-                std::array dynamicStates = {
-                    vk::DynamicState::eViewport,
-                    vk::DynamicState::eScissor,
-                };
-
-                vk::PipelineDepthStencilStateCreateInfo depthSpencilStateCreateInfo;
-                depthSpencilStateCreateInfo
-                    .setStencilTestEnable(false)
-                    .setDepthTestEnable(true)
-                    .setDepthWriteEnable(true)
-                    .setDepthBoundsTestEnable(false)
-                    .setDepthCompareOp(vk::CompareOp::eLess)
-                    .setMinDepthBounds(0.0f)
-                    .setMaxDepthBounds(1.0f);
-
-                vk::PipelineDynamicStateCreateInfo dynamicStateCreateInfo;
-                dynamicStateCreateInfo.setDynamicStates(dynamicStates);
-
-                vk::PushConstantRange pushConstantRange;
-                pushConstantRange
-                    .setOffset(0)
-                    .setSize(128)
-                    .setStageFlags(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
-
-                vk::PipelineLayoutCreateInfo layoutCreateInfo;
-                layoutCreateInfo
-                    .setSetLayouts(descriptor.SetLayout)
-                    .setPushConstantRanges(pushConstantRange);
-
-                passNative.PipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
-
-                vk::GraphicsPipelineCreateInfo pipelineCreateInfo;
-                pipelineCreateInfo
-                    .setStages(shaderStageCreateInfos)
-                    .setPVertexInputState(&vertexInputStateCreateInfo)
-                    .setPInputAssemblyState(&inputAssemblyStateCreateInfo)
-                    .setPViewportState(&viewportStateCreateInfo)
-                    .setPRasterizationState(&rasterizationStateCreateInfo)
-                    .setPMultisampleState(&multisampleStateCreateInfo)
-                    .setPDepthStencilState(&depthSpencilStateCreateInfo)
-                    .setPColorBlendState(&colorBlendStateCreateInfo)
-                    .setPDynamicState(&dynamicStateCreateInfo)
-                    .setLayout(passNative.PipelineLayout)
-                    .setRenderPass(passNative.RenderPassHandle)
-                    .setSubpass(0)
-                    .setBasePipelineHandle(vk::Pipeline{ })
-                    .setBasePipelineIndex(0);
-
-                passNative.Pipeline = GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
-            }
         }
-        else if (dynamic_cast<ComputeShader*>(renderPassPipeline.Shader.get()) != nullptr)
+
+        if (dynamic_cast<GraphicShader*>(pass.Shader.get()) != nullptr)
+        {
+            passNative.PipelineType = vk::PipelineBindPoint::eGraphics;
+            passNative.Pipeline = CreateGraphicPipeline(*pass.Shader, passNative.PipelineLayout, pass.VertexBindings, passNative.RenderPassHandle);
+        }
+        else if (dynamic_cast<ComputeShader*>(pass.Shader.get()) != nullptr)
         {
             passNative.PipelineType = vk::PipelineBindPoint::eCompute;
-            auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(renderPassPipeline.Shader->GetShaderUniforms());
-            passNative.DescriptorSet = descriptor.Set;
-
-            vk::PipelineShaderStageCreateInfo shaderStageCreateInfo{
-                vk::PipelineShaderStageCreateFlags{ },
-                ToNative(ShaderType::COMPUTE),
-                renderPassPipeline.Shader->GetNativeShader(ShaderType::COMPUTE),
-                "main"
-            };
-
-            vk::PushConstantRange pushConstantRange;
-            pushConstantRange
-                .setOffset(0)
-                .setSize(128)
-                .setStageFlags(vk::ShaderStageFlagBits::eCompute);
-
-            vk::PipelineLayoutCreateInfo layoutCreateInfo;
-            layoutCreateInfo
-                .setSetLayouts(descriptor.SetLayout)
-                .setPushConstantRanges(pushConstantRange);
-
-            passNative.PipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
-
-            vk::ComputePipelineCreateInfo pipelineCreateInfo;
-            pipelineCreateInfo
-                .setStage(shaderStageCreateInfo)
-                .setLayout(passNative.PipelineLayout)
-                .setBasePipelineHandle(vk::Pipeline{ })
-                .setBasePipelineIndex(0);
-
-            passNative.Pipeline = GetCurrentVulkanContext().GetDevice().createComputePipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
+            passNative.Pipeline = CreateComputePipeline(*pass.Shader, passNative.PipelineLayout);
         }
+
         return passNative;
     }
 
