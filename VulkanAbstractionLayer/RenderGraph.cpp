@@ -52,19 +52,11 @@ namespace VulkanAbstractionLayer
         RenderPassState state{ *this, commandBuffer, node.PassNative };
             
         node.PassCustom->BeforeRender(state);
-
         node.PipelineBarrierCallback(commandBuffer);
 
-        if ((bool)node.PassNative.RenderPassHandle) // has render pass
-        {
-            commandBuffer.BeginRenderPass(node.PassNative);
-            node.PassCustom->OnRender(state);
-            commandBuffer.EndRenderPass();
-        }
-        else
-        {
-            node.PassCustom->OnRender(state);
-        }
+        commandBuffer.BeginPass(node.PassNative);
+        node.PassCustom->OnRender(state);
+        commandBuffer.EndPass(node.PassNative);
 
         node.PassCustom->AfterRender(state);
     }

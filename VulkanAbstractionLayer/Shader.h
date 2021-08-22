@@ -49,6 +49,5 @@ namespace VulkanAbstractionLayer
         virtual ArrayView<const TypeSPIRV> GetInputAttributes() const = 0;
         virtual ArrayView<const ShaderUniforms> GetShaderUniforms() const = 0;
         virtual const vk::ShaderModule& GetNativeShader(ShaderType type) const = 0;
-        virtual bool IsEmpty() const = 0;
     };
 }

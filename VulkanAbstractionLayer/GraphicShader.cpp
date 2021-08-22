@@ -124,9 +124,4 @@ namespace VulkanAbstractionLayer
             return this->fragmentShader;
         }
     }
-
-    bool GraphicShader::IsEmpty() const
-    {
-        return !(bool)this->vertexShader || !(bool)this->fragmentShader;
-    }
 }

@@ -403,9 +403,9 @@ namespace VulkanAbstractionLayer
         };
     }
 
-    RenderPassNative RenderGraphBuilder::BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions)
+    PassNative RenderGraphBuilder::BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions)
     {
-        RenderPassNative renderPassNative;
+        PassNative passNative;
 
         std::vector<vk::AttachmentDescription> attachmentDescriptions;
         std::vector<vk::AttachmentReference> attachmentReferences;
@@ -421,7 +421,8 @@ namespace VulkanAbstractionLayer
         auto& attachmentTransitions = resourceTransitions.ImageTransitions.at(renderPassReference.Name);
         vk::AttachmentReference depthStencilAttachmentReference;
 
-        if (!renderPassAttachments.empty()) // should render pass be created?
+        // should render pass be created?
+        if (!renderPassAttachments.empty())
         {
             for (size_t attachmentIndex = 0; attachmentIndex < renderPassAttachments.size(); attachmentIndex++)
             {
@@ -457,14 +458,14 @@ namespace VulkanAbstractionLayer
                 if (attachmentTransition.FinalUsage == ImageUsage::DEPTH_SPENCIL_ATTACHMENT)
                 {
                     depthStencilAttachmentReference = std::move(attachmentReference);
-                    renderPassNative.ClearValues.push_back(vk::ClearDepthStencilValue{
+                    passNative.ClearValues.push_back(vk::ClearDepthStencilValue{
                         attachment.DepthSpencilClear.Depth, attachment.DepthSpencilClear.Stencil
                     });
                 }
                 else
                 {
                     attachmentReferences.push_back(std::move(attachmentReference));
-                    renderPassNative.ClearValues.push_back(vk::ClearColorValue{
+                    passNative.ClearValues.push_back(vk::ClearColorValue{
                         std::array{ attachment.ColorClear.R, attachment.ColorClear.G, attachment.ColorClear.B, attachment.ColorClear.A }
                     });
                 }
@@ -505,23 +506,24 @@ namespace VulkanAbstractionLayer
                 .setAttachments(attachmentDescriptions)
                 .setSubpasses(subpassDescription)
                 .setDependencies(subpassDependencies);
-            renderPassNative.RenderPassHandle = GetCurrentVulkanContext().GetDevice().createRenderPass(renderPassCreateInfo);
+            passNative.RenderPassHandle = GetCurrentVulkanContext().GetDevice().createRenderPass(renderPassCreateInfo);
 
             vk::FramebufferCreateInfo framebufferCreateInfo;
             framebufferCreateInfo
-                .setRenderPass(renderPassNative.RenderPassHandle)
+                .setRenderPass(passNative.RenderPassHandle)
                 .setAttachments(attachmentViews)
                 .setWidth(renderAreaWidth)
                 .setHeight(renderAreaHeight)
                 .setLayers(1);
-            renderPassNative.Framebuffer = GetCurrentVulkanContext().GetDevice().createFramebuffer(framebufferCreateInfo);
+            passNative.Framebuffer = GetCurrentVulkanContext().GetDevice().createFramebuffer(framebufferCreateInfo);
 
-            renderPassNative.RenderArea = vk::Rect2D{ vk::Offset2D{ 0u, 0u }, vk::Extent2D{ renderAreaWidth, renderAreaHeight } };
+            passNative.RenderArea = vk::Rect2D{ vk::Offset2D{ 0u, 0u }, vk::Extent2D{ renderAreaWidth, renderAreaHeight } };
 
             if (dynamic_cast<GraphicShader*>(renderPassPipeline.Shader.get()) != nullptr)
             {
+                passNative.PipelineType = vk::PipelineBindPoint::eGraphics;
                 auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(renderPassPipeline.Shader->GetShaderUniforms());
-                renderPassNative.DescriptorSet = descriptor.Set;
+                passNative.DescriptorSet = descriptor.Set;
 
                 std::array shaderStageCreateInfos = {
                     vk::PipelineShaderStageCreateInfo {
@@ -664,31 +666,64 @@ namespace VulkanAbstractionLayer
                     .setSetLayouts(descriptor.SetLayout)
                     .setPushConstantRanges(pushConstantRange);
 
-                renderPassNative.PipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
+                passNative.PipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
 
                 vk::GraphicsPipelineCreateInfo pipelineCreateInfo;
                 pipelineCreateInfo
                     .setStages(shaderStageCreateInfos)
                     .setPVertexInputState(&vertexInputStateCreateInfo)
                     .setPInputAssemblyState(&inputAssemblyStateCreateInfo)
-                    .setPTessellationState(nullptr)
                     .setPViewportState(&viewportStateCreateInfo)
                     .setPRasterizationState(&rasterizationStateCreateInfo)
                     .setPMultisampleState(&multisampleStateCreateInfo)
                     .setPDepthStencilState(&depthSpencilStateCreateInfo)
                     .setPColorBlendState(&colorBlendStateCreateInfo)
                     .setPDynamicState(&dynamicStateCreateInfo)
-                    .setLayout(renderPassNative.PipelineLayout)
-                    .setRenderPass(renderPassNative.RenderPassHandle)
+                    .setLayout(passNative.PipelineLayout)
+                    .setRenderPass(passNative.RenderPassHandle)
                     .setSubpass(0)
                     .setBasePipelineHandle(vk::Pipeline{ })
                     .setBasePipelineIndex(0);
 
-                renderPassNative.Pipeline = GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
+                passNative.Pipeline = GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
             }
         }
+        else if (dynamic_cast<ComputeShader*>(renderPassPipeline.Shader.get()) != nullptr)
+        {
+            passNative.PipelineType = vk::PipelineBindPoint::eCompute;
+            auto descriptor = GetCurrentVulkanContext().GetDescriptorCache().GetDescriptor(renderPassPipeline.Shader->GetShaderUniforms());
+            passNative.DescriptorSet = descriptor.Set;
 
-        return renderPassNative;
+            vk::PipelineShaderStageCreateInfo shaderStageCreateInfo{
+                vk::PipelineShaderStageCreateFlags{ },
+                ToNative(ShaderType::COMPUTE),
+                renderPassPipeline.Shader->GetNativeShader(ShaderType::COMPUTE),
+                "main"
+            };
+
+            vk::PushConstantRange pushConstantRange;
+            pushConstantRange
+                .setOffset(0)
+                .setSize(128)
+                .setStageFlags(vk::ShaderStageFlagBits::eCompute);
+
+            vk::PipelineLayoutCreateInfo layoutCreateInfo;
+            layoutCreateInfo
+                .setSetLayouts(descriptor.SetLayout)
+                .setPushConstantRanges(pushConstantRange);
+
+            passNative.PipelineLayout = GetCurrentVulkanContext().GetDevice().createPipelineLayout(layoutCreateInfo);
+
+            vk::ComputePipelineCreateInfo pipelineCreateInfo;
+            pipelineCreateInfo
+                .setStage(shaderStageCreateInfo)
+                .setLayout(passNative.PipelineLayout)
+                .setBasePipelineHandle(vk::Pipeline{ })
+                .setBasePipelineIndex(0);
+
+            passNative.Pipeline = GetCurrentVulkanContext().GetDevice().createComputePipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
+        }
+        return passNative;
     }
 
     RenderGraphBuilder::DependencyHashMap RenderGraphBuilder::AcquireRenderPassDependencies()
@@ -804,7 +839,7 @@ namespace VulkanAbstractionLayer
         return attachments;
     }
 
-    void RenderGraphBuilder::WriteDescriptorSets(StringId renderPassName, const RenderPassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments)
+    void RenderGraphBuilder::WriteDescriptorSets(StringId renderPassName, const PassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments)
     {
         auto& pipeline = pipelines.at(renderPassName);
         pipeline.DescriptorBindings.ResolveAttachments(attachments);

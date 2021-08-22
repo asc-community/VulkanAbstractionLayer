@@ -56,6 +56,5 @@ namespace VulkanAbstractionLayer
         ArrayView<const TypeSPIRV> GetInputAttributes() const override;
         ArrayView<const ShaderUniforms> GetShaderUniforms() const override;
         virtual const vk::ShaderModule& GetNativeShader(ShaderType type) const override;
-        virtual bool IsEmpty() const override;
     };
 }

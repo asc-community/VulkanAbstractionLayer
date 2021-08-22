@@ -36,7 +36,7 @@
 
 namespace VulkanAbstractionLayer
 {
-    struct RenderPassNative;
+    struct PassNative;
     
     struct Rect2D
     {
@@ -101,8 +101,8 @@ namespace VulkanAbstractionLayer
         const vk::CommandBuffer& GetNativeHandle() const { return this->handle; }
         void Begin();
         void End();
-        void BeginRenderPass(const RenderPassNative& renderPass);
-        void EndRenderPass();
+        void BeginPass(const PassNative& renderPass);
+        void EndPass(const PassNative& renderPass);
         void Draw(uint32_t vertexCount, uint32_t instanceCount) { this->Draw(vertexCount, instanceCount, 0, 0); }
         void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
         void BindIndexBufferInt32(const Buffer& indexBuffer);
@@ -111,7 +111,7 @@ namespace VulkanAbstractionLayer
         void SetScissor(const Rect2D& scissor);
         void SetRenderArea(const Image& image);
 
-        void PushConstants(const RenderPassNative& renderPass, const uint8_t* data, size_t size);
+        void PushConstants(const PassNative& renderPass, const uint8_t* data, size_t size);
         
         void CopyImage(const ImageInfo& source, const ImageInfo& distance);
         void CopyBufferToImage(const BufferInfo& source, const ImageInfo& distance);
@@ -134,13 +134,13 @@ namespace VulkanAbstractionLayer
         }
 
         template<typename T>
-        void PushConstants(const RenderPassNative& renderPass, ArrayView<const T> constants)
+        void PushConstants(const PassNative& renderPass, ArrayView<const T> constants)
         {
             this->PushConstants(renderPass, (const uint8_t*)constants.data(), constants.size() * sizeof(T));
         }
 
         template<typename T>
-        void PushConstants(const RenderPassNative& renderPass, const T* constants)
+        void PushConstants(const PassNative& renderPass, const T* constants)
         {
             this->PushConstants(renderPass, (const uint8_t*)constants, sizeof(T));
         }

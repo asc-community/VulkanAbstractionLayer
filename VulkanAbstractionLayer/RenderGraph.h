@@ -42,7 +42,7 @@ namespace VulkanAbstractionLayer
     struct RenderGraphNode
     {
         StringId Name;
-        RenderPassNative PassNative;
+        PassNative PassNative;
         std::unique_ptr<RenderPass> PassCustom;
         std::function<void(CommandBuffer&)> PipelineBarrierCallback;
     };

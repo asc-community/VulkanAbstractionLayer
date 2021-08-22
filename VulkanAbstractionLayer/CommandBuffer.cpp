@@ -61,27 +61,35 @@ namespace VulkanAbstractionLayer
         this->handle.end();
     }
 
-    void CommandBuffer::BeginRenderPass(const RenderPassNative& renderPass)
+    void CommandBuffer::BeginPass(const PassNative& pass)
     {
-        vk::RenderPassBeginInfo renderPassBeginInfo;
-        renderPassBeginInfo
-            .setRenderPass(renderPass.RenderPassHandle)
-            .setRenderArea(renderPass.RenderArea)
-            .setFramebuffer(renderPass.Framebuffer)
-            .setClearValues(renderPass.ClearValues);
+        if ((bool)pass.RenderPassHandle)
+        {
+            vk::RenderPassBeginInfo renderPassBeginInfo;
+            renderPassBeginInfo
+                .setRenderPass(pass.RenderPassHandle)
+                .setRenderArea(pass.RenderArea)
+                .setFramebuffer(pass.Framebuffer)
+                .setClearValues(pass.ClearValues);
 
-        this->handle.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+            this->handle.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+        }
 
-        vk::Pipeline graphicPipeline = renderPass.Pipeline;
-        vk::PipelineLayout pipelineLayout = renderPass.PipelineLayout;
-        vk::DescriptorSet descriptorSet = renderPass.DescriptorSet;
-        if ((bool)graphicPipeline) this->handle.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicPipeline);
-        if ((bool)descriptorSet) this->handle.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, descriptorSet, { });
+        vk::Pipeline pipeline = pass.Pipeline;
+        vk::PipelineLayout pipelineLayout = pass.PipelineLayout;
+        vk::PipelineBindPoint pipelineType = pass.PipelineType;
+        vk::DescriptorSet descriptorSet = pass.DescriptorSet;
+
+        if ((bool)pipeline) this->handle.bindPipeline(pipelineType, pipeline);
+        if ((bool)descriptorSet) this->handle.bindDescriptorSets(pipelineType, pipelineLayout, 0, descriptorSet, { });
     }
 
-    void CommandBuffer::EndRenderPass()
+    void CommandBuffer::EndPass(const PassNative& pass)
     {
-        this->handle.endRenderPass();
+        if ((bool)pass.RenderPassHandle)
+        {
+            this->handle.endRenderPass();
+        }
     }
 
     void CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
@@ -131,7 +139,7 @@ namespace VulkanAbstractionLayer
         this->SetScissor(Rect2D{ 0, 0, image.GetWidth(), image.GetHeight() });
     }
 
-    void CommandBuffer::PushConstants(const RenderPassNative& renderPass, const uint8_t* data, size_t size)
+    void CommandBuffer::PushConstants(const PassNative& renderPass, const uint8_t* data, size_t size)
     {
         this->GetNativeHandle().pushConstants(
             renderPass.PipelineLayout,

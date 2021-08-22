@@ -37,13 +37,14 @@ namespace VulkanAbstractionLayer
 {
     class RenderGraph;
 
-    struct RenderPassNative
+    struct PassNative
     {
         vk::RenderPass RenderPassHandle;
         vk::DescriptorSet DescriptorSet;
         vk::Framebuffer Framebuffer;
         vk::Pipeline Pipeline;
         vk::PipelineLayout PipelineLayout;
+        vk::PipelineBindPoint PipelineType;
         vk::Rect2D RenderArea;
         std::vector<vk::ClearValue> ClearValues;
     };
@@ -52,7 +53,7 @@ namespace VulkanAbstractionLayer
     {
         RenderGraph& Graph;
         CommandBuffer& Commands;
-        const RenderPassNative& Pass;
+        const PassNative& Pass;
 
         const Image& GetAttachment(StringId name);
     };

@@ -47,11 +47,6 @@ namespace VulkanAbstractionLayer
         return this->computeShader;
     }
 
-    bool ComputeShader::IsEmpty() const
-    {
-        return !(bool)this->computeShader;
-    }
-
     void ComputeShader::Destroy()
     {
         auto& vulkan = GetCurrentVulkanContext();
