@@ -33,7 +33,7 @@
 
 namespace VulkanAbstractionLayer
 {
-    vk::Format FormatTable[] = {
+    static vk::Format FormatTable[] = {
         vk::Format::eUndefined,
         vk::Format::eR4G4UnormPack8,
         vk::Format::eR4G4B4A4UnormPack16,
@@ -184,7 +184,7 @@ namespace VulkanAbstractionLayer
         vk::ShaderStageFlagBits::eMeshNV,
     };
 
-    vk::DescriptorType DescriptorTypeTable[] = {
+    static vk::DescriptorType DescriptorTypeTable[] = {
         vk::DescriptorType::eSampler,
         vk::DescriptorType::eCombinedImageSampler,
         vk::DescriptorType::eSampledImage,
@@ -198,6 +198,22 @@ namespace VulkanAbstractionLayer
         vk::DescriptorType::eInputAttachment,
         vk::DescriptorType::eInlineUniformBlockEXT,
         vk::DescriptorType::eAccelerationStructureKHR,
+    };
+
+    static vk::ImageLayout ImageLayoutTable[] = {
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::ImageLayout::eGeneral,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eAttachmentOptimalKHR,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eUndefined,
     };
 
     template<>
@@ -303,6 +319,11 @@ namespace VulkanAbstractionLayer
         }
         assert(false);
         return (UniformType)0;
+    }
+
+    const vk::ImageLayout& UniformTypeToImageLayout(UniformType type)
+    {
+        return ImageLayoutTable[(size_t)type];
     }
 
     const vk::ShaderStageFlagBits& ToNative(ShaderType type)

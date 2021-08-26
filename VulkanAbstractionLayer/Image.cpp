@@ -74,7 +74,7 @@ namespace VulkanAbstractionLayer
         case VulkanAbstractionLayer::ImageUsage::SHADER_READ:
             return vk::ImageLayout::eShaderReadOnlyOptimal;
         case VulkanAbstractionLayer::ImageUsage::STORAGE:
-            return vk::ImageLayout::eShaderReadOnlyOptimal; // TODO: what if writes?
+            return vk::ImageLayout::eGeneral;
         case VulkanAbstractionLayer::ImageUsage::COLOR_ATTACHMENT:
             return vk::ImageLayout::eColorAttachmentOptimal;
         case VulkanAbstractionLayer::ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
@@ -121,23 +121,23 @@ namespace VulkanAbstractionLayer
     {
         switch (layout)
         {
-        case VulkanAbstractionLayer::ImageUsage::UNKNOWN:
+        case ImageUsage::UNKNOWN:
             return vk::PipelineStageFlagBits::eTopOfPipe;
-        case VulkanAbstractionLayer::ImageUsage::TRANSFER_SOURCE:
+        case ImageUsage::TRANSFER_SOURCE:
             return vk::PipelineStageFlagBits::eTransfer;
-        case VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION:
+        case ImageUsage::TRANSFER_DISTINATION:
             return vk::PipelineStageFlagBits::eTransfer;
-        case VulkanAbstractionLayer::ImageUsage::SHADER_READ:
+        case ImageUsage::SHADER_READ:
             return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
-        case VulkanAbstractionLayer::ImageUsage::STORAGE:
+        case ImageUsage::STORAGE:
             return vk::PipelineStageFlagBits::eFragmentShader; // TODO: whats for vertex shader reads?
-        case VulkanAbstractionLayer::ImageUsage::COLOR_ATTACHMENT:
+        case ImageUsage::COLOR_ATTACHMENT:
             return vk::PipelineStageFlagBits::eColorAttachmentOutput;
-        case VulkanAbstractionLayer::ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
+        case ImageUsage::DEPTH_SPENCIL_ATTACHMENT:
             return vk::PipelineStageFlagBits::eEarlyFragmentTests; // TODO: whats for late fragment test?
-        case VulkanAbstractionLayer::ImageUsage::INPUT_ATTACHMENT:
+        case ImageUsage::INPUT_ATTACHMENT:
             return vk::PipelineStageFlagBits::eFragmentShader; // TODO: check if at least works
-        case VulkanAbstractionLayer::ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
+        case ImageUsage::FRAGMENT_SHADING_RATE_ATTACHMENT:
             return vk::PipelineStageFlagBits::eFragmentShadingRateAttachmentKHR;
         default:
             assert(false);

@@ -253,14 +253,14 @@ public:
     }
 };
 
-class OpaqueRenderPass : public RenderPass
+class ClothRenderPass : public RenderPass
 {    
     SharedResources& sharedResources;
     std::vector<ImageReference> textureArray;
 public:
     Sampler TextureSampler;
 
-    OpaqueRenderPass(SharedResources& sharedResources)
+    ClothRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
         this->TextureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
@@ -340,7 +340,7 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
         .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
-        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("OpaquePass"_id, std::make_unique<ClothRenderPass>(resources))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .SetOptions(options)
         .SetOutputName("Output"_id);
@@ -403,7 +403,8 @@ struct Camera
 
 int main()
 {
-    std::filesystem::current_path(APPLICATION_WORKING_DIRECTORY);
+    if (std::filesystem::exists(APPLICATION_WORKING_DIRECTORY))
+        std::filesystem::current_path(APPLICATION_WORKING_DIRECTORY);
 
     WindowCreateOptions windowOptions;
     windowOptions.Position = { 100.0f, 100.0f };

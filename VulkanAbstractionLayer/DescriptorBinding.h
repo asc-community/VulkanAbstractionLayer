@@ -62,8 +62,8 @@ namespace VulkanAbstractionLayer
 		std::vector<AttachmentResolveInfo> descriptorAttachmentInfos;
 
 		size_t AllocateBinding(const Buffer& buffer);
-		size_t AllocateBinding(const Image& image, ImageView view);
-		size_t AllocateBinding(const Image& image, const Sampler& sampler, ImageView view);
+		size_t AllocateBinding(const Image& image, ImageView view, UniformType type);
+		size_t AllocateBinding(const Image& image, const Sampler& sampler, ImageView view, UniformType type);
 		size_t AllocateBinding(const Sampler& sampler);
 	public:
 		DescriptorBinding& Bind(uint32_t binding, const Buffer& buffer, UniformType type);

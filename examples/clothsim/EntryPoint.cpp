@@ -30,29 +30,30 @@ void WindowErrorCallback(const std::string& message)
     std::cerr << "[ERROR Window]: " << message << std::endl;
 }
 
+constexpr uint32_t ClothSizeX = 16 * 8;
+constexpr uint32_t ClothSizeY = 16 * 8;
+
 struct CameraUniformData
 {
     Matrix4x4 Matrix;
     Vector3 Position;
 };
 
-struct MeshData
+struct BallStorageData
 {
-    struct InstanceData
-    {
-        Vector4 Position;
-    };
-
-    Buffer VertexBuffer;
-    Buffer InstanceBuffer;
-    Vector3 BaseColor = { 0.0f, 0.0f, 0.0f };
+    Vector3 Position{ ClothSizeX * 0.5f, 20.0f, ClothSizeY * 0.5f };
+    float Radius = 1.0f;
 };
 
 struct SharedResources
 {
-    std::vector<MeshData> Meshes;
     Buffer CameraUniformBuffer;
     CameraUniformData CameraUniform;
+    Image PositionImage;
+    Image VelocityImage;
+    Buffer BallVertexBuffer;
+    std::array<BallStorageData, 2> BallStorage;
+    Buffer BallStorageBuffer;
 };
 
 class UniformSubmitRenderPass : public RenderPass
@@ -69,11 +70,13 @@ public:
     virtual void SetupPipeline(PipelineState pipeline) override
     {
         pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
+        pipeline.DeclareBuffer(this->sharedResources.BallStorageBuffer);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,   BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.BallStorageBuffer,     BufferUsage::TRANSFER_DESTINATION);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -83,23 +86,59 @@ public:
             auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
             auto uniformAllocation = stageBuffer.Submit(&uniformData);
             state.Commands.CopyBuffer(
-                BufferInfo{ stageBuffer.GetBuffer(), uniformAllocation.Offset }, 
+                BufferInfo{ stageBuffer.GetBuffer(), uniformAllocation.Offset },
+                BufferInfo{ uniformBuffer, 0 },
+                uniformAllocation.Size
+            );
+        };
+        auto FillUniformArray = [&state](const auto& uniformData, const auto& uniformBuffer) mutable
+        {
+            auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+            auto uniformAllocation = stageBuffer.Submit(MakeView(uniformData));
+            state.Commands.CopyBuffer(
+                BufferInfo{ stageBuffer.GetBuffer(), uniformAllocation.Offset },
                 BufferInfo{ uniformBuffer, 0 },
                 uniformAllocation.Size
             );
         };
 
         FillUniform(this->sharedResources.CameraUniform, this->sharedResources.CameraUniformBuffer);
+        FillUniformArray(this->sharedResources.BallStorage, this->sharedResources.BallStorageBuffer);
     }
 };
 
 class ComputeRenderPass : public RenderPass
-{    
-    BufferReference computeBuffer;
+{
+    SharedResources& sharedResources;
+
+    int selectedControlNodeIndex = 0;
+    std::array<Vector3, 4> controlNodePositions = {
+        Vector3{ 0.0f,       0.0f, 0.0f       },
+        Vector3{ 0.0f,       0.0f, ClothSizeY },
+        Vector3{ ClothSizeX, 0.0f, 0.0f       },
+        Vector3{ ClothSizeX, 0.0f, ClothSizeY },
+    };
+
+    std::pair<uint32_t, uint32_t> GetNodeIndicies(int index)
+    {
+        switch (index)
+        {
+        case 0:
+            return { 0, 0 };
+        case 1:
+            return { ClothSizeX - 1, 0 };
+        case 2:
+            return { 0, ClothSizeY -1 };
+        case 3:
+            return { ClothSizeX - 1, ClothSizeY - 1 };
+        default:
+            return { -1, -1 };
+        }
+    }
 public:
 
-    ComputeRenderPass(BufferReference computeBuffer)
-        : computeBuffer(computeBuffer)
+    ComputeRenderPass(SharedResources& sharedResources)
+        : sharedResources(sharedResources)
     {
         
     }
@@ -110,66 +149,79 @@ public:
             ShaderLoader::LoadFromSourceFile("main_compute.glsl", ShaderType::COMPUTE, ShaderLanguage::GLSL)
         );
 
-        pipeline.DeclareBuffer(computeBuffer.get());
+        pipeline.DeclareImage(sharedResources.PositionImage, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(sharedResources.VelocityImage, ImageUsage::TRANSFER_DISTINATION);
 
         pipeline.DescriptorBindings
-            .Bind(0, computeBuffer, UniformType::STORAGE_BUFFER);
+            .Bind(0, sharedResources.PositionImage, UniformType::STORAGE_IMAGE)
+            .Bind(1, sharedResources.VelocityImage, UniformType::STORAGE_IMAGE)
+            .Bind(2, sharedResources.BallStorageBuffer, UniformType::UNIFORM_BUFFER);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
-        depedencies.AddBuffer(computeBuffer.get(), BufferUsage::STORAGE_BUFFER);
+        depedencies.AddImage(sharedResources.PositionImage, ImageUsage::STORAGE);
+        depedencies.AddImage(sharedResources.VelocityImage, ImageUsage::STORAGE);
+        depedencies.AddBuffer(sharedResources.BallStorageBuffer, BufferUsage::UNIFORM_BUFFER);
+    }
+
+    virtual void BeforeRender(RenderPassState state) override
+    {
+        ImGui::Begin("node control");
+        ImGui::DragInt("node index", &this->selectedControlNodeIndex, 0.1f, 0, 3);
+        ImGui::DragFloat3("node velocity", &this->controlNodePositions[this->selectedControlNodeIndex][0], 0.1f);
+        ImGui::End();
     }
     
     virtual void OnRender(RenderPassState state) override
     {
         struct
         {
-            uint32_t InstanceCount;
-            float TimeDelta;
-        } computeShaderInfo;
-        computeShaderInfo.InstanceCount = computeBuffer.get().GetByteSize() / sizeof(MeshData::InstanceData);
-        computeShaderInfo.TimeDelta = ImGui::GetIO().DeltaTime;
+            Vector4 NodeVelocity;
+            uint32_t NodeIndexX;
+            uint32_t NodeIndexY;
+        } pushConstants;
 
-        state.Commands.PushConstants(state.Pass, &computeShaderInfo);
-        state.Commands.Dispatch(1, 1, 1);
+        auto indices = GetNodeIndicies(this->selectedControlNodeIndex);
+        pushConstants.NodeIndexX = indices.first;
+        pushConstants.NodeIndexY = indices.second;
+        pushConstants.NodeVelocity = Vector4(this->controlNodePositions[this->selectedControlNodeIndex], 0.0f);
+
+        state.Commands.PushConstants(state.Pass, &pushConstants);
+        state.Commands.Dispatch(this->sharedResources.PositionImage.GetWidth() / 16, this->sharedResources.PositionImage.GetHeight() / 16, 1);
     }
 };
 
-class OpaqueRenderPass : public RenderPass
+class ClothRenderPass : public RenderPass
 {
     SharedResources& sharedResources;
+    Sampler textureSampler;
 public:
 
-    OpaqueRenderPass(SharedResources& sharedResources)
+    ClothRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
-        
+        this->textureSampler.Init(
+            Sampler::MinFilter::LINEAR, 
+            Sampler::MagFilter::LINEAR, 
+            Sampler::AddressMode::REPEAT, 
+            Sampler::MipFilter::LINEAR
+        );
     }
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
         pipeline.Shader = std::make_unique<GraphicShader>(
-            ShaderLoader::LoadFromSourceFile("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSourceFile("cloth_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
             ShaderLoader::LoadFromSourceFile("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
         );
-
-        pipeline.VertexBindings = {
-            VertexBinding{
-                VertexBinding::Rate::PER_VERTEX,
-                5
-            },
-            VertexBinding{
-                VertexBinding::Rate::PER_INSTANCE,
-                1
-            }
-        };
 
         pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
         pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DescriptorBindings
-            .Bind(0, sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER);
+            .Bind(0, sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, sharedResources.PositionImage, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -178,37 +230,96 @@ public:
         depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
 
         depedencies.AddBuffer(sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        for (const auto& mesh : sharedResources.Meshes)
-        {
-            depedencies.AddBuffer(mesh.VertexBuffer, BufferUsage::VERTEX_BUFFER);
-            depedencies.AddBuffer(mesh.InstanceBuffer, BufferUsage::VERTEX_BUFFER);
-        }
+        depedencies.AddImage(sharedResources.PositionImage, ImageUsage::SHADER_READ);
     }
 
     virtual void OnRender(RenderPassState state) override
     {
         state.Commands.SetRenderArea(state.GetAttachment("Output"_id));
 
-        for (const auto& mesh : sharedResources.Meshes)
+        uint32_t width = sharedResources.PositionImage.GetWidth();
+        uint32_t height = sharedResources.PositionImage.GetHeight();
+        uint32_t quadCount = (width - 1) * (height - 1);
+
+        struct
         {
-            size_t vertexCount = mesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
-            size_t instanceCount = mesh.InstanceBuffer.GetByteSize() / sizeof(MeshData::InstanceData);
-            state.Commands.BindVertexBuffers(mesh.VertexBuffer, mesh.InstanceBuffer);
-            state.Commands.PushConstants(state.Pass, &mesh.BaseColor);
-            state.Commands.Draw(vertexCount, instanceCount);
-        }
+            Vector3 BaseColor;
+            float QuadsPerRow;
+        } pushConstants;
+        pushConstants.BaseColor = Vector3{ 0.8f, 0.0f, 0.0f };
+        pushConstants.QuadsPerRow = width - 1;
+
+        size_t vertexCount = 12 * quadCount;
+        state.Commands.PushConstants(state.Pass, &pushConstants);
+        state.Commands.Draw(vertexCount, 1);
+    }
+};
+
+class BallRenderPass : public RenderPass
+{
+    SharedResources& sharedResources;
+public:
+
+    BallRenderPass(SharedResources& sharedResources)
+        : sharedResources(sharedResources)
+    {
+
+    }
+
+    virtual void SetupPipeline(PipelineState pipeline) override
+    {
+        pipeline.Shader = std::make_unique<GraphicShader>(
+            ShaderLoader::LoadFromSourceFile("ball_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSourceFile("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
+        );
+
+        pipeline.VertexBindings = {
+            VertexBinding{
+                VertexBinding::Rate::PER_VERTEX,
+                5
+            }
+        };
+
+        pipeline.DescriptorBindings
+            .Bind(0, sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, sharedResources.BallStorageBuffer, UniformType::UNIFORM_BUFFER);
+    }
+
+    virtual void SetupDependencies(DependencyState depedencies) override
+    {
+        depedencies.AddAttachment("Output"_id, AttachmentState::LOAD_COLOR);
+        depedencies.AddAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+
+        depedencies.AddBuffer(sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
+        depedencies.AddBuffer(sharedResources.BallStorageBuffer, BufferUsage::UNIFORM_BUFFER);
+    }
+
+    virtual void OnRender(RenderPassState state) override
+    {
+        state.Commands.SetRenderArea(state.GetAttachment("Output"_id));
+
+        struct
+        {
+            Vector3 BaseColor;
+            float Padding;
+        } pushConstants;
+        pushConstants.BaseColor = Vector3{ 0.0f, 0.8f, 0.0f };
+
+        size_t vertexCount = this->sharedResources.BallVertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
+        state.Commands.BindVertexBuffers(this->sharedResources.BallVertexBuffer);
+        state.Commands.PushConstants(state.Pass, &pushConstants);
+        state.Commands.Draw(vertexCount, this->sharedResources.BallStorage.size());
     }
 };
 
 auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value options)
 {
-    auto& cubeInstances = resources.Meshes[1].InstanceBuffer;
-
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
         .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
-        .AddRenderPass("ComputePass"_id, std::make_unique<ComputeRenderPass>(cubeInstances))
-        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("ComputePass"_id, std::make_unique<ComputeRenderPass>(resources))
+        .AddRenderPass("ClothPass"_id, std::make_unique<ClothRenderPass>(resources))
+        .AddRenderPass("BallPass"_id, std::make_unique<BallRenderPass>(resources))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .SetOptions(options)
         .SetOutputName("Output"_id);
@@ -218,8 +329,8 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
 
 struct Camera
 {
-    Vector3 Position{ 5.0f, 2.0f, 0.0f };
-    Vector2 Rotation{ 1.5f * Pi, 0.0f };
+    Vector3 Position{ 0.0f, 25.0f, 50.0f };
+    Vector2 Rotation{ 2.2f, -1.0f };
     float Fov = 65.0f;
     float MovementSpeed = 10.00f;
     float RotationMovementSpeed = 2.5f;
@@ -270,7 +381,36 @@ struct Camera
 };
 
 template<typename T>
-void LoadData(Buffer& buffer, BufferUsage::Value usage, ArrayView<T> data)
+void LoadImageData(Image& image, uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, ArrayView<T> data)
+{
+    assert(data.size() == width * height);
+    image.Init(
+        width,
+        height,
+        format,
+        usage | ImageUsage::TRANSFER_DISTINATION,
+        MemoryUsage::GPU_ONLY,
+        ImageOptions::DEFAULT
+    );
+
+    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
+    auto& stagingBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+
+    auto allocation = stagingBuffer.Submit(data);
+    commandBuffer.Begin();
+    commandBuffer.CopyBufferToImage(
+        BufferInfo{ stagingBuffer.GetBuffer(), allocation.Offset },
+        ImageInfo{ image, ImageUsage::UNKNOWN, 0, 0 }
+    );
+
+    stagingBuffer.Flush();
+    commandBuffer.End();
+    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
+    stagingBuffer.Reset();
+}
+
+template<typename T>
+void LoadBufferData(Buffer& buffer, BufferUsage::Value usage, ArrayView<T> data)
 {
     buffer.Init(
         data.size() * sizeof(T),
@@ -297,7 +437,8 @@ void LoadData(Buffer& buffer, BufferUsage::Value usage, ArrayView<T> data)
 
 int main()
 {
-    std::filesystem::current_path(APPLICATION_WORKING_DIRECTORY);
+    if(std::filesystem::exists(APPLICATION_WORKING_DIRECTORY))
+        std::filesystem::current_path(APPLICATION_WORKING_DIRECTORY);
 
     WindowCreateOptions windowOptions;
     windowOptions.Position = { 100.0f, 100.0f };
@@ -325,42 +466,49 @@ int main()
     Vulkan.InitializeContext(window.CreateWindowSurface(Vulkan), deviceOptions);
 
     SharedResources sharedResources{
-        { }, // vertex buffers
         Buffer{ sizeof(CameraUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        { } // camera uniform
+        { }, // camera uniform
+        Image{ }, // position image
+        Image{ }, // velocity image
+        Buffer{ }, // ball vertex data
+        { BallStorageData{ { 0.0f, 20.0f, 0.0f }, 5.0f }, BallStorageData{ { ClothSizeX, 30.0f, ClothSizeY }, 20.0f } },
+        Buffer{ sizeof(BallStorageData) * sharedResources.BallStorage.size(), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
     };
+    
+    std::vector<Vector4> positions(ClothSizeX * ClothSizeY);
+    for (size_t x = 0; x < ClothSizeX; x++)
+    {
+        for (size_t y = 0; y < ClothSizeY; y++)
+        {
+            positions[x * ClothSizeY + y] = Vector4{ (float)x, 0.0f, (float)y, 1.0f };
+        }
+    }
+    LoadImageData(
+        sharedResources.PositionImage,
+        ClothSizeX,
+        ClothSizeY,
+        Format::R32G32B32A32_SFLOAT,
+        ImageUsage::STORAGE | ImageUsage::SHADER_READ,
+        MakeView(positions)
+    );
+    std::vector<Vector4> velocities(ClothSizeX * ClothSizeY, Vector4{ 0.0f, 0.0f, 0.0f, 0.0f });
+    LoadImageData(
+        sharedResources.VelocityImage,
+        ClothSizeX,
+        ClothSizeY,
+        Format::R32G32B32A32_SFLOAT,
+        ImageUsage::STORAGE,
+        MakeView(velocities)
+    );
 
-    std::array planeVertices = {
-        ModelData::Vertex{ { -500.0f, 0.0f, -500.0f }, { -500.0f, -500.0f }, { 0.0f, 1.0f, 0.0f } },
-        ModelData::Vertex{ { -500.0f, 0.0f,  500.0f }, { -500.0f,  500.0f }, { 0.0f, 1.0f, 0.0f } },
-        ModelData::Vertex{ {  500.0f, 0.0f,  500.0f }, {  500.0f,  500.0f }, { 0.0f, 1.0f, 0.0f } },
-        ModelData::Vertex{ {  500.0f, 0.0f,  500.0f }, {  500.0f,  500.0f }, { 0.0f, 1.0f, 0.0f } },
-        ModelData::Vertex{ {  500.0f, 0.0f, -500.0f }, {  500.0f, -500.0f }, { 0.0f, 1.0f, 0.0f } },
-        ModelData::Vertex{ { -500.0f, 0.0f, -500.0f }, { -500.0f, -500.0f }, { 0.0f, 1.0f, 0.0f } },
-    };
-    std::array planePosition = {
-        MeshData::InstanceData{ { 0.0f, 0.0f, 0.0f, 1.0f} }
-    };
-
-    auto& planeMesh = sharedResources.Meshes.emplace_back();
-    planeMesh.BaseColor = { 0.8f, 0.8f, 0.8f };
-    LoadData(planeMesh.VertexBuffer, BufferUsage::VERTEX_BUFFER, MakeView(planeVertices));
-    LoadData(planeMesh.InstanceBuffer, BufferUsage::VERTEX_BUFFER, MakeView(planePosition));
-
-    auto cube = ModelLoader::LoadFromObj("models/cube.obj");
-    std::array cubeInstances = {
-        MeshData::InstanceData{ { 0.0f, 0.0f, -5.0f, 1.0f } },
-        MeshData::InstanceData{ { 0.0f, 0.0f, -2.5f, 1.0f } },
-        MeshData::InstanceData{ { 0.0f, 0.0f, -0.0f, 1.0f } },
-        MeshData::InstanceData{ { 0.0f, 0.0f,  2.5f, 1.0f } },
-        MeshData::InstanceData{ { 0.0f, 0.0f,  5.0f, 1.0f } },
-    };
-
-    for (auto& vertex : cube.Shapes[0].Vertices) vertex.Position.y += 0.5f;
-    auto& cubeMesh = sharedResources.Meshes.emplace_back();
-    cubeMesh.BaseColor = { 0.8f, 0.0f, 0.0f };
-    LoadData(cubeMesh.VertexBuffer, BufferUsage::VERTEX_BUFFER, MakeView(cube.Shapes[0].Vertices));
-    LoadData(cubeMesh.InstanceBuffer, BufferUsage::VERTEX_BUFFER | BufferUsage::STORAGE_BUFFER, MakeView(cubeInstances));
+    auto ballModel = ModelLoader::LoadFromObj("sphere.obj");
+    for (auto& vertex : ballModel.Shapes[0].Vertices)
+        vertex.Position = Normalize(vertex.Position);
+    LoadBufferData(
+        sharedResources.BallVertexBuffer,
+        BufferUsage::VERTEX_BUFFER,
+        MakeView(ballModel.Shapes[0].Vertices)
+    );
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 
@@ -412,6 +560,22 @@ int main()
             ImGui::DragFloat3("position", &camera.Position[0]);
             ImGui::DragFloat2("rotation", &camera.Rotation[0], 0.01f);
             ImGui::DragFloat("fov", &camera.Fov);
+            ImGui::End();
+
+            ImGui::Begin("Performace");
+            ImGui::Text("FPS: %f", ImGui::GetIO().Framerate);
+            ImGui::End();
+
+            ImGui::Begin("Balls");
+            int ballIndex = 0;
+            for (auto& ball : sharedResources.BallStorage)
+            {
+                ImGui::PushID(ballIndex++);
+                ImGui::DragFloat3("position", &ball.Position[0], 0.5f);
+                ImGui::DragFloat("radius", &ball.Radius, 0.5f, 0.0f);
+                ImGui::Separator();
+                ImGui::PopID();
+            }
             ImGui::End();
             
             sharedResources.CameraUniform.Matrix = camera.GetMatrix();

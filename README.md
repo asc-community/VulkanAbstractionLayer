@@ -171,3 +171,5 @@ while (!window.ShouldClose())
 *area light from [LTC paper](https://eheitzresearch.wordpress.com/415-2/)*
 ![ltc-textured](preview/ltc-textured.png)
 *textured light from [LTC paper](https://eheitzresearch.wordpress.com/415-2/)*
+![cloth-simulation](preview/cloth-simulation.png)
+*cloth simulation based on compute shader*

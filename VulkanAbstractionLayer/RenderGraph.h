@@ -45,6 +45,7 @@ namespace VulkanAbstractionLayer
         PassNative PassNative;
         std::unique_ptr<RenderPass> PassCustom;
         std::function<void(CommandBuffer&)> PipelineBarrierCallback;
+        DescriptorBinding Descriptors;
     };
 
     class RenderGraph

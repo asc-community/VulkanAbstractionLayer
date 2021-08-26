@@ -292,13 +292,12 @@ namespace VulkanAbstractionLayer
         for (const auto& [imageNativeHandle, renderPassName] : transitions.FirstImageUsages)
         {
             auto& externalImage = this->externalImages.at(imageNativeHandle);
-            auto inPassImageUsage = transitions.ImageTransitions.at(renderPassName).at(imageNativeHandle).FinalUsage;
+            auto inPassImageUsage = transitions.ImageTransitions.at(renderPassName).at(imageNativeHandle).InitialUsage;
 
             VkImage imageHandle = (VkImage)imageNativeHandle;
             auto attachmentIt = attachments.find(ImageHandleToAttachmentName(imageNativeHandle));
             if (IsAttachmentName(imageHandle) && attachmentIt != attachments.end())
             {
-                inPassImageUsage = transitions.ImageTransitions.at(renderPassName).at(imageNativeHandle).InitialUsage;
                 imageHandle = attachmentIt->second.GetNativeHandle();
             }
             else if (this->options & RenderGraphOptions::ON_SWAPCHAIN_RESIZE)
@@ -315,7 +314,8 @@ namespace VulkanAbstractionLayer
         }
 
         auto callback = 
-            [imageBarriers = std::move(imageBarriers), pipelineSrcFlags = pipelineSourceFlags, pipelineDstFlags = pipelineDistanceFlags](CommandBuffer commands)
+            [imageBarriers = std::move(imageBarriers), pipelineSrcFlags = pipelineSourceFlags, pipelineDstFlags = pipelineDistanceFlags]
+        (CommandBuffer commands)
         {
             if (!imageBarriers.empty())
             {
@@ -328,6 +328,7 @@ namespace VulkanAbstractionLayer
                     imageBarriers
                 );
             }
+
         };
         return InternalCallback{ std::move(callback) };
     }
@@ -461,7 +462,7 @@ namespace VulkanAbstractionLayer
             }
         };
 
-        auto& vertexAttributes = shader.GetInputAttributes();
+        auto vertexAttributes = shader.GetInputAttributes();
 
         std::vector<vk::VertexInputBindingDescription> vertexBindingDescriptions;
         std::vector<vk::VertexInputAttributeDescription> vertexAttributeDescriptions;
@@ -863,7 +864,7 @@ namespace VulkanAbstractionLayer
         return attachments;
     }
 
-    void RenderGraphBuilder::WriteDescriptorSets(StringId renderPassName, const PassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments)
+    void RenderGraphBuilder::ResolveDescriptorSets(StringId renderPassName, const PassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments)
     {
         auto& pipeline = pipelines.at(renderPassName);
         pipeline.DescriptorBindings.ResolveAttachments(attachments);
@@ -933,7 +934,7 @@ namespace VulkanAbstractionLayer
     void PreWarmDescriptorSets(const Shader& shader)
     {
         auto& descriptorCache = GetCurrentVulkanContext().GetDescriptorCache();
-        auto& uniforms = shader.GetShaderUniforms();
+        auto uniforms = shader.GetShaderUniforms();
         (void)descriptorCache.GetDescriptor(uniforms);
     }
 
@@ -976,13 +977,14 @@ namespace VulkanAbstractionLayer
         for (auto& renderPassReference : this->renderPassReferences)
         {
             auto renderPass = this->BuildRenderPass(renderPassReference, pipelines, attachments, resourceTransitions);
-            this->WriteDescriptorSets(renderPassReference.Name, renderPass, pipelines, attachments);
+            this->ResolveDescriptorSets(renderPassReference.Name, renderPass, pipelines, attachments);
 
             nodes.push_back(RenderGraphNode{
                 renderPassReference.Name,
                 std::move(renderPass),
                 std::move(renderPassReference.Pass),
                 this->CreateInternalOnRenderCallback(renderPassReference.Name, dependencies.at(renderPassReference.Name), resourceTransitions, attachments),
+                std::move(pipelines.at(renderPassReference.Name).DescriptorBindings)
             });
         }
 

@@ -561,7 +561,6 @@ namespace VulkanAbstractionLayer
 
     void CommandBuffer::TransferLayout(ArrayView<ImageReference> images, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout)
     {
-        vk::PipelineStageFlags srcPipelineStages = { };
         std::vector<vk::ImageMemoryBarrier> barriers;
         barriers.reserve(images.size());
 
