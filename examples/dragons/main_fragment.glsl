@@ -215,7 +215,6 @@ void main()
     
     vec3 viewDirection = normalize(uCameraPosition - vPosition);
     vec3 lightColor = pow(uLightColor_uAmbientIntensity.rgb, vec3(GAMMA));
-    float ambientFactor = uLightColor_uAmbientIntensity.a;
 
     Fragment fragment;
     fragment.Albedo = pow(albedoColor, vec3(GAMMA));
@@ -223,9 +222,12 @@ void main()
     fragment.Metallic = material.MetallicFactor;
     fragment.Roughness = material.RoughnessFactor;
 
+    float ambientFactor = uLightColor_uAmbientIntensity.a;
+    float diffuseFactor = max(dot(fragment.Normal, uLightDirection), 0.0);
+
     vec3 color = calculateIBL(fragment, viewDirection, uSkybox, uSkyboxIrradiance, uBRDFLUT);
     float shadowFactor = computeShadow(vPosition, uLightProjection, uShadowTexture);
 
-    vec3 shadowedColor = (ambientFactor + shadowFactor) * pow(color, vec3(1.0 / GAMMA));
+    vec3 shadowedColor = (ambientFactor + diffuseFactor * shadowFactor) * pow(color, vec3(1.0 / GAMMA));
     oColor = vec4(shadowedColor, 1.0);
 }

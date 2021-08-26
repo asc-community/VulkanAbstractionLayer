@@ -9,8 +9,6 @@ layout(push_constant) uniform uComputeShaderInfo
 {
     vec4 uNodePosition;
     ivec2 uNodeUV;
-    float uBallMass;
-    float uBallStiffness;
 };
 
 #define BALL_COUNT 2

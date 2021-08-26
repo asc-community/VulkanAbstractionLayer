@@ -298,6 +298,8 @@ namespace VulkanAbstractionLayer
 
         this->descriptorCache.Init();
         this->virtualFrames.Init(options.VirtualFrameCount, options.MaxStageBufferSize);
+
+        options.InfoCallback("initialization finished");
     }
 
     void VulkanContext::RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight)
