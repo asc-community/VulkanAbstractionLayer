@@ -751,13 +751,23 @@ namespace VulkanAbstractionLayer
         return passNative;
     }
 
-    RenderGraphBuilder::DependencyHashMap RenderGraphBuilder::AcquireRenderPassDependencies()
+    RenderGraphBuilder::DependencyHashMap RenderGraphBuilder::AcquireRenderPassDependencies(const PipelineHashMap& pipelines)
     {
         DependencyHashMap dependencies;
         for (auto& renderPassReference : this->renderPassReferences)
         {
             auto& dependency = dependencies[renderPassReference.Name];
+            auto& pipeline = pipelines.at(renderPassReference.Name);
             renderPassReference.Pass->SetupDependencies(dependency);
+            
+            for (const auto& bufferDescriptor : pipeline.DescriptorBindings.GetBufferDescriptors())
+                if(bufferDescriptor.Handle != nullptr) 
+                    dependency.AddBuffer(*bufferDescriptor.Handle, bufferDescriptor.Usage);
+            for (const auto& imageDescriptor : pipeline.DescriptorBindings.GetImageDescriptors())
+                if (imageDescriptor.Handle != nullptr)
+                    dependency.AddImage(*imageDescriptor.Handle, imageDescriptor.Usage);
+            for (const auto& attachmentDescriptor : pipeline.DescriptorBindings.GetAttachmentDescriptors())
+                dependency.AddImage(attachmentDescriptor.Name, attachmentDescriptor.Usage);
         }
         return dependencies;
     }
@@ -966,8 +976,8 @@ namespace VulkanAbstractionLayer
 
     std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
     {
-        DependencyHashMap dependencies = this->AcquireRenderPassDependencies();
         PipelineHashMap pipelines = this->CreatePipelines();
+        DependencyHashMap dependencies = this->AcquireRenderPassDependencies(pipelines);
         ResourceTransitions resourceTransitions = this->ResolveResourceTransitions(dependencies);
         if (this->outputName != StringId{ }) this->SetupOutputImage(resourceTransitions, this->outputName);
         AttachmentHashMap attachments = this->AllocateAttachments(pipelines, resourceTransitions, dependencies);

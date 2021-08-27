@@ -401,8 +401,6 @@ public:
     virtual void SetupDependencies(DependencyState dependencies) override
     {
         dependencies.AddAttachment("ShadowDepth"_id, ClearDepthStencil{ });
-        dependencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        dependencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -475,17 +473,6 @@ public:
     {
         depedencies.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
         depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
-
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-
-        depedencies.AddImages(this->sharedResources.Textures, ImageUsage::SHADER_READ);
-        depedencies.AddImage("ShadowDepth"_id, ImageUsage::SHADER_READ);
-        depedencies.AddImage(this->sharedResources.BRDFLUT, ImageUsage::SHADER_READ);
-        depedencies.AddImage(this->sharedResources.Skybox, ImageUsage::SHADER_READ);
-        depedencies.AddImage(this->sharedResources.SkyboxIrradiance, ImageUsage::SHADER_READ);
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -530,10 +517,6 @@ public:
     {
         depedencies.AddAttachment("Output"_id, AttachmentState::LOAD_COLOR);
         depedencies.AddAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
-
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-
-        depedencies.AddImage(this->sharedResources.Skybox, ImageUsage::SHADER_READ);
     }
 
     virtual void OnRender(RenderPassState state) override

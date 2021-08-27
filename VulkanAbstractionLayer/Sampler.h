@@ -30,6 +30,9 @@
 
 #include <vulkan/vulkan.hpp>
 
+struct VkSampler_T;
+using VkSampler = VkSampler_T*;
+
 namespace VulkanAbstractionLayer
 {
     class Sampler

@@ -47,21 +47,36 @@ namespace VulkanAbstractionLayer
 			uint32_t Count;
 		};
 
+		struct BufferWriteInfo
+		{
+			const Buffer* Handle;
+			BufferUsage::Bits Usage;
+		};
+
+		struct ImageWriteInfo
+		{
+			const Image* Handle;
+			ImageUsage::Bits Usage;
+			ImageView View;
+			const Sampler* SamplerHandle;
+		};
+
 		struct AttachmentResolveInfo
 		{
 			StringId Name;
 			uint32_t Binding;
 			UniformType Type;
+			ImageUsage::Bits Usage;
 			ImageView View;
 			SamplerReference SamplerHandle;
 		};
 
 		std::vector<DescriptorWriteInfo> descriptorWrites;
-		std::vector<vk::DescriptorBufferInfo> descriptorBufferInfos;
-		std::vector<vk::DescriptorImageInfo> descriptorImageInfos;
-		std::vector<AttachmentResolveInfo> descriptorAttachmentInfos;
+		std::vector<BufferWriteInfo> bufferWriteInfos;
+		std::vector<ImageWriteInfo> imageWriteInfos;
+		std::vector<AttachmentResolveInfo> attachmentWriteInfos;
 
-		size_t AllocateBinding(const Buffer& buffer);
+		size_t AllocateBinding(const Buffer& buffer, UniformType type);
 		size_t AllocateBinding(const Image& image, ImageView view, UniformType type);
 		size_t AllocateBinding(const Image& image, const Sampler& sampler, ImageView view, UniformType type);
 		size_t AllocateBinding(const Sampler& sampler);
@@ -86,5 +101,8 @@ namespace VulkanAbstractionLayer
 		void ResolveAttachments(const std::unordered_map<StringId, ImageReference>& mappings);
 
 		void Write(const vk::DescriptorSet& descriptorSet) const;
+		const auto& GetBufferDescriptors() const { return this->bufferWriteInfos; }
+		const auto& GetImageDescriptors() const { return this->imageWriteInfos; }
+		const auto& GetAttachmentDescriptors() const { return this->attachmentWriteInfos; }
 	};
 }

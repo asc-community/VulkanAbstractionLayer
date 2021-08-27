@@ -309,15 +309,6 @@ public:
     {
         depedencies.AddAttachment("Output"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
         depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
-
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddImages(this->textureArray, ImageUsage::SHADER_READ);
-        depedencies.AddImage(this->sharedResources.LookupLTCMatrix, ImageUsage::SHADER_READ);
-        depedencies.AddImage(this->sharedResources.LookupLTCAmplitude, ImageUsage::SHADER_READ);
-        depedencies.AddImages(this->sharedResources.LightTextures, ImageUsage::SHADER_READ);
     }
     
     virtual void OnRender(RenderPassState state) override

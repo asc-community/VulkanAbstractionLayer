@@ -38,11 +38,6 @@
 #include "Shader.h"
 #include "DescriptorBinding.h"
 
-struct VkBuffer_T;
-struct VkImage_T;
-using VkBuffer = VkBuffer_T*;
-using VkImage = VkImage_T*;
-
 namespace VulkanAbstractionLayer
 {
     struct RenderGraphOptions
@@ -123,9 +118,9 @@ namespace VulkanAbstractionLayer
         std::vector<RenderPassReference> renderPassReferences;
         StringId outputName = { };
         RenderGraphOptions::Value options = { };
-
+        
         PassNative BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions);
-        DependencyHashMap AcquireRenderPassDependencies();
+        DependencyHashMap AcquireRenderPassDependencies(const PipelineHashMap& pipelines);
         InternalCallback CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
         InternalCallback CreateOnCreatePipelineCallback(const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
         PresentCallback CreateOnPresentCallback(StringId outputName, const ResourceTransitions& transitions);

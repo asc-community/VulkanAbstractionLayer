@@ -200,22 +200,6 @@ namespace VulkanAbstractionLayer
         vk::DescriptorType::eAccelerationStructureKHR,
     };
 
-    static vk::ImageLayout ImageLayoutTable[] = {
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eShaderReadOnlyOptimal,
-        vk::ImageLayout::eShaderReadOnlyOptimal,
-        vk::ImageLayout::eGeneral,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eAttachmentOptimalKHR,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eUndefined,
-    };
-
     template<>
     TypeSPIRV TypeSPIRV::As<float>()
     {
@@ -319,11 +303,6 @@ namespace VulkanAbstractionLayer
         }
         assert(false);
         return (UniformType)0;
-    }
-
-    const vk::ImageLayout& UniformTypeToImageLayout(UniformType type)
-    {
-        return ImageLayoutTable[(size_t)type];
     }
 
     const vk::ShaderStageFlagBits& ToNative(ShaderType type)

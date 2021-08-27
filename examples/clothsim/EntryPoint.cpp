@@ -32,6 +32,7 @@ void WindowErrorCallback(const std::string& message)
 
 constexpr uint32_t ClothSizeX = 16 * 8;
 constexpr uint32_t ClothSizeY = 16 * 8;
+constexpr uint32_t BallCount = 2;
 
 struct CameraUniformData
 {
@@ -52,7 +53,7 @@ struct SharedResources
     Image PositionImage;
     Image VelocityImage;
     Buffer BallVertexBuffer;
-    std::array<BallStorageData, 2> BallStorage;
+    std::array<BallStorageData, BallCount> BallStorage;
     Buffer BallStorageBuffer;
 };
 
@@ -160,9 +161,7 @@ public:
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
-        depedencies.AddImage(sharedResources.PositionImage, ImageUsage::STORAGE);
-        depedencies.AddImage(sharedResources.VelocityImage, ImageUsage::STORAGE);
-        depedencies.AddBuffer(sharedResources.BallStorageBuffer, BufferUsage::UNIFORM_BUFFER);
+
     }
 
     virtual void BeforeRender(RenderPassState state) override
@@ -228,9 +227,6 @@ public:
     {
         depedencies.AddAttachment("Output"_id, ClearColor{ 0.3f, 0.4f, 0.7f });
         depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
-
-        depedencies.AddBuffer(sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddImage(sharedResources.PositionImage, ImageUsage::SHADER_READ);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -289,9 +285,6 @@ public:
     {
         depedencies.AddAttachment("Output"_id, AttachmentState::LOAD_COLOR);
         depedencies.AddAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
-
-        depedencies.AddBuffer(sharedResources.CameraUniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddBuffer(sharedResources.BallStorageBuffer, BufferUsage::UNIFORM_BUFFER);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -472,7 +465,7 @@ int main()
         Image{ }, // velocity image
         Buffer{ }, // ball vertex data
         { BallStorageData{ { 0.0f, 20.0f, 0.0f }, 5.0f }, BallStorageData{ { ClothSizeX, 30.0f, ClothSizeY }, 20.0f } },
-        Buffer{ sizeof(BallStorageData) * sharedResources.BallStorage.size(), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(BallStorageData) * BallCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
     };
     
     std::vector<Vector4> positions(ClothSizeX * ClothSizeY);

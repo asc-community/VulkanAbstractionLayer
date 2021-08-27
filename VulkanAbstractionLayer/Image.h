@@ -36,6 +36,9 @@
 struct VkImage_T;
 using VkImage = VkImage_T*;
 
+struct VkImageView_T;
+using VkImageView = VkImageView_T*;
+
 namespace VulkanAbstractionLayer
 {
     struct ImageUsage
