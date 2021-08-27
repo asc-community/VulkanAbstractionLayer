@@ -4,6 +4,14 @@ WIP library for abstracting Vulkan API to later use in my projects (including [M
 
 ![vulkan-logo](preview/vulkan-logo.png)
 
+## Supported features
+- loading obj and gltf objects (multiple submeshes, pbr materials)
+- loading png, jpg, tga, bmp, dds, zlib-packed images (mip-maps, automatic format selection)
+- virtual frames, staging buffers, mipmap generation (via blitImage)
+- render graph with automatic attachment creation, descriptor set allocation and barrier placement
+- imgui integration (with support of textures)
+- vertex/fragment shaders, compute shaders, from-source shader compilation and reflection
+
 ## Installation
 1. clone to your system using: `git clone --recurse-submodules https://github.com/vkdev-team/VulkanAbstractionLayer`
 2. make sure you have Vulkan SDK installed (Vulkan 1.2 is recommended)
@@ -98,7 +106,7 @@ public:
         };
 
         // declare external graph resources (buffers, images, attachments) with their initial state
-        pipeline.DeclareBuffer(uniformBuffer, BufferUsage::UNKNOWN);
+        pipeline.DeclareBuffer(uniformBuffer);
         pipeline.DeclareImages(textures, ImageUsage::TRANSFER_DESTIONATION);
         pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
         pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
@@ -133,7 +141,7 @@ Build render graph from render passes:
 
 RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddRenderPass("SomePass"_id, std::make_unique<SomeRenderPass>(sharedResources))
+        .AddRenderPass("SomePass"_id, std::make_unique<SomeRenderPass>(parameters))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .SetOutputName("Output"_id);
 
@@ -152,20 +160,12 @@ while (!window.ShouldClose())
         Vulkan.StartFrame();
 
         renderGraph.Execute(Vulkan.GetCurrentCommandBuffer());
-        renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.GetCurrentSwapchainImage());
+        renderGraph.Present(Vulkan.GetCurrentCommandBuffer(), Vulkan.AcquireCurrentSwapchainImage(ImageUsage::TRANSFER_DISTINATION));
 
         Vulkan.EndFrame();
     }
 }
 ```
-
-## Supported features
-- loading obj and gltf objects (multiple submeshes, pbr materials)
-- loading png, jpg, tga, bmp, dds, zlib-packed images (mip-maps, automatic format selection)
-- virtual frames, staging buffers, mipmap generation (via blitImage)
-- render graph with automatic attachment creation, descriptor set allocation and barrier placement
-- imgui integration (with support of textures)
-- vertex/fragment shaders, compute shaders, from-source shader compilation and reflection
 
 ## Some Examples
 ![instanced-dragons](preview/instanced-dragons.png)
