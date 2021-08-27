@@ -80,12 +80,12 @@ public:
     virtual void SetupPipeline(PipelineState pipeline) override
     {
         // load shader
-        pipeline.Shader = GraphicShader{
+        pipeline.Shader = std::make_unique<GraphicShader>(
             ShaderLoader::LoadFromSource("vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
-            ShaderLoader::LoadFromSource("fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL),
-        };
+            ShaderLoader::LoadFromSource("fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
+        );
 
-        // describe bindings per vertex buffer
+        // describe vertex buffer bindings
         pipeline.VertexBindings = {
             VertexBinding{
                 VertexBinding::Rate::PER_VERTEX,
@@ -97,7 +97,7 @@ public:
             },
         };
 
-        // declare used graph resources (buffers, images, attachments) with their initial state
+        // declare external graph resources (buffers, images, attachments) with their initial state
         pipeline.DeclareBuffer(uniformBuffer, BufferUsage::UNKNOWN);
         pipeline.DeclareImages(textures, ImageUsage::TRANSFER_DESTIONATION);
         pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
@@ -108,24 +108,21 @@ public:
             .Bind(0, uniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, textureSampler, UniformType::SAMPLER)
             .Bind(2, textures, UniformType::SAMPLED_IMAGE);
-    }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
-    {
-        // describe used resources in render pass
-        depedencies.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
-        depedencies.AddAttachment("OutputDepth"_id, ClearDepthSpencil{ });
-
-        depedencies.AddBuffer(uniformBuffer, BufferUsage::UNIFORM_BUFFER);
-        depedencies.AddImages(textures, ImageUsage::SHADER_READ);
+        // add output attachments
+        pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
+        pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthSpencil{ });
     }
     
     virtual void OnRender(RenderPassState state) override
     {
-        auto& output = state.GetOutputColorAttachment(0);
-        state.Commands.SetRenderArea(output);
+        state.Commands.SetRenderArea(state.GetAttachment("Output"_id));
 
         // draw some stuff
+        state.Commands.BindVertexBuffers(vertexBuffer);
+        state.Commands.BindIndexBufferUInt32(indexBuffer);
+        state.Commands.PushConstants(state.Pass, &pushConstants);
+        state.Commands.DrawIndexed(indexCount, instanceCount);
     }
 };
 ```
@@ -161,6 +158,14 @@ while (!window.ShouldClose())
     }
 }
 ```
+
+## Supported features
+- loading obj and gltf objects (multiple submeshes, pbr materials)
+- loading png, jpg, tga, bmp, dds, zlib-packed images (mip-maps, automatic format selection)
+- virtual frames, staging buffers, mipmap generation (via blitImage)
+- render graph with automatic attachment creation, descriptor set allocation and barrier placement
+- imgui integration (with support of textures)
+- vertex/fragment shaders, compute shaders, from-source shader compilation and reflection
 
 ## Some Examples
 ![instanced-dragons](preview/instanced-dragons.png)
