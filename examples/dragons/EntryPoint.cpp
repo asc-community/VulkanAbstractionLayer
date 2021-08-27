@@ -658,8 +658,8 @@ int main()
     Vector3 modelRotation{ -HalfPi, Pi, 0.0f };
     Vector3 lightColor{ 0.7f, 0.7f, 0.7f };
     Vector3 lightDirection{ -0.3f, 1.0f, -0.6f };
-    float lightBounds = 150.0f;
-    float lightAmbientIntensity = 0.3f;
+    float lightBounds = 50.0f;
+    float lightAmbientIntensity = 0.7f;
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
