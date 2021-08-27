@@ -94,17 +94,32 @@ namespace VulkanAbstractionLayer
         }
     }
 
+    void CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount)
+    {
+        this->handle.draw(vertexCount, instanceCount, 0, 0);
+    }
+
     void CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
     {
         this->handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
     }
 
-    void CommandBuffer::BindIndexBufferInt32(const Buffer& indexBuffer)
+    void CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCount)
+    {
+        this->handle.drawIndexed(indexCount, instanceCount, 0, 0, 0);
+    }
+
+    void CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, uint32_t vertexOffset, uint32_t firstInstance)
+    {
+        this->handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    }
+
+    void CommandBuffer::BindIndexBufferUInt32(const Buffer& indexBuffer)
     {
         this->handle.bindIndexBuffer(indexBuffer.GetNativeHandle(), 0, vk::IndexType::eUint32);
     }
 
-    void CommandBuffer::BindIndexBufferInt16(const Buffer& indexBuffer)
+    void CommandBuffer::BindIndexBufferUInt16(const Buffer& indexBuffer)
     {
         this->handle.bindIndexBuffer(indexBuffer.GetNativeHandle(), 0, vk::IndexType::eUint16);
     }

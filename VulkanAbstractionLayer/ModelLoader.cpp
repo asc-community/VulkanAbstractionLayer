@@ -21,7 +21,7 @@
 // DISCLAIMED.IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
 // FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 // DAMAGES(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS TINYGLTF_COMPONENT_TYPE_INTERRUPTION) HOWEVER
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
@@ -57,7 +57,7 @@ namespace VulkanAbstractionLayer
         std::vector<std::pair<Vector3, Vector3>> tangentsBitangents;
         tangentsBitangents.resize(attrib.normals.size(), { Vector3{ 0.0f, 0.0f, 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f } });
 
-        size_t indexOffset = 0;
+        ModelData::Index indexOffset = 0;
         for (size_t faceIndex : mesh.num_face_vertices)
         {
             assert(faceIndex == 3);
@@ -109,47 +109,47 @@ namespace VulkanAbstractionLayer
 
         for (auto& [tangent, bitangent] : tangentsBitangents)
         {
-            if(Dot(tangent, tangent)     > 0.0f) tangent   = Normalize(tangent);
-            if(Dot(bitangent, bitangent) > 0.0f) bitangent = Normalize(bitangent);
+            if (tangent != Vector3{ 0.0f, 0.0f, 0.0f }) tangent = Normalize(tangent);
+            if (bitangent != Vector3{ 0.0f, 0.0f, 0.0f }) bitangent = Normalize(bitangent);
         }
         return tangentsBitangents;
     }
 
-    static auto ComputeTangentsBitangents(ArrayView<const uint16_t> indicies, ArrayView<const Vector3> positions, ArrayView<const Vector2> texCoords)
+    static auto ComputeTangentsBitangents(ArrayView<ModelData::Index> indices, ArrayView<const Vector3> positions, ArrayView<const Vector2> texCoords)
     {
         std::vector<std::pair<Vector3, Vector3>> tangentsBitangents;
         tangentsBitangents.resize(positions.size(), { Vector3{ 0.0f, 0.0f, 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f } });
 
-        assert(indicies.size() % 3 == 0);
-        for (size_t i = 0; i < indicies.size(); i += 3)
+        assert(indices.size() % 3 == 0);
+        for (size_t i = 0; i < indices.size(); i += 3)
         {
-            const auto& position1 = positions[indicies[i + 0]];
-            const auto& position2 = positions[indicies[i + 1]];
-            const auto& position3 = positions[indicies[i + 2]];
+            const auto& position1 = positions[indices[i + 0]];
+            const auto& position2 = positions[indices[i + 1]];
+            const auto& position3 = positions[indices[i + 2]];
 
-            const auto& texCoord1 = texCoords[indicies[i + 0]];
-            const auto& texCoord2 = texCoords[indicies[i + 1]];
-            const auto& texCoord3 = texCoords[indicies[i + 2]];
+            const auto& texCoord1 = texCoords[indices[i + 0]];
+            const auto& texCoord2 = texCoords[indices[i + 1]];
+            const auto& texCoord3 = texCoords[indices[i + 2]];
 
             auto tangentBitangent = ComputeTangentSpace(
                 position1, position2, position3,
                 texCoord1, texCoord2, texCoord3
             );
 
-            tangentsBitangents[indicies[i + 0]].first += tangentBitangent.first;
-            tangentsBitangents[indicies[i + 0]].second += tangentBitangent.second;
+            tangentsBitangents[indices[i + 0]].first += tangentBitangent.first;
+            tangentsBitangents[indices[i + 0]].second += tangentBitangent.second;
 
-            tangentsBitangents[indicies[i + 1]].first += tangentBitangent.first;
-            tangentsBitangents[indicies[i + 1]].second += tangentBitangent.second;
+            tangentsBitangents[indices[i + 1]].first += tangentBitangent.first;
+            tangentsBitangents[indices[i + 1]].second += tangentBitangent.second;
 
-            tangentsBitangents[indicies[i + 2]].first += tangentBitangent.first;
-            tangentsBitangents[indicies[i + 2]].second += tangentBitangent.second;
+            tangentsBitangents[indices[i + 2]].first += tangentBitangent.first;
+            tangentsBitangents[indices[i + 2]].second += tangentBitangent.second;
         }
 
         for (auto& [tangent, bitangent] : tangentsBitangents)
         {
-            if (Dot(tangent, tangent) > 0.0f) tangent = Normalize(tangent);
-            if (Dot(bitangent, bitangent) > 0.0f) bitangent = Normalize(bitangent);
+            if (tangent != Vector3{ 0.0f, 0.0f, 0.0f }) tangent = Normalize(tangent);
+            if (bitangent != Vector3{ 0.0f, 0.0f, 0.0f }) bitangent = Normalize(bitangent);
         }
         return tangentsBitangents;
     }
@@ -206,14 +206,18 @@ namespace VulkanAbstractionLayer
             if (!attrib.normals.empty() && !attrib.texcoords.empty())
                 tangentsBitangents = ComputeTangentsBitangents(shape.mesh, attrib);
 
-            size_t index_offset = 0;
+            resultShape.Vertices.reserve(shape.mesh.indices.size());
+            resultShape.Indices.reserve(shape.mesh.indices.size());
+
+            ModelData::Index indexOffset = 0;
             for (size_t faceIndex : shape.mesh.num_face_vertices)
             {
                 assert(faceIndex == 3);
-                for (size_t v = 0; v < faceIndex; v++)
+                for (size_t v = 0; v < faceIndex; v++, indexOffset++)
                 {
-                    tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
+                    tinyobj::index_t idx = shape.mesh.indices[indexOffset];
                     auto& vertex = resultShape.Vertices.emplace_back();
+                    resultShape.Indices.push_back(indexOffset);
 
                     vertex.Position.x = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
                     vertex.Position.y = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
@@ -232,7 +236,6 @@ namespace VulkanAbstractionLayer
                         vertex.Bitangent = tangentsBitangents[idx.vertex_index].second;
                     }
                 }
-                index_offset += faceIndex;
             }
         }
 
@@ -241,80 +244,72 @@ namespace VulkanAbstractionLayer
 
     static Format ImageFormatFromGLTFImage(const tinygltf::Image& image)
     {
-        constexpr int BYTE = 5120;
-        constexpr int UNSIGNED_BYTE = 5121;
-        constexpr int SHORT = 5122;
-        constexpr int UNSIGNED_SHORT = 5123;
-        constexpr int INT = 5124;
-        constexpr int UNSIGNED_INT = 5125;
-        constexpr int FLOAT = 5126;
-
         if (image.component == 1)
         {
-            if (image.pixel_type == BYTE)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_BYTE)
                 return Format::R8_SNORM;
-            if (image.pixel_type == UNSIGNED_BYTE)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
                 return Format::R8_UNORM;
-            if (image.pixel_type == SHORT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_SHORT)
                 return Format::R16_SINT;
-            if (image.pixel_type == UNSIGNED_SHORT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
                 return Format::R16_UINT;
-            if (image.pixel_type == INT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_INT)
                 return Format::R32_SINT;
-            if (image.pixel_type == UNSIGNED_INT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
                 return Format::R32_UINT;
-            if (image.pixel_type == FLOAT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_FLOAT)
                 return Format::R32_SFLOAT;
         }
         if (image.component == 2)
         {
-            if (image.pixel_type == BYTE)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_BYTE)
                 return Format::R8G8_SNORM;
-            if (image.pixel_type == UNSIGNED_BYTE)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
                 return Format::R8G8_UNORM;
-            if (image.pixel_type == SHORT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_SHORT)
                 return Format::R16G16_SINT;
-            if (image.pixel_type == UNSIGNED_SHORT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
                 return Format::R16G16_UINT;
-            if (image.pixel_type == INT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_INT)
                 return Format::R32G32_SINT;
-            if (image.pixel_type == UNSIGNED_INT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
                 return Format::R32G32_UINT;
-            if (image.pixel_type == FLOAT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_FLOAT)
                 return Format::R32G32_SFLOAT;
         }
         if (image.component == 3)
         {
-            if (image.pixel_type == BYTE)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_BYTE)
                 return Format::R8G8B8_SNORM;
-            if (image.pixel_type == UNSIGNED_BYTE)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
                 return Format::R8G8B8_UNORM;
-            if (image.pixel_type == SHORT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_SHORT)
                 return Format::R16G16B16_SINT;
-            if (image.pixel_type == UNSIGNED_SHORT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
                 return Format::R16G16B16_UINT;
-            if (image.pixel_type == INT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_INT)
                 return Format::R32G32B32_SINT;
-            if (image.pixel_type == UNSIGNED_INT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
                 return Format::R32G32B32_UINT;
-            if (image.pixel_type == FLOAT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_FLOAT)
                 return Format::R32G32B32_SFLOAT;
         }
         if (image.component == 4)
         {
-            if (image.pixel_type == BYTE)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_BYTE)
                 return Format::R8G8B8A8_SNORM;
-            if (image.pixel_type == UNSIGNED_BYTE)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
                 return Format::R8G8B8A8_UNORM;
-            if (image.pixel_type == SHORT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_SHORT)
                 return Format::R16G16B16A16_SINT;
-            if (image.pixel_type == UNSIGNED_SHORT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
                 return Format::R16G16B16A16_UINT;
-            if (image.pixel_type == INT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_INT)
                 return Format::R32G32B32A32_SINT;
-            if (image.pixel_type == UNSIGNED_INT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
                 return Format::R32G32B32A32_UINT;
-            if (image.pixel_type == FLOAT)
+            if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_FLOAT)
                 return Format::R32G32B32A32_SFLOAT;
         }
         return Format::UNDEFINED;
@@ -397,7 +392,6 @@ namespace VulkanAbstractionLayer
                 const auto& indexAccessor = model.accessors[primitive.indices];
                 auto& indexBuffer = model.bufferViews[indexAccessor.bufferView];
                 const uint8_t* indexBegin = model.buffers[indexBuffer.buffer].data.data() + indexBuffer.byteOffset;
-                ArrayView<const uint16_t> indicies((const uint16_t*)indexBegin, (const uint16_t*)(indexBegin + indexBuffer.byteLength));
 
                 const auto& positionAccessor = model.accessors[primitive.attributes.at("POSITION")];
                 const auto& texCoordAccessor = model.accessors[primitive.attributes.at("TEXCOORD_0")];
@@ -415,17 +409,32 @@ namespace VulkanAbstractionLayer
                 ArrayView<const Vector2> texCoords((const Vector2*)texCoordBegin, (const Vector2*)(texCoordBegin + texCoordBuffer.byteLength));
                 ArrayView<const Vector3> normals((const Vector3*)normalBegin, (const Vector3*)(normalBegin + normalBuffer.byteLength));
 
-                auto tangentsBitangents = ComputeTangentsBitangents(indicies, positions, texCoords);
-
-                resultShape.Vertices.reserve(indicies.size());
-                for (auto& index : indicies)
+                if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
                 {
-                    auto& vertex = resultShape.Vertices.emplace_back();
-                    vertex.Position = positions[index];
-                    vertex.TexCoord = texCoords[index];
-                    vertex.Normal = normals[index];
-                    vertex.Tangent = tangentsBitangents[index].first;
-                    vertex.Bitangent = tangentsBitangents[index].second;
+                    ArrayView<const uint16_t> indices((const uint16_t*)indexBegin, (const uint16_t*)(indexBegin + indexBuffer.byteLength));
+                    resultShape.Indices.resize(indices.size());
+                    for (size_t i = 0; i < resultShape.Indices.size(); i++)
+                        resultShape.Indices[i] = (ModelData::Index)indices[i];
+                }
+                if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+                {
+                    ArrayView<const uint32_t> indices((const uint32_t*)indexBegin, (const uint32_t*)(indexBegin + indexBuffer.byteLength));
+                    resultShape.Indices.resize(indices.size());
+                    for (size_t i = 0; i < resultShape.Indices.size(); i++)
+                        resultShape.Indices[i] = (ModelData::Index)indices[i];
+                }
+
+                auto tangentsBitangents = ComputeTangentsBitangents(resultShape.Indices, positions, texCoords);
+
+                resultShape.Vertices.resize(positions.size());
+                for (size_t i = 0; i < resultShape.Vertices.size(); i++)
+                {
+                    auto& vertex = resultShape.Vertices[i];
+                    vertex.Position = positions[i];
+                    vertex.TexCoord = texCoords[i];
+                    vertex.Normal = normals[i];
+                    vertex.Tangent = tangentsBitangents[i].first;
+                    vertex.Bitangent = tangentsBitangents[i].second;
                 }
             }
         }

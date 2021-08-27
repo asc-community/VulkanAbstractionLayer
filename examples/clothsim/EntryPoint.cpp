@@ -53,6 +53,7 @@ struct SharedResources
     Image PositionImage;
     Image VelocityImage;
     Buffer BallVertexBuffer;
+    Buffer BallIndexBuffer;
     std::array<BallStorageData, BallCount> BallStorage;
     Buffer BallStorageBuffer;
 };
@@ -296,10 +297,11 @@ public:
         } pushConstants;
         pushConstants.BaseColor = Vector3{ 0.0f, 0.8f, 0.0f };
 
-        size_t vertexCount = this->sharedResources.BallVertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
+        size_t indexCount = this->sharedResources.BallIndexBuffer.GetByteSize() / sizeof(ModelData::Index);
         state.Commands.BindVertexBuffers(this->sharedResources.BallVertexBuffer);
+        state.Commands.BindIndexBufferUInt32(this->sharedResources.BallIndexBuffer);
         state.Commands.PushConstants(state.Pass, &pushConstants);
-        state.Commands.Draw(vertexCount, this->sharedResources.BallStorage.size());
+        state.Commands.DrawIndexed(indexCount, this->sharedResources.BallStorage.size());
     }
 };
 
@@ -462,6 +464,7 @@ int main()
         Image{ }, // position image
         Image{ }, // velocity image
         Buffer{ }, // ball vertex data
+        Buffer{ }, // ball index data
         { BallStorageData{ { 0.0f, 20.0f, 0.0f }, 5.0f }, BallStorageData{ { ClothSizeX, 30.0f, ClothSizeY }, 20.0f } },
         Buffer{ sizeof(BallStorageData) * BallCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
     };
@@ -499,6 +502,11 @@ int main()
         sharedResources.BallVertexBuffer,
         BufferUsage::VERTEX_BUFFER,
         MakeView(ballModel.Shapes[0].Vertices)
+    );
+    LoadBufferData(
+        sharedResources.BallIndexBuffer,
+        BufferUsage::INDEX_BUFFER,
+        MakeView(ballModel.Shapes[0].Indices)
     );
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });

@@ -103,10 +103,12 @@ namespace VulkanAbstractionLayer
         void End();
         void BeginPass(const PassNative& renderPass);
         void EndPass(const PassNative& renderPass);
-        void Draw(uint32_t vertexCount, uint32_t instanceCount) { this->Draw(vertexCount, instanceCount, 0, 0); }
+        void Draw(uint32_t vertexCount, uint32_t instanceCount);
         void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
-        void BindIndexBufferInt32(const Buffer& indexBuffer);
-        void BindIndexBufferInt16(const Buffer& indexBuffer);
+        void DrawIndexed(uint32_t indexCount, uint32_t instanceCount);
+        void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, uint32_t vertexOffset, uint32_t firstInstance);
+        void BindIndexBufferUInt32(const Buffer& indexBuffer);
+        void BindIndexBufferUInt16(const Buffer& indexBuffer);
         void SetViewport(const Viewport& viewport);
         void SetScissor(const Rect2D& scissor);
         void SetRenderArea(const Image& image);

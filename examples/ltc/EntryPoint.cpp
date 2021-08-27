@@ -45,6 +45,7 @@ struct Mesh
     struct Submesh
     {
         Buffer VertexBuffer;
+        Buffer IndexBuffer;
         uint32_t MaterialIndex;
     };
 
@@ -161,11 +162,24 @@ void LoadModelGLTF(Mesh& mesh, const std::string& filepath)
             MemoryUsage::GPU_ONLY
         );
 
-        auto allocation = stageBuffer.Submit(MakeView(shape.Vertices));
+        auto vertexAllocation = stageBuffer.Submit(MakeView(shape.Vertices));
         commandBuffer.CopyBuffer(
-            BufferInfo{ stageBuffer.GetBuffer(), allocation.Offset }, 
+            BufferInfo{ stageBuffer.GetBuffer(), vertexAllocation.Offset },
             BufferInfo{ submesh.VertexBuffer, 0 }, 
-            allocation.Size
+            vertexAllocation.Size
+        );
+
+        submesh.IndexBuffer.Init(
+            shape.Indices.size() * sizeof(ModelData::Index),
+            BufferUsage::INDEX_BUFFER | BufferUsage::TRANSFER_DESTINATION,
+            MemoryUsage::GPU_ONLY
+        );
+
+        auto indexAllocation = stageBuffer.Submit(MakeView(shape.Indices));
+        commandBuffer.CopyBuffer(
+            BufferInfo{ stageBuffer.GetBuffer(), indexAllocation.Offset },
+            BufferInfo{ submesh.IndexBuffer, 0 },
+            indexAllocation.Size
         );
 
         submesh.MaterialIndex = shape.MaterialIndex;
@@ -315,10 +329,11 @@ public:
 
         for (const auto& submesh : this->sharedResources.Sponza.Submeshes)
         {
-            size_t vertexCount = submesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
+            size_t indexCount = submesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
             state.Commands.PushConstants(state.Pass, &submesh.MaterialIndex);
             state.Commands.BindVertexBuffers(submesh.VertexBuffer);
-            state.Commands.Draw((uint32_t)vertexCount, 1);
+            state.Commands.BindIndexBufferUInt32(submesh.IndexBuffer);
+            state.Commands.DrawIndexed((uint32_t)indexCount, 1);
         }
     }
 };

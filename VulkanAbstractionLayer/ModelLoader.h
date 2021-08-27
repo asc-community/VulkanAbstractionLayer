@@ -56,10 +56,13 @@ namespace VulkanAbstractionLayer
             float RoughnessScale = 1.0f;
         };
 
+        using Index = uint32_t;
+
         struct Shape
         {
             std::string Name;
             std::vector<Vertex> Vertices;
+            std::vector<Index> Indices;
             uint32_t MaterialIndex = 0;
         };
 

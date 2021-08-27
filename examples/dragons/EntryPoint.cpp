@@ -31,6 +31,7 @@ void WindowErrorCallback(const std::string& message)
 struct Mesh
 {
     Buffer VertexBuffer;
+    Buffer IndexBuffer;
     Buffer InstanceBuffer;
 };
 
@@ -134,7 +135,7 @@ void LoadImage(Image& image, const std::string& filepath)
     stageBuffer.Reset();
 }
 
-Mesh CreateMesh(ArrayView<ModelData::Vertex> vertices, ArrayView<InstanceData> instances, ArrayView<ImageData> textures, std::vector<Image>& images)
+Mesh CreateMesh(ArrayView<ModelData::Vertex> vertices, ArrayView<ModelData::Index> indices, ArrayView<InstanceData> instances, ArrayView<ImageData> textures, std::vector<Image>& images)
 {
     Mesh result;
 
@@ -145,15 +146,22 @@ Mesh CreateMesh(ArrayView<ModelData::Vertex> vertices, ArrayView<InstanceData> i
     commandBuffer.Begin();
 
     auto instanceAllocation = stageBuffer.Submit(MakeView(instances));
+    auto indexAllocation = stageBuffer.Submit(MakeView(indices));
     auto vertexAllocation = stageBuffer.Submit(MakeView(vertices));
 
     result.InstanceBuffer.Init(instanceAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
+    result.IndexBuffer.Init(indexAllocation.Size, BufferUsage::INDEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
     result.VertexBuffer.Init(vertexAllocation.Size, BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY);
 
     commandBuffer.CopyBuffer(
         BufferInfo{ stageBuffer.GetBuffer(), instanceAllocation.Offset }, 
         BufferInfo{ result.InstanceBuffer, 0 }, 
         instanceAllocation.Size
+    );
+    commandBuffer.CopyBuffer(
+        BufferInfo{ stageBuffer.GetBuffer(), indexAllocation.Offset },
+        BufferInfo{ result.IndexBuffer, 0 },
+        indexAllocation.Size
     );
     commandBuffer.CopyBuffer(
         BufferInfo{ stageBuffer.GetBuffer(), vertexAllocation.Offset }, 
@@ -201,6 +209,9 @@ Mesh CreatePlaneMesh(std::vector<MaterialData>& globalMaterials, std::vector<Ima
         ModelData::Vertex{ { -500.0f, -500.0f, -0.01f }, { -15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
         ModelData::Vertex{ {  500.0f, -500.0f, -0.01f }, {  15.0f, -15.0f }, { 0.0f, 0.0f, 1.0f } },
     };
+    std::vector<ModelData::Index> indices = {
+        0, 1, 2, 3, 4, 5
+    };
     std::vector instances = {
         InstanceData{ { 0.0f, 0.0f, 0.0f }, (uint32_t)globalMaterials.size() },
     };
@@ -215,7 +226,7 @@ Mesh CreatePlaneMesh(std::vector<MaterialData>& globalMaterials, std::vector<Ima
     auto albedoTexture = ImageLoader::LoadImageFromFile("textures/sand_albedo.jpg");
     auto normalTexture = ImageLoader::LoadImageFromFile("textures/sand_normal.jpg");
 
-    return CreateMesh(vertices, instances, MakeView(std::array{ albedoTexture, normalTexture }), globalImages);
+    return CreateMesh(vertices, indices, instances, MakeView(std::array{ albedoTexture, normalTexture }), globalImages);
 }
 
 Mesh CreateDragonMesh(std::vector<MaterialData>& globalMaterials, std::vector<Image>& globalImages)
@@ -230,6 +241,7 @@ Mesh CreateDragonMesh(std::vector<MaterialData>& globalMaterials, std::vector<Im
 
     auto model = ModelLoader::LoadFromObj("models/dragon.obj");
     auto& vertices = model.Shapes.front().Vertices;
+    auto& indices = model.Shapes.front().Indices;
 
     std::array albedoTextures = {
         std::vector<uint8_t>{ 255, 255, 255, 255 },
@@ -283,7 +295,7 @@ Mesh CreateDragonMesh(std::vector<MaterialData>& globalMaterials, std::vector<Im
         0.5f, // roughness
     });
 
-    return CreateMesh(vertices, instances, textures, globalImages);
+    return CreateMesh(vertices, indices, instances, textures, globalImages);
 }
 
 class UniformSubmitRenderPass : public RenderPass
@@ -407,10 +419,11 @@ public:
 
         for (const auto& mesh : this->sharedResources.Meshes)
         {
-            size_t vertexCount = mesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
-            size_t instanceCount = mesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
+            size_t indexCount = mesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
+            size_t instanceCount = mesh.InstanceBuffer.GetByteSize() / sizeof(InstanceData);
             state.Commands.BindVertexBuffers(mesh.VertexBuffer, mesh.InstanceBuffer);
-            state.Commands.Draw((uint32_t)vertexCount, (uint32_t)instanceCount);
+            state.Commands.BindIndexBufferUInt32(mesh.IndexBuffer);
+            state.Commands.DrawIndexed((uint32_t)indexCount, (uint32_t)instanceCount);
         }
     }
 };
@@ -476,10 +489,11 @@ public:
 
         for (const auto& mesh : this->sharedResources.Meshes)
         {
-            size_t vertexCount = mesh.VertexBuffer.GetByteSize() / sizeof(ModelData::Vertex);
-            size_t instanceCount = mesh.InstanceBuffer.GetByteSize() / sizeof(Vector3);
+            size_t indexCount = mesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
+            size_t instanceCount = mesh.InstanceBuffer.GetByteSize() / sizeof(InstanceData);
             state.Commands.BindVertexBuffers(mesh.VertexBuffer, mesh.InstanceBuffer);
-            state.Commands.Draw((uint32_t)vertexCount, (uint32_t)instanceCount);
+            state.Commands.BindIndexBufferUInt32(mesh.IndexBuffer);
+            state.Commands.DrawIndexed((uint32_t)indexCount, (uint32_t)instanceCount);
         }
     }
 };
