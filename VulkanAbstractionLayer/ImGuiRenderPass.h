@@ -45,9 +45,9 @@ namespace VulkanAbstractionLayer
 		ImGuiRenderPass(StringId outputImageName, AttachmentState onLoad)
 			: outputImageName(outputImageName), onLoad(onLoad) { }
 
-		virtual void SetupDependencies(DependencyState state) override
+		virtual void SetupPipeline(PipelineState pipeline) override
 		{
-			state.AddAttachment(this->outputImageName, this->onLoad);
+			pipeline.AddOutputAttachment(this->outputImageName, this->onLoad);
 		}
 
 		virtual void OnRender(RenderPassState state) override

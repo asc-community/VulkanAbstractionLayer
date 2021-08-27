@@ -33,20 +33,10 @@
 #include "StringId.h"
 #include "Buffer.h"
 #include "Image.h"
-#include "CommandBuffer.h"
+#include "ArrayUtils.h"
 
 namespace VulkanAbstractionLayer
 {
-    enum class AttachmentState
-    {
-        DISCARD_COLOR = 0,
-        DISCARD_DEPTH_SPENCIL,
-        LOAD_COLOR,
-        LOAD_DEPTH_SPENCIL,
-        CLEAR_COLOR,
-        CLEAR_DEPTH_SPENCIL,
-    };
-
 	class DependencyStorage
 	{
 		struct BufferDependency
@@ -61,18 +51,8 @@ namespace VulkanAbstractionLayer
             ImageUsage::Bits Usage;
         };
 
-        struct AttachmentDependency
-        {
-            StringId Name;
-            ClearColor ColorClear;
-            ClearDepthStencil DepthSpencilClear;
-            AttachmentState OnLoad;
-        };
-
         std::vector<BufferDependency> bufferDependencies;
         std::vector<ImageDependency> imageDependencies;
-        std::vector<AttachmentDependency> attachmentDependencies;
-
     public:
         void AddBuffer(const Buffer& buffer, BufferUsage::Bits usage);
         void AddBuffers(ArrayView<BufferReference> buffers, BufferUsage::Bits usage);
@@ -82,12 +62,8 @@ namespace VulkanAbstractionLayer
         void AddImages(ArrayView<ImageReference> images, ImageUsage::Bits usage);
         void AddImages(ArrayView<Image> images, ImageUsage::Bits usage);
         void AddImages(ArrayView<StringId> images, ImageUsage::Bits usage);
-        void AddAttachment(StringId name, ClearColor clear);
-        void AddAttachment(StringId name, ClearDepthStencil clear);
-        void AddAttachment(StringId name, AttachmentState onLoad);
 
         const auto& GetBufferDependencies() const { return this->bufferDependencies; }
         const auto& GetImageDependencies() const { return this->imageDependencies; }
-        const auto& GetAttachmentDependencies() const { return this->attachmentDependencies; }
 	};
 }

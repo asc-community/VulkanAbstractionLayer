@@ -396,11 +396,8 @@ public:
         pipeline.DescriptorBindings
             .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER);
-    }
 
-    virtual void SetupDependencies(DependencyState dependencies) override
-    {
-        dependencies.AddAttachment("ShadowDepth"_id, ClearDepthStencil{ });
+        pipeline.AddOutputAttachment("ShadowDepth"_id, ClearDepthStencil{ });
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -467,12 +464,9 @@ public:
             .Bind(7, this->sharedResources.BRDFLUT, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(8, this->sharedResources.Skybox, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(9, this->sharedResources.SkyboxIrradiance, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
-    }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
-    {
-        depedencies.AddAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
-        depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
+        pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
+        pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -511,12 +505,9 @@ public:
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(8, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
-    }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
-    {
-        depedencies.AddAttachment("Output"_id, AttachmentState::LOAD_COLOR);
-        depedencies.AddAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+        pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
+        pipeline.AddOutputAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
     }
 
     virtual void OnRender(RenderPassState state) override

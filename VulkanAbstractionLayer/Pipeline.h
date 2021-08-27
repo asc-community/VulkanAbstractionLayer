@@ -31,10 +31,20 @@
 #include "Shader.h"
 #include "DescriptorBinding.h"
 #include "StringId.h"
-#include <optional>
+#include "CommandBuffer.h"
 
 namespace VulkanAbstractionLayer
 {
+    enum class AttachmentState
+    {
+        DISCARD_COLOR = 0,
+        DISCARD_DEPTH_SPENCIL,
+        LOAD_COLOR,
+        LOAD_DEPTH_SPENCIL,
+        CLEAR_COLOR,
+        CLEAR_DEPTH_SPENCIL,
+    };
+
     class Pipeline
     {
         struct BufferDeclaration
@@ -60,13 +70,26 @@ namespace VulkanAbstractionLayer
             uint32_t ImageHeight;
         };
 
+        struct OutputAttachment
+        {
+            StringId Name;
+            ClearColor ColorClear;
+            ClearDepthStencil DepthSpencilClear;
+            AttachmentState OnLoad;
+        };
+
         std::vector<BufferDeclaration> bufferDeclarations;
         std::vector<ImageDeclaration> imageDeclarations;
         std::vector<AttachmentDeclaration> attachmentDeclarations;
+        std::vector<OutputAttachment> outputAttachments;
     public:
         std::unique_ptr<Shader> Shader;
         std::vector<VertexBinding> VertexBindings;
         DescriptorBinding DescriptorBindings;
+
+        void AddOutputAttachment(StringId name, ClearColor clear);
+        void AddOutputAttachment(StringId name, ClearDepthStencil clear);
+        void AddOutputAttachment(StringId name, AttachmentState onLoad);
 
         void DeclareBuffer(const Buffer& buffer);
         void DeclareImage(const Image& image, ImageUsage::Bits oldUsage);
@@ -82,5 +105,6 @@ namespace VulkanAbstractionLayer
         const auto& GetBufferDeclarations() const { return this->bufferDeclarations; }
         const auto& GetImageDeclarations() const { return this->imageDeclarations; }
         const auto& GetAttachmentDeclarations() const { return this->attachmentDeclarations; }
+        const auto& GetOutputAttachments() const { return this->outputAttachments; }
     };
 }

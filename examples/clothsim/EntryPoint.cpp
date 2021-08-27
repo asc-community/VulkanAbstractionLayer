@@ -221,12 +221,13 @@ public:
         pipeline.DescriptorBindings
             .Bind(0, sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, sharedResources.PositionImage, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+
+        pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.3f, 0.4f, 0.7f });
+        pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
-        depedencies.AddAttachment("Output"_id, ClearColor{ 0.3f, 0.4f, 0.7f });
-        depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -279,12 +280,9 @@ public:
         pipeline.DescriptorBindings
             .Bind(0, sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, sharedResources.BallStorageBuffer, UniformType::UNIFORM_BUFFER);
-    }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
-    {
-        depedencies.AddAttachment("Output"_id, AttachmentState::LOAD_COLOR);
-        depedencies.AddAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+        pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
+        pipeline.AddOutputAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
     }
 
     virtual void OnRender(RenderPassState state) override

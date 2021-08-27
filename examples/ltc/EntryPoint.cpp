@@ -303,12 +303,9 @@ public:
             .Bind(6, this->sharedResources.LookupLTCMatrix, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(7, this->sharedResources.LookupLTCAmplitude, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(8, this->sharedResources.LightTextures, UniformType::SAMPLED_IMAGE);
-    }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
-    {
-        depedencies.AddAttachment("Output"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
-        depedencies.AddAttachment("OutputDepth"_id, ClearDepthStencil{ });
+        pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
+        pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
     }
     
     virtual void OnRender(RenderPassState state) override

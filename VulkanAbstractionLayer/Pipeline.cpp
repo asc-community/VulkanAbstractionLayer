@@ -80,11 +80,49 @@ namespace VulkanAbstractionLayer
 
 	void Pipeline::DeclareAttachment(StringId name, Format format)
 	{
-		this->attachmentDeclarations.push_back({ name, format, 0, 0 });
+		this->attachmentDeclarations.push_back(AttachmentDeclaration{ 
+			name, 
+			format, 
+			0, 0 
+		});
 	}
 
 	void Pipeline::DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height)
 	{
-		this->attachmentDeclarations.push_back({ name, format, width, height });
+		this->attachmentDeclarations.push_back(AttachmentDeclaration{ 
+			name, 
+			format, 
+			width, height 
+		});
+	}
+
+	void Pipeline::AddOutputAttachment(StringId name, ClearColor clear)
+	{
+		this->outputAttachments.push_back(OutputAttachment{ 
+			name, 
+			clear, 
+			ClearDepthStencil{ }, 
+			AttachmentState::CLEAR_COLOR 
+		});
+	}
+
+	void Pipeline::AddOutputAttachment(StringId name, ClearDepthStencil clear)
+	{
+		this->outputAttachments.push_back(OutputAttachment{ 
+			name, 
+			ClearColor{ },
+			clear, 
+			AttachmentState::CLEAR_DEPTH_SPENCIL 
+		});
+	}
+
+	void Pipeline::AddOutputAttachment(StringId name, AttachmentState onLoad)
+	{
+		this->outputAttachments.push_back(OutputAttachment{ 
+			name, 
+			ClearColor{ }, 
+			ClearDepthStencil{ }, 
+			onLoad 
+		});
 	}
 }

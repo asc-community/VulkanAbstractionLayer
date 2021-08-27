@@ -121,10 +121,10 @@ namespace VulkanAbstractionLayer
         
         PassNative BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions);
         DependencyHashMap AcquireRenderPassDependencies(const PipelineHashMap& pipelines);
-        InternalCallback CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
+        InternalCallback CreateInternalOnRenderCallback(StringId renderPassName, const Pipeline& pipeline, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
         InternalCallback CreateOnCreatePipelineCallback(const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
         PresentCallback CreateOnPresentCallback(StringId outputName, const ResourceTransitions& transitions);
-        ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies);
+        ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies, const PipelineHashMap& pipelines);
         AttachmentHashMap AllocateAttachments(const PipelineHashMap& pipelines, const ResourceTransitions& transitions, const DependencyHashMap& dependencies);
         void ResolveDescriptorSets(StringId renderPassName, const PassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments);
         void SetupOutputImage(ResourceTransitions& transitions, StringId outputImage);

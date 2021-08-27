@@ -333,9 +333,9 @@ namespace VulkanAbstractionLayer
         return InternalCallback{ std::move(callback) };
     }
 
-    RenderGraphBuilder::InternalCallback RenderGraphBuilder::CreateInternalOnRenderCallback(StringId renderPassName, const DependencyStorage& dependencies, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments)
+    RenderGraphBuilder::InternalCallback RenderGraphBuilder::CreateInternalOnRenderCallback(StringId renderPassName, const Pipeline& pipeline, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments)
     {
-        auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
+        auto& renderPassAttachments = pipeline.GetOutputAttachments();
         auto& bufferTransitions = resourceTransitions.BufferTransitions.at(renderPassName);
         auto& imageTransitions = resourceTransitions.ImageTransitions.at(renderPassName);
 
@@ -628,7 +628,7 @@ namespace VulkanAbstractionLayer
         renderPassReference.Pass->SetupDependencies(dependencies);
 
         auto& pass = pipelines.at(renderPassReference.Name);
-        auto& renderPassAttachments = dependencies.GetAttachmentDependencies();
+        auto& renderPassAttachments = pass.GetOutputAttachments();
         auto& attachmentTransitions = resourceTransitions.ImageTransitions.at(renderPassReference.Name);
 
         // should render pass be created?
@@ -772,7 +772,7 @@ namespace VulkanAbstractionLayer
         return dependencies;
     }
 
-    RenderGraphBuilder::ResourceTransitions RenderGraphBuilder::ResolveResourceTransitions(const DependencyHashMap& dependencies)
+    RenderGraphBuilder::ResourceTransitions RenderGraphBuilder::ResolveResourceTransitions(const DependencyHashMap& dependencies, const PipelineHashMap& pipelines)
     {
         ResourceTransitions resourceTransitions;
         std::unordered_map<VkBuffer, BufferUsage::Bits> lastBufferUsages;
@@ -781,6 +781,7 @@ namespace VulkanAbstractionLayer
         for (const auto& renderPassReference : this->renderPassReferences)
         {
             auto& renderPassDependencies = dependencies.at(renderPassReference.Name);
+            auto& renderPassAttachments = pipelines.at(renderPassReference.Name).GetOutputAttachments();
             auto& bufferTransitions = resourceTransitions.BufferTransitions[renderPassReference.Name];
             auto& imageTransitions = resourceTransitions.ImageTransitions[renderPassReference.Name];
 
@@ -814,7 +815,7 @@ namespace VulkanAbstractionLayer
                 resourceTransitions.LastImageUsages[imageDependency.ImageNativeHandle] = renderPassReference.Name;
             }
 
-            for (const auto& attachmentDependency : renderPassDependencies.GetAttachmentDependencies())
+            for (const auto& attachmentDependency : renderPassAttachments)
             {
                 auto attachmentNativeHandle = AttachmentNameToImageHandle(attachmentDependency.Name);
                 auto attachmentDependencyUsage = AttachmentStateToImageUsage(attachmentDependency.OnLoad);
@@ -978,7 +979,7 @@ namespace VulkanAbstractionLayer
     {
         PipelineHashMap pipelines = this->CreatePipelines();
         DependencyHashMap dependencies = this->AcquireRenderPassDependencies(pipelines);
-        ResourceTransitions resourceTransitions = this->ResolveResourceTransitions(dependencies);
+        ResourceTransitions resourceTransitions = this->ResolveResourceTransitions(dependencies, pipelines);
         if (this->outputName != StringId{ }) this->SetupOutputImage(resourceTransitions, this->outputName);
         AttachmentHashMap attachments = this->AllocateAttachments(pipelines, resourceTransitions, dependencies);
 
@@ -993,7 +994,7 @@ namespace VulkanAbstractionLayer
                 renderPassReference.Name,
                 std::move(renderPass),
                 std::move(renderPassReference.Pass),
-                this->CreateInternalOnRenderCallback(renderPassReference.Name, dependencies.at(renderPassReference.Name), resourceTransitions, attachments),
+                this->CreateInternalOnRenderCallback(renderPassReference.Name, pipelines.at(renderPassReference.Name), resourceTransitions, attachments),
                 std::move(pipelines.at(renderPassReference.Name).DescriptorBindings)
             });
         }
