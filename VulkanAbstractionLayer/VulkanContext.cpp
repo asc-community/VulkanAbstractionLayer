@@ -155,6 +155,7 @@ namespace VulkanAbstractionLayer
         if ((bool)this->swapchain) this->device.destroySwapchainKHR(this->swapchain);
         if ((bool)this->imageAvailableSemaphore) this->device.destroySemaphore(this->imageAvailableSemaphore);
         if ((bool)this->renderingFinishedSemaphore) this->device.destroySemaphore(this->renderingFinishedSemaphore);
+        if ((bool)this->immediateFence) this->device.destroyFence(this->immediateFence);
         if ((bool)this->device) this->device.destroy();
         if ((bool)this->surface) this->instance.destroySurfaceKHR(this->surface);
         if ((bool)this->instance) this->instance.destroy();
@@ -286,6 +287,7 @@ namespace VulkanAbstractionLayer
 
         this->imageAvailableSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
         this->renderingFinishedSemaphore = this->device.createSemaphore(vk::SemaphoreCreateInfo{ });
+        this->immediateFence = this->device.createFence(vk::FenceCreateInfo{ });
 
         vk::CommandPoolCreateInfo commandPoolCreateInfo;
         commandPoolCreateInfo
@@ -393,8 +395,10 @@ namespace VulkanAbstractionLayer
     {
         vk::SubmitInfo submitInfo;
         submitInfo.setCommandBuffers(commands.GetNativeHandle());
-        this->GetGraphicsQueue().submit(submitInfo);
-        this->GetDevice().waitIdle();
+        this->GetGraphicsQueue().submit(submitInfo, this->immediateFence);
+        auto waitResult = this->device.waitForFences(this->immediateFence, false, UINT64_MAX);
+        assert(waitResult == vk::Result::eSuccess);
+        this->device.resetFences(this->immediateFence);
     }
 
     void VulkanContext::EndFrame()

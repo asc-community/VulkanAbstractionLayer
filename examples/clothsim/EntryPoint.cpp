@@ -192,13 +192,13 @@ public:
     }
 };
 
-class ClothRenderPass : public RenderPass
+class OpaqueRenderPass : public RenderPass
 {
     SharedResources& sharedResources;
     Sampler textureSampler;
 public:
 
-    ClothRenderPass(SharedResources& sharedResources)
+    OpaqueRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
         this->textureSampler.Init(
@@ -311,7 +311,7 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
     renderGraphBuilder
         .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
         .AddRenderPass("ComputePass"_id, std::make_unique<ComputeRenderPass>(resources))
-        .AddRenderPass("ClothPass"_id, std::make_unique<ClothRenderPass>(resources))
+        .AddRenderPass("ClothPass"_id, std::make_unique<OpaqueRenderPass>(resources))
         .AddRenderPass("BallPass"_id, std::make_unique<BallRenderPass>(resources))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .SetOptions(options)
@@ -495,7 +495,7 @@ int main()
         MakeView(velocities)
     );
 
-    auto ballModel = ModelLoader::LoadFromObj("sphere.obj");
+    auto ballModel = ModelLoader::LoadFromObj("../models/sphere/sphere.obj");
     for (auto& vertex : ballModel.Shapes[0].Vertices)
         vertex.Position = Normalize(vertex.Position);
     LoadBufferData(

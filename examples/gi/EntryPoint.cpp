@@ -29,7 +29,6 @@ void WindowErrorCallback(const std::string& message)
     std::cerr << "[ERROR Window]: " << message << std::endl;
 }
 
-constexpr size_t MaxLightCount = 4;
 constexpr size_t MaxMaterialCount = 256;
 
 struct Mesh
@@ -65,15 +64,10 @@ struct ModelUniformData
     Matrix3x4 Matrix;
 };
 
-struct LightUniformData
+struct ReflectionProbe
 {
-    Matrix3x4 Rotation;
     Vector3 Position;
-    float Width;
-    Vector3 Color;
-    float Height;
-    uint32_t TextureIndex;
-    uint32_t Padding[3];
+    Image Cubemap;
 };
 
 struct SharedResources
@@ -81,14 +75,14 @@ struct SharedResources
     Buffer CameraUniformBuffer;
     Buffer ModelUniformBuffer;
     Buffer MaterialUniformBuffer;
-    Buffer LightUniformBuffer;
     Mesh Sponza;
-    Image LookupLTCMatrix;
-    Image LookupLTCAmplitude;
-    std::vector<Image> LightTextures;
+    Mesh Sphere;
     CameraUniformData CameraUniform;
     ModelUniformData ModelUniform;
-    std::array<LightUniformData, MaxLightCount> LightUniformArray;
+    std::vector<ReflectionProbe> ReflectionProbes;
+    Image Skybox;
+    Image SkyboxIrradiance;
+    Image BRDFLUT;
 };
 
 void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imageData, ImageOptions::Value options)
@@ -144,9 +138,46 @@ void LoadImage(Image& image, const std::string& filepath, ImageOptions::Value op
     stageBuffer.Reset();
 }
 
-void LoadModelGLTF(Mesh& mesh, const std::string& filepath)
+void LoadCubemap(Image& image, const std::string& filepath)
 {
-    auto model = ModelLoader::LoadFromGltf(filepath);
+    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
+    auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
+
+    commandBuffer.Begin();
+
+    auto cubemapData = ImageLoader::LoadCubemapImageFromFile(filepath);
+    image.Init(
+        cubemapData.FaceWidth,
+        cubemapData.FaceHeight,
+        cubemapData.FaceFormat,
+        ImageUsage::TRANSFER_DISTINATION | ImageUsage::TRANSFER_SOURCE | ImageUsage::SHADER_READ,
+        MemoryUsage::GPU_ONLY,
+        ImageOptions::CUBEMAP | ImageOptions::MIPMAPS
+    );
+
+    for (uint32_t layer = 0; layer < cubemapData.Faces.size(); layer++)
+    {
+        const auto& face = cubemapData.Faces[layer];
+        auto textureAllocation = stageBuffer.Submit(face.data(), face.size());
+
+        commandBuffer.CopyBufferToImage(
+            BufferInfo{ stageBuffer.GetBuffer(), textureAllocation.Offset },
+            ImageInfo{ image, ImageUsage::UNKNOWN, 0, layer }
+        );
+    }
+
+    commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
+
+    stageBuffer.Flush();
+    commandBuffer.End();
+
+    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
+    stageBuffer.Reset();
+}
+
+void LoadModel(Mesh& mesh, const std::string& filepath)
+{
+    auto model = ModelLoader::Load(filepath);
    
     auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
     auto& stageBuffer = GetCurrentVulkanContext().GetCurrentStageBuffer();
@@ -225,7 +256,6 @@ public:
     {
         pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer);
     }
 
@@ -233,7 +263,6 @@ public:
     {
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,   BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.LightUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
     }
 
@@ -262,7 +291,6 @@ public:
 
         FillUniform(this->sharedResources.CameraUniform, this->sharedResources.CameraUniformBuffer);
         FillUniform(this->sharedResources.ModelUniform, this->sharedResources.ModelUniformBuffer);
-        FillUniformArray(this->sharedResources.LightUniformArray, this->sharedResources.LightUniformBuffer);
         FillUniformArray(this->sharedResources.Sponza.Materials, this->sharedResources.MaterialUniformBuffer);
     }
 };
@@ -303,20 +331,19 @@ public:
         pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.LookupLTCMatrix, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.LookupLTCAmplitude, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImages(this->sharedResources.LightTextures, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.BRDFLUT, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.SkyboxIrradiance, ImageUsage::TRANSFER_DISTINATION);
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(2, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(3, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
-            .Bind(5, this->TextureSampler, UniformType::SAMPLER)
-            .Bind(6, this->sharedResources.LookupLTCMatrix, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(7, this->sharedResources.LookupLTCAmplitude, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(8, this->sharedResources.LightTextures, UniformType::SAMPLED_IMAGE);
+            .Bind(3, this->textureArray, UniformType::SAMPLED_IMAGE)
+            .Bind(4, this->TextureSampler, UniformType::SAMPLER)
+            .Bind(5, this->sharedResources.BRDFLUT, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(6, this->sharedResources.Skybox, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(7, this->sharedResources.SkyboxIrradiance, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
         pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
         pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
@@ -338,12 +365,119 @@ public:
     }
 };
 
+class ReflectionProbeRenderPass : public RenderPass
+{
+    SharedResources& sharedResources;
+    std::vector<ImageReference> reflectionProbes;
+    Sampler textureSampler;
+public:
+    ReflectionProbeRenderPass(SharedResources& sharedResources)
+        : sharedResources(sharedResources)
+    {
+        this->textureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
+        for (const auto& probe : this->sharedResources.ReflectionProbes)
+            reflectionProbes.push_back(std::ref(probe.Cubemap));
+    }
+
+    virtual void SetupPipeline(PipelineState pipeline) override
+    {
+        pipeline.Shader = std::make_unique<GraphicShader>(
+            ShaderLoader::LoadFromSourceFile("reflection_probe_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSourceFile("reflection_probe_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
+        );
+
+        pipeline.VertexBindings = {
+            VertexBinding{
+                VertexBinding::Rate::PER_VERTEX,
+                VertexBinding::BindingRangeAll
+            }
+        };
+
+        pipeline.DeclareImages(this->reflectionProbes, ImageUsage::TRANSFER_DISTINATION);
+
+        pipeline.DescriptorBindings
+            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, this->reflectionProbes, UniformType::SAMPLED_IMAGE)
+            .Bind(2, this->textureSampler, UniformType::SAMPLER);
+
+        pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
+        pipeline.AddOutputAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+    }
+
+    virtual void OnRender(RenderPassState state) override
+    {
+        auto& output = state.GetAttachment("Output"_id);
+        state.Commands.SetRenderArea(output);
+
+        struct
+        {
+            Vector3 Position;
+            float Size;
+            uint32_t ProbeIndex;
+        } pushConstants;
+
+        uint32_t probeIndex = 0;
+        for (const auto& probe : this->sharedResources.ReflectionProbes)
+        {
+            const auto& sphereMesh = this->sharedResources.Sphere.Submeshes[0];
+            size_t indexCount = sphereMesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
+
+            pushConstants.Position = probe.Position;
+            pushConstants.Size = 10.0f;
+            pushConstants.ProbeIndex = probeIndex++;
+
+            state.Commands.PushConstants(state.Pass, &pushConstants);
+            state.Commands.BindVertexBuffers(sphereMesh.VertexBuffer);
+            state.Commands.BindIndexBufferUInt32(sphereMesh.IndexBuffer);
+            state.Commands.DrawIndexed((uint32_t)indexCount, 1);
+        }
+    }
+};
+
+class SkyboxRenderPass : public RenderPass
+{
+    SharedResources& sharedResources;
+    Sampler skyboxSampler;
+public:
+    SkyboxRenderPass(SharedResources& sharedResources)
+        : sharedResources(sharedResources)
+    {
+        this->skyboxSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::CLAMP_TO_EDGE, Sampler::MipFilter::LINEAR);
+    }
+
+    virtual void SetupPipeline(PipelineState pipeline) override
+    {
+        pipeline.Shader = std::make_unique<GraphicShader>(
+            ShaderLoader::LoadFromSourceFile("skybox_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSourceFile("skybox_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
+        );
+
+        pipeline.DescriptorBindings
+            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(8, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+
+        pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
+        pipeline.AddOutputAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+    }
+
+    virtual void OnRender(RenderPassState state) override
+    {
+        auto& output = state.GetAttachment("Output"_id);
+        state.Commands.SetRenderArea(output);
+
+        constexpr uint32_t SkyboxVertexCount = 36;
+        state.Commands.Draw(SkyboxVertexCount, 1);
+    }
+};
+
 auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value options)
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
         .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
         .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("ReflectionProbePass"_id, std::make_unique<ReflectionProbeRenderPass>(resources))
+        .AddRenderPass("SkyboxPass"_id, std::make_unique<SkyboxRenderPass>(resources))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .SetOptions(options)
         .SetOutputName("Output"_id);
@@ -359,8 +493,8 @@ struct Camera
     float MovementSpeed = 250.0f;
     float RotationMovementSpeed = 2.5f;
     float AspectRatio = 16.0f / 9.0f;
-    float ZNear = 0.1f;
-    float ZFar = 5000.0f;
+    float ZNear = 0.5f;
+    float ZFar = 100000.0f;
 
     void Rotate(const Vector2& delta)
     {
@@ -438,53 +572,33 @@ int main()
         Buffer{ sizeof(CameraUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(ModelUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(Mesh::Material) * MaxMaterialCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(LightUniformData) * MaxLightCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // sponza
-        { }, // ltc matrix lookup
-        { }, // ltc amplitude lookup
+        { }, // sphere
+        { }, // camera uniform
+        { }, // model uniform
+        { }, // reflection probes
+        { }, // skybox
+        { }, // skybox irradiance
+        { }, // brdf lut
     };
 
-    LoadModelGLTF(sharedResources.Sponza, "../models/Sponza/glTF/Sponza.gltf");
+    auto& testProbe = sharedResources.ReflectionProbes.emplace_back();
+    testProbe.Position = Vector3{ -50.0f, 150.0f, 200.0f };
+    LoadCubemap(testProbe.Cubemap, "../textures/skybox.png");
+
+    LoadModel(sharedResources.Sphere, "../models/sphere/sphere.obj");
+    LoadModel(sharedResources.Sponza, "../models/Sponza/glTF/Sponza.gltf");
+
+    LoadCubemap(sharedResources.Skybox, "../textures/skybox.png");
+    LoadCubemap(sharedResources.SkyboxIrradiance, "../textures/skybox_irradiance.png");
+    LoadImage(sharedResources.BRDFLUT, "../textures/brdf_lut.dds", ImageOptions::DEFAULT);
+
     Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
-    LoadImage(sharedResources.LookupLTCMatrix, "../textures/ltc_matrix.dds", ImageOptions::DEFAULT);
-    LoadImage(sharedResources.LookupLTCAmplitude, "../textures/ltc_amplitude.dds", ImageOptions::DEFAULT);
-    LoadImage(sharedResources.LightTextures.emplace_back(), "../textures/white_filtered.dds", ImageOptions::MIPMAPS);
-    LoadImage(sharedResources.LightTextures.emplace_back(), "../textures/stained_glass_filtered.dds", ImageOptions::MIPMAPS);
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 
     Camera camera;
     Vector3 modelRotation{ 0.0f, HalfPi, 0.0f };
-
-    auto& lightArray = sharedResources.LightUniformArray;
-
-    lightArray[0].Color = Vector3{ 1.0f, 1.0f, 1.0f };
-    lightArray[0].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
-    lightArray[0].Position = Vector3{ -400.0f, 200.0f, 0.0f };
-    lightArray[0].Height = 300.0f;
-    lightArray[0].Width = 50.0f;
-    lightArray[0].TextureIndex = 0;
-
-    lightArray[1].Color = Vector3{ 1.0f, 0.0f, 0.0f };
-    lightArray[1].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
-    lightArray[1].Position = Vector3{ -45.0f, 200.0f, 1100.0f };
-    lightArray[1].Height = 200.0f;
-    lightArray[1].Width = 200.0f;
-    lightArray[1].TextureIndex = 0;
-
-    lightArray[2].Color = Vector3{ 0.0f, 0.0f, 1.0f };
-    lightArray[2].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
-    lightArray[2].Position = Vector3{ -45.0f, 200.0f, 1000.0f };
-    lightArray[2].Height = 200.0f;
-    lightArray[2].Width = 200.0f;
-    lightArray[2].TextureIndex = 0;
-
-    lightArray[3].Color = Vector3{ 1.0f, 1.0f, 1.0f };
-    lightArray[3].Rotation = MakeRotationMatrix(Vector3{ 0.0f, 0.0f, 0.0f });
-    lightArray[3].Position = Vector3{ -45.0f, 200.0f, -1000.0f };
-    lightArray[3].Height = 300.0f;
-    lightArray[3].Width = 300.0f;
-    lightArray[3].TextureIndex = 1;
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
@@ -528,21 +642,21 @@ int main()
 
             auto mouseMovement = ImGui::GetMouseDragDelta(MouseButton::RIGHT, 0.0f);
             ImGui::ResetMouseDragDelta(MouseButton::RIGHT);
-            camera.Rotate(Vector2{ -mouseMovement.x, -mouseMovement.y } * dt);
+            camera.Rotate(Vector2{ -mouseMovement.x, -mouseMovement.y } *dt);
 
             Vector3 movementDirection{ 0.0f };
             if (ImGui::IsKeyDown(KeyCode::W))
-                movementDirection += Vector3{  1.0f,  0.0f,  0.0f };
+                movementDirection += Vector3{ 1.0f,  0.0f,  0.0f };
             if (ImGui::IsKeyDown(KeyCode::A))
-                movementDirection += Vector3{  0.0f,  0.0f, -1.0f };
+                movementDirection += Vector3{ 0.0f,  0.0f, -1.0f };
             if (ImGui::IsKeyDown(KeyCode::S))
                 movementDirection += Vector3{ -1.0f,  0.0f,  0.0f };
             if (ImGui::IsKeyDown(KeyCode::D))
-                movementDirection += Vector3{  0.0f,  0.0f,  1.0f };
+                movementDirection += Vector3{ 0.0f,  0.0f,  1.0f };
             if (ImGui::IsKeyDown(KeyCode::SPACE))
-                movementDirection += Vector3{  0.0f,  1.0f,  0.0f };
+                movementDirection += Vector3{ 0.0f,  1.0f,  0.0f };
             if (ImGui::IsKeyDown(KeyCode::LEFT_SHIFT))
-                movementDirection += Vector3{  0.0f, -1.0f,  0.0f };
+                movementDirection += Vector3{ 0.0f, -1.0f,  0.0f };
             if (movementDirection != Vector3{ 0.0f }) movementDirection = Normalize(movementDirection);
             camera.Move(movementDirection * dt);
 
@@ -563,29 +677,6 @@ int main()
             ImGui::End();
 
             sharedResources.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
-
-            int lightIndex = 0;
-            ImGui::Begin("Lights");
-
-            for (auto& lightUniform : sharedResources.LightUniformArray)
-            {
-                ImGui::PushID(lightIndex++);
-                if (ImGui::TreeNode(("light_" + std::to_string(lightIndex)).c_str()))
-                {
-                    auto rotation = MakeRotationAngles((Matrix4x4)lightUniform.Rotation);
-
-                    ImGui::ColorEdit3("color", &lightUniform.Color[0], ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float);
-                    ImGui::DragFloat3("rotation", &rotation[0], 0.01f);
-                    ImGui::DragFloat3("position", &lightUniform.Position[0]);
-                    ImGui::DragFloat("width", &lightUniform.Width);
-                    ImGui::DragFloat("height", &lightUniform.Height);
-                    ImGui::TreePop();
-
-                    lightUniform.Rotation = MakeRotationMatrix(rotation);
-                }
-                ImGui::PopID();
-            }
-            ImGui::End();
 
             ImGui::Begin("Performace");
             ImGui::Text("FPS: %f", ImGui::GetIO().Framerate);
@@ -619,6 +710,19 @@ int main()
                 ImGui::Separator();
                 ImGui::PopID();
             }
+            ImGui::End();
+
+            int reflectionProbeIndex = 0;
+            ImGui::Begin("Reflection probes");
+            ImGui::PushID(reflectionProbeIndex++);
+
+            for (auto& probe : sharedResources.ReflectionProbes)
+            {
+                ImGui::DragFloat3("position", &probe.Position[0]);
+            }
+
+            ImGui::Separator();
+            ImGui::PopID();
             ImGui::End();
 
             renderGraph->Execute(Vulkan.GetCurrentCommandBuffer());

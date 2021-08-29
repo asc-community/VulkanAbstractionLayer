@@ -358,8 +358,11 @@ namespace VulkanAbstractionLayer
     {
         int width = 0, height = 0, channels = 0;
         const uint32_t actualChannels = 4;
+
         stbi_set_flip_vertically_on_load(true);
         uint8_t* data = stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+        stbi_set_flip_vertically_on_load(false);
+
         std::vector<uint8_t> vecData;
         vecData.resize(width * height * actualChannels * sizeof(uint8_t));
         std::copy(data, data + vecData.size(), vecData.begin());
@@ -373,7 +376,7 @@ namespace VulkanAbstractionLayer
 
         for (size_t i = 0; i < faceHeight; i++)
         {
-            size_t y = i + sliceY * faceHeight;
+            size_t y = (faceHeight - i - 1) + sliceY * faceHeight;
             size_t x = sliceX * faceWidth;
             size_t bytesInRow = faceWidth * channelCount;
 
@@ -394,8 +397,8 @@ namespace VulkanAbstractionLayer
 
         cubemapData.Faces[0] = ExtractCubemapFace(image, cubemapData.FaceWidth, cubemapData.FaceHeight, ChannelCount, 2, 1);
         cubemapData.Faces[1] = ExtractCubemapFace(image, cubemapData.FaceWidth, cubemapData.FaceHeight, ChannelCount, 0, 1);
-        cubemapData.Faces[2] = ExtractCubemapFace(image, cubemapData.FaceWidth, cubemapData.FaceHeight, ChannelCount, 1, 0);
-        cubemapData.Faces[3] = ExtractCubemapFace(image, cubemapData.FaceWidth, cubemapData.FaceHeight, ChannelCount, 1, 2);
+        cubemapData.Faces[2] = ExtractCubemapFace(image, cubemapData.FaceWidth, cubemapData.FaceHeight, ChannelCount, 1, 2);
+        cubemapData.Faces[3] = ExtractCubemapFace(image, cubemapData.FaceWidth, cubemapData.FaceHeight, ChannelCount, 1, 0);
         cubemapData.Faces[4] = ExtractCubemapFace(image, cubemapData.FaceWidth, cubemapData.FaceHeight, ChannelCount, 1, 1);
         cubemapData.Faces[5] = ExtractCubemapFace(image, cubemapData.FaceWidth, cubemapData.FaceHeight, ChannelCount, 3, 1);
         return cubemapData;

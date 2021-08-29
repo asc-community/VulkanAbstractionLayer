@@ -90,6 +90,7 @@ namespace VulkanAbstractionLayer
         vk::Queue deviceQueue;
         vk::Semaphore imageAvailableSemaphore;
         vk::Semaphore renderingFinishedSemaphore;
+        vk::Fence immediateFence;
         vk::CommandPool commandPool;
         vk::SwapchainKHR swapchain;
         VmaAllocator allocator = { };

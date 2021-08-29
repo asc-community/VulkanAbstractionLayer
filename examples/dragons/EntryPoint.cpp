@@ -223,8 +223,8 @@ Mesh CreatePlaneMesh(std::vector<MaterialData>& globalMaterials, std::vector<Ima
         0.9f, // roughness
     });
 
-    auto albedoTexture = ImageLoader::LoadImageFromFile("textures/sand_albedo.jpg");
-    auto normalTexture = ImageLoader::LoadImageFromFile("textures/sand_normal.jpg");
+    auto albedoTexture = ImageLoader::LoadImageFromFile("../textures/sand_albedo.jpg");
+    auto normalTexture = ImageLoader::LoadImageFromFile("../textures/sand_normal.jpg");
 
     return CreateMesh(vertices, indices, instances, MakeView(std::array{ albedoTexture, normalTexture }), globalImages);
 }
@@ -239,7 +239,7 @@ Mesh CreateDragonMesh(std::vector<MaterialData>& globalMaterials, std::vector<Im
         InstanceData{ { 0.0f, 0.0f,  40.0f }, (uint32_t)globalMaterials.size() + 4 },
     };
 
-    auto model = ModelLoader::LoadFromObj("models/dragon.obj");
+    auto model = ModelLoader::LoadFromObj("../models/dragon/dragon.obj");
     auto& vertices = model.Shapes.front().Vertices;
     auto& indices = model.Shapes.front().Indices;
 
@@ -428,13 +428,13 @@ public:
     }
 };
 
-class ClothRenderPass : public RenderPass
+class OpaqueRenderPass : public RenderPass
 {    
     SharedResources& sharedResources;
     Sampler textureSampler;
     Sampler depthSampler;
 public:
-    ClothRenderPass(SharedResources& sharedResources)
+    OpaqueRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
         this->textureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
@@ -540,7 +540,7 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
     renderGraphBuilder
         .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
         .AddRenderPass("ShadowPass"_id, std::make_unique<ShadowRenderPass>(resources))
-        .AddRenderPass("OpaquePass"_id, std::make_unique<ClothRenderPass>(resources))
+        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
         .AddRenderPass("SkyboxPass"_id, std::make_unique<SkyboxRenderPass>(resources))
         .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
         .SetOptions(options)
@@ -645,9 +645,9 @@ int main()
         Image{ }, // skybox irradiance
     };
 
-    LoadImage(sharedResources.BRDFLUT, "textures/brdf_lut.dds");
-    LoadCubemap(sharedResources.Skybox, "textures/skybox.png");
-    LoadCubemap(sharedResources.SkyboxIrradiance, "textures/skybox_irradiance.png");
+    LoadImage(sharedResources.BRDFLUT, "../textures/brdf_lut.dds");
+    LoadCubemap(sharedResources.Skybox, "../textures/skybox.png");
+    LoadCubemap(sharedResources.SkyboxIrradiance, "../textures/skybox_irradiance.png");
 
     sharedResources.Meshes.push_back(CreatePlaneMesh(sharedResources.Materials, sharedResources.Textures));
     sharedResources.Meshes.push_back(CreateDragonMesh(sharedResources.Materials, sharedResources.Textures));

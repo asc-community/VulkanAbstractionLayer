@@ -75,5 +75,6 @@ namespace VulkanAbstractionLayer
     public:
         static ModelData LoadFromObj(const std::string& filepath);
         static ModelData LoadFromGltf(const std::string& filepath);
+        static ModelData Load(const std::string& filepath);
     };
 }

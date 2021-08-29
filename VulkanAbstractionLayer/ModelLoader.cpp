@@ -441,4 +441,26 @@ namespace VulkanAbstractionLayer
 
         return result;
     }
+
+    static bool IsGLTFModel(const std::string& filepath)
+    {
+        std::filesystem::path filename{ filepath };
+        return filename.extension() == ".gltf";
+    }
+
+    static bool IsObjModel(const std::string& filepath)
+    {
+        std::filesystem::path filename{ filepath };
+        return filename.extension() == ".obj";
+    }
+
+    ModelData ModelLoader::Load(const std::string& filepath)
+    {
+        if (IsGLTFModel(filepath))
+            return ModelLoader::LoadFromGltf(filepath);
+        if (IsObjModel(filepath))
+            return ModelLoader::LoadFromObj(filepath);
+        assert(false); // unknown model format
+        return ModelData{ };
+    }
 }
