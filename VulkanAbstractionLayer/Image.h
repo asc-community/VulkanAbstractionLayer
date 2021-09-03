@@ -62,10 +62,8 @@ namespace VulkanAbstractionLayer
     enum class ImageView
     {
         NATIVE = 0,
-        DEPTH_SPENCIL = 0,
-        CUBEMAP,
-        DEPTH,
-        STENCIL,
+        DEPTH_ONLY,
+        STENCIL_ONLY,
     };
 
     struct ImageOptions
@@ -90,13 +88,13 @@ namespace VulkanAbstractionLayer
         struct ImageViews
         {
             vk::ImageView NativeView;
-            vk::ImageView CubemapView;
             vk::ImageView DepthOnlyView;
             vk::ImageView StencilOnlyView;
         };
 
         vk::Image handle;
-        ImageViews imageViews;
+        ImageViews defaultImageViews;
+        std::vector<ImageViews> cubemapImageViews;
         vk::Extent2D extent = { 0u, 0u };
         uint32_t mipLevelCount = 1;
         uint32_t layerCount = 1;
@@ -116,6 +114,7 @@ namespace VulkanAbstractionLayer
         void Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, ImageOptions::Value mipmapping);
 
         vk::ImageView GetNativeView(ImageView view) const;
+        vk::ImageView GetNativeView(ImageView view, uint32_t layer) const;
         uint32_t GetMipLevelWidth(uint32_t mipLevel) const;
         uint32_t GetMipLevelHeight(uint32_t mipLevel) const;
 
@@ -130,6 +129,9 @@ namespace VulkanAbstractionLayer
     vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image);
     vk::ImageSubresourceLayers GetDefaultImageSubresourceLayers(const Image& image, uint32_t mipLevel, uint32_t layer);
     vk::ImageSubresourceRange GetDefaultImageSubresourceRange(const Image& image);
+
+    uint32_t CalculateImageMipLevelCount(ImageOptions::Value options, uint32_t width, uint32_t height);
+    uint32_t CalculateImageLayerCount(ImageOptions::Value options);
 
     using ImageReference = std::reference_wrapper<const Image>;
 }

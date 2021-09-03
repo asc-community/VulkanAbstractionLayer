@@ -254,15 +254,20 @@ namespace VulkanAbstractionLayer
         auto deviceExtensions = options.DeviceExtensions;
         deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
         deviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+        deviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
 
         vk::PhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures;
         descriptorIndexingFeatures.descriptorBindingPartiallyBound = true;
+
+        vk::PhysicalDeviceMultiviewFeatures multiviewFeatures;
+        multiviewFeatures.multiview = true;
+        multiviewFeatures.pNext = &descriptorIndexingFeatures;
 
         vk::DeviceCreateInfo deviceCreateInfo;
         deviceCreateInfo
             .setQueueCreateInfos(deviceQueueCreateInfo)
             .setPEnabledExtensionNames(deviceExtensions)
-            .setPNext(&descriptorIndexingFeatures);
+            .setPNext(&multiviewFeatures);
 
         this->device = this->physicalDevice.createDevice(deviceCreateInfo);
         this->deviceQueue = this->device.getQueue(this->queueFamilyIndex, 0);

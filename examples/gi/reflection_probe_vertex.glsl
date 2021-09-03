@@ -22,13 +22,15 @@ layout(set = 0, binding = 0) uniform uCameraBuffer
 
 layout(push_constant) uniform uProbeContant
 {
-    vec4 uProbePosition_ProbeSize;
+    vec3 uProbePosition;
+    float uProbeSize;
     uint uProbeCubemapIndex;
 };
 
+
 void main() 
 {
-    vPosition = uProbePosition_ProbeSize.w * iPosition + uProbePosition_ProbeSize.xyz;
+    vPosition = uProbeSize * iPosition + uProbePosition;
     gl_Position = uViewProjection * vec4(vPosition, 1.0);
     vNormal = iNormal;
 }

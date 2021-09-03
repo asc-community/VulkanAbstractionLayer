@@ -15,7 +15,8 @@ layout(set = 0, binding = 1) uniform textureCube uProbeArray[256];
 
 layout(push_constant) uniform uProbeContant
 {
-    vec4 uProbePosition_ProbeSize;
+    vec3 uProbePosition;
+    float uProbeSize;
     uint uProbeCubemapIndex;
 };
 

@@ -659,7 +659,10 @@ namespace VulkanAbstractionLayer
                     .setFinalLayout(ImageUsageToImageLayout(attachmentTransition.FinalUsage));
 
                 attachmentDescriptions.push_back(std::move(attachmentDescription));
-                attachmentViews.push_back(imageReference.GetNativeView(ImageView::NATIVE));
+                if (attachment.Layer == Pipeline::OutputAttachment::ALL_LAYERS)
+                    attachmentViews.push_back(imageReference.GetNativeView(ImageView::NATIVE));
+                else
+                    attachmentViews.push_back(imageReference.GetNativeView(ImageView::NATIVE, attachment.Layer));
 
                 vk::AttachmentReference attachmentReference;
                 attachmentReference
@@ -717,6 +720,23 @@ namespace VulkanAbstractionLayer
                 .setAttachments(attachmentDescriptions)
                 .setSubpasses(subpassDescription)
                 .setDependencies(subpassDependencies);
+
+            vk::RenderPassMultiviewCreateInfo renderPassMultiViewCreateInfo;
+            if (!renderPassAttachments.empty())
+            {
+                auto& layeredAttachment = renderPassAttachments.front();
+                uint32_t layerCount = attachments.at(layeredAttachment.Name).GetLayerCount();
+
+                if (layerCount > 1 && layeredAttachment.Layer == Pipeline::OutputAttachment::ALL_LAYERS)
+                {
+                    uint32_t viewMask = (1u << layerCount) - 1; // bits of mask: for example 0b0...011 for 2 views
+                    renderPassMultiViewCreateInfo
+                        .setSubpassCount(1)
+                        .setViewMasks(viewMask)
+                        .setCorrelationMasks(viewMask);
+                    renderPassCreateInfo.setPNext(&renderPassMultiViewCreateInfo);
+                }
+            }
             passNative.RenderPassHandle = GetCurrentVulkanContext().GetDevice().createRenderPass(renderPassCreateInfo);
 
             vk::FramebufferCreateInfo framebufferCreateInfo;
@@ -863,12 +883,12 @@ namespace VulkanAbstractionLayer
                 auto attachmentUsage = transitions.TotalImageUsages.at(AttachmentNameToImageHandle(attachment.Name));
 
                 attachments.emplace(attachment.Name, Image(
-                    attachment.ImageWidth == 0 ? surfaceWidth : attachment.ImageWidth,
-                    attachment.ImageHeight == 0 ? surfaceHeight : attachment.ImageHeight,
+                    attachment.Width == 0 ? surfaceWidth : attachment.Width,
+                    attachment.Height == 0 ? surfaceHeight : attachment.Height,
                     attachment.ImageFormat,
                     attachmentUsage,
                     MemoryUsage::GPU_ONLY,
-                    ImageOptions::DEFAULT
+                    attachment.Options
                 ));
             }
         }
@@ -936,8 +956,8 @@ namespace VulkanAbstractionLayer
             this->externalImages[attachmentNativeHandle] = ExternalImage{ 
                 ImageUsage::UNKNOWN, 
                 attachmentDeclaration.ImageFormat, 
-                1, // mip level count
-                1, // layer count
+                CalculateImageMipLevelCount(attachmentDeclaration.Options, attachmentDeclaration.Width, attachmentDeclaration.Height),
+                CalculateImageLayerCount(attachmentDeclaration.Options),
             };
         }
     }

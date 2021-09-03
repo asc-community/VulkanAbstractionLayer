@@ -253,7 +253,7 @@ namespace VulkanAbstractionLayer
         shader.setEnvInput(ShaderLanguageTable[(size_t)language], ShaderTypeTable[(size_t)type], glslang::EShClient::EShClientVulkan, 460);
         shader.setEnvClient(glslang::EShClient::EShClientVulkan, (glslang::EShTargetClientVersion)GetCurrentVulkanContext().GetAPIVersion());
         shader.setEnvTarget(glslang::EShTargetLanguage::EShTargetSpv, glslang::EShTargetLanguageVersion::EShTargetSpv_1_5);
-        bool isParsed = shader.parse(&ResourceLimits, 100, false, EShMessages::EShMsgDefault);
+        bool isParsed = shader.parse(&ResourceLimits, 460, false, EShMessages::EShMsgDefault);
         if (!isParsed) return ShaderData{ };
 
         glslang::TProgram program;

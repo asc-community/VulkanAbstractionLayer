@@ -10,8 +10,8 @@ struct Material
 {
     uint AlbedoTextureIndex;
     uint NormalTextureIndex;
-    float MetallicFactor;
-    float RoughnessFactor;
+    uint MetallicRoughnessTextureIndex;
+    float RoughnessScale;
 };
 
 struct Fragment
@@ -22,26 +22,21 @@ struct Fragment
     float Roughness;
 };
 
-layout(set = 0, binding = 0) uniform uCameraBuffer
-{
-    mat4 uViewProjection;
-    vec3 uCameraPosition;
-};
-
-layout(set = 0, binding = 2) uniform uMaterialBuffer
+layout(set = 0, binding = 3) uniform uMaterialBuffer
 {
     Material uMaterials[256];
 };
 
-layout(set = 0, binding = 3) uniform texture2D uTextures[4096];
-layout(set = 0, binding = 4) uniform sampler uImageSampler;
+layout(set = 0, binding = 4) uniform texture2D uTextures[4096];
+layout(set = 0, binding = 5) uniform sampler uImageSampler;
 
-layout(set = 0, binding = 5) uniform sampler2D uBRDFLUT;
-layout(set = 0, binding = 6) uniform samplerCube uSkybox;
-layout(set = 0, binding = 7) uniform samplerCube uSkyboxIrradiance;
+layout(set = 0, binding = 6) uniform sampler2D uBRDFLUT;
+layout(set = 0, binding = 7) uniform samplerCube uSkybox;
+layout(set = 0, binding = 8) uniform samplerCube uSkyboxIrradiance;
 
-layout(push_constant) uniform uMaterialConstant
+layout(push_constant) uniform uPushConstant
 {
+    vec3 uCameraPosition;
     uint uMaterialIndex;
 };
 
@@ -167,8 +162,9 @@ vec3 calculateIBL(Fragment fragment, vec3 viewDirection, samplerCube env, sample
 void main() 
 {
     Material material = uMaterials[uMaterialIndex];
-    vec4 albedoColor = texture(sampler2D(uTextures[material.AlbedoTextureIndex], uImageSampler), vTexCoord);
-    vec4 normalColor = texture(sampler2D(uTextures[material.NormalTextureIndex], uImageSampler), vTexCoord);
+    vec4 albedoColor   = texture(sampler2D(uTextures[material.AlbedoTextureIndex], uImageSampler), vTexCoord);
+    vec4 normalColor   = texture(sampler2D(uTextures[material.NormalTextureIndex], uImageSampler), vTexCoord);
+    vec4 metallicRoughnessColor = texture(sampler2D(uTextures[material.MetallicRoughnessTextureIndex], uImageSampler), vTexCoord);
     
     if(albedoColor.a < 0.5)
         discard;
@@ -178,8 +174,8 @@ void main()
     Fragment fragment;
     fragment.Albedo = pow(albedoColor.rgb, vec3(GAMMA));
     fragment.Normal = vNormalMatrix * vec3(2.0 * normalColor.rgb - 1.0);
-    fragment.Metallic = material.MetallicFactor;
-    fragment.Roughness = material.RoughnessFactor;
+    fragment.Metallic = 1.0 - metallicRoughnessColor.b;
+    fragment.Roughness = material.RoughnessScale * metallicRoughnessColor.g;
 
     vec3 color = calculateIBL(fragment, viewDirection, uSkybox, uSkyboxIrradiance, uBRDFLUT);
     oColor = vec4(pow(color, vec3(1.0 / GAMMA)), 1.0);

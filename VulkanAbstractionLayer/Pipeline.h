@@ -47,6 +47,7 @@ namespace VulkanAbstractionLayer
 
     class Pipeline
     {
+    public:
         struct BufferDeclaration
         {
             VkBuffer BufferNativeHandle;
@@ -66,30 +67,39 @@ namespace VulkanAbstractionLayer
         {
             StringId Name;
             Format ImageFormat;
-            uint32_t ImageWidth;
-            uint32_t ImageHeight;
+            uint32_t Width;
+            uint32_t Height;
+            ImageOptions::Value Options;
         };
 
         struct OutputAttachment
         {
+            constexpr static uint32_t ALL_LAYERS = uint32_t(-1);
+
             StringId Name;
             ClearColor ColorClear;
             ClearDepthStencil DepthSpencilClear;
             AttachmentState OnLoad;
+            uint32_t Layer;
         };
 
+    private:
         std::vector<BufferDeclaration> bufferDeclarations;
         std::vector<ImageDeclaration> imageDeclarations;
         std::vector<AttachmentDeclaration> attachmentDeclarations;
         std::vector<OutputAttachment> outputAttachments;
+
     public:
-        std::unique_ptr<Shader> Shader;
+        std::shared_ptr<Shader> Shader;
         std::vector<VertexBinding> VertexBindings;
         DescriptorBinding DescriptorBindings;
 
         void AddOutputAttachment(StringId name, ClearColor clear);
         void AddOutputAttachment(StringId name, ClearDepthStencil clear);
         void AddOutputAttachment(StringId name, AttachmentState onLoad);
+        void AddOutputAttachment(StringId name, ClearColor clear, uint32_t layer);
+        void AddOutputAttachment(StringId name, ClearDepthStencil clear, uint32_t layer);
+        void AddOutputAttachment(StringId name, AttachmentState onLoad, uint32_t layer);
 
         void DeclareBuffer(const Buffer& buffer);
         void DeclareImage(const Image& image, ImageUsage::Bits oldUsage);
@@ -101,6 +111,7 @@ namespace VulkanAbstractionLayer
 
         void DeclareAttachment(StringId name, Format format);
         void DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height);
+        void DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height, ImageOptions::Value options);
 
         const auto& GetBufferDeclarations() const { return this->bufferDeclarations; }
         const auto& GetImageDeclarations() const { return this->imageDeclarations; }

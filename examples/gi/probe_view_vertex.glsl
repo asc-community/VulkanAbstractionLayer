@@ -1,5 +1,7 @@
 #version 460
 
+#extension GL_EXT_multiview : enable
+
 layout(location = 0) in vec3 iPosition;
 layout(location = 1) in vec2 iTexCoord;
 layout(location = 2) in vec3 iNormal;
@@ -40,7 +42,7 @@ layout(set = 0, binding = 2) uniform uModelBuffer
 void main() 
 {
     vPosition = uModel * iPosition;
-    gl_Position = uViewProjection * vec4(vPosition, 1.0);
+    gl_Position = uProbeMatrices[gl_ViewIndex] * vec4(vPosition, 1.0);
     vTexCoord = iTexCoord;
     vNormalMatrix = uModel * mat3(iTangent, iBitangent, iNormal);
 }

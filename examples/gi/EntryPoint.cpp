@@ -70,19 +70,80 @@ struct ReflectionProbe
     Image Cubemap;
 };
 
+struct ReflectionProbeUniformData
+{
+    std::array<Matrix4x4, 6> Matrices;
+};
+
+struct Camera
+{
+    Vector3 Position{ 40.0f, 200.0f, -90.0f };
+    Vector2 Rotation{ Pi, 0.0f };
+    float Fov = 65.0f;
+    float MovementSpeed = 250.0f;
+    float RotationMovementSpeed = 2.5f;
+    float AspectRatio = 16.0f / 9.0f;
+    float ZNear = 0.5f;
+    float ZFar = 100000.0f;
+
+    void Rotate(const Vector2& delta)
+    {
+        this->Rotation += this->RotationMovementSpeed * delta;
+
+        constexpr float MaxAngleY = HalfPi - 0.001f;
+        constexpr float MaxAngleX = TwoPi;
+        this->Rotation.y = std::clamp(this->Rotation.y, -MaxAngleY, MaxAngleY);
+        this->Rotation.x = std::fmod(this->Rotation.x, MaxAngleX);
+    }
+
+    void Move(const Vector3& direction)
+    {
+        Matrix3x3 view{
+            std::sin(Rotation.x), 0.0f, std::cos(Rotation.x), // forward
+            0.0f, 1.0f, 0.0f, // up
+            std::sin(Rotation.x - HalfPi), 0.0f, std::cos(Rotation.x - HalfPi) // right
+        };
+
+        this->Position += this->MovementSpeed * (view * direction);
+    }
+
+    Matrix4x4 GetViewMatrix() const
+    {
+        Vector3 direction{
+            std::cos(this->Rotation.y) * std::sin(this->Rotation.x),
+            std::sin(this->Rotation.y),
+            std::cos(this->Rotation.y) * std::cos(this->Rotation.x)
+        };
+        return MakeLookAtMatrix(this->Position, direction, Vector3{0.0f, 1.0f, 0.0f});
+    }
+
+    Matrix4x4 GetProjectionMatrix() const
+    {
+        return MakePerspectiveMatrix(ToRadians(this->Fov), this->AspectRatio, this->ZNear, this->ZFar);
+    }
+
+    Matrix4x4 GetMatrix()
+    {
+        return this->GetProjectionMatrix() * this->GetViewMatrix();
+    }
+};
+
 struct SharedResources
 {
     Buffer CameraUniformBuffer;
     Buffer ModelUniformBuffer;
     Buffer MaterialUniformBuffer;
+    Buffer ReflectionProbeUniformBuffer;
     Mesh Sponza;
     Mesh Sphere;
     CameraUniformData CameraUniform;
     ModelUniformData ModelUniform;
+    ReflectionProbeUniformData ReflectionProbeUniform;
     std::vector<ReflectionProbe> ReflectionProbes;
     Image Skybox;
     Image SkyboxIrradiance;
     Image BRDFLUT;
+    std::shared_ptr<Shader> MainShader;
 };
 
 void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imageData, ImageOptions::Value options)
@@ -230,8 +291,7 @@ void LoadModel(Mesh& mesh, const std::string& filepath)
         LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.NormalTexture, ImageOptions::MIPMAPS);
         LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.MetallicRoughness, ImageOptions::MIPMAPS);
 
-        constexpr float AppliedRoughnessScale = 0.5f;
-        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, AppliedRoughnessScale * material.RoughnessScale });
+        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, material.RoughnessScale });
         textureIndex += 3;
 
         stageBuffer.Flush();
@@ -257,13 +317,15 @@ public:
         pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer);
+        pipeline.DeclareBuffer(this->sharedResources.ReflectionProbeUniformBuffer);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,   BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,          BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer,           BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer,        BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.ReflectionProbeUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -292,6 +354,88 @@ public:
         FillUniform(this->sharedResources.CameraUniform, this->sharedResources.CameraUniformBuffer);
         FillUniform(this->sharedResources.ModelUniform, this->sharedResources.ModelUniformBuffer);
         FillUniformArray(this->sharedResources.Sponza.Materials, this->sharedResources.MaterialUniformBuffer);
+        FillUniform(this->sharedResources.ReflectionProbeUniform, this->sharedResources.ReflectionProbeUniformBuffer);
+    }
+};
+
+class ReflectionCalculateRenderPass : public RenderPass
+{
+    SharedResources& sharedResources;
+    std::vector<ImageReference> textureArray;
+    Sampler TextureSampler;
+public:
+
+    ReflectionCalculateRenderPass(SharedResources& sharedResources)
+        : sharedResources(sharedResources)
+    {
+        this->TextureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
+
+        for (const auto& texture : this->sharedResources.Sponza.Textures)
+        {
+            this->textureArray.push_back(std::ref(texture));
+        }
+    }
+
+    virtual void SetupPipeline(PipelineState pipeline) override
+    {
+        pipeline.Shader = std::make_unique<GraphicShader>(
+            ShaderLoader::LoadFromSourceFile("probe_view_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSourceFile("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
+        );
+
+        pipeline.VertexBindings = {
+            VertexBinding{
+                VertexBinding::Rate::PER_VERTEX,
+                VertexBinding::BindingRangeAll
+            }
+        };
+
+        constexpr uint32_t probeResolution = 1024;
+        pipeline.DeclareAttachment("OutputProbe"_id, Format::R8G8B8A8_UNORM, probeResolution, probeResolution, ImageOptions::CUBEMAP);
+        pipeline.DeclareAttachment("OutputProbeDepth"_id, Format::D32_SFLOAT_S8_UINT, probeResolution, probeResolution, ImageOptions::CUBEMAP);
+
+        pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.BRDFLUT, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.DeclareImage(this->sharedResources.SkyboxIrradiance, ImageUsage::TRANSFER_DISTINATION);
+
+        pipeline.DescriptorBindings
+            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(2, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
+            .Bind(5, this->TextureSampler, UniformType::SAMPLER)
+            .Bind(6, this->sharedResources.BRDFLUT, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(7, this->sharedResources.Skybox, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(8, this->sharedResources.SkyboxIrradiance, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+
+        pipeline.AddOutputAttachment("OutputProbe"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
+        pipeline.AddOutputAttachment("OutputProbeDepth"_id, ClearDepthStencil{ });
+    }
+
+    virtual void OnRender(RenderPassState state) override
+    {
+        auto& output = state.GetAttachment("OutputProbe"_id);
+        state.Commands.SetRenderArea(output);
+
+        struct
+        {
+            Vector3 CameraPosition;
+            uint32_t MaterialIndex;
+        } pushConstants;
+
+        for (const auto& submesh : this->sharedResources.Sponza.Submeshes)
+        {
+            pushConstants.CameraPosition = sharedResources.ReflectionProbes[0].Position;
+            pushConstants.MaterialIndex = submesh.MaterialIndex;
+
+            size_t indexCount = submesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
+            state.Commands.PushConstants(state.Pass, &pushConstants);
+            state.Commands.BindVertexBuffers(submesh.VertexBuffer);
+            state.Commands.BindIndexBufferUInt32(submesh.IndexBuffer);
+            state.Commands.DrawIndexed((uint32_t)indexCount, 1);
+        }
     }
 };
 
@@ -315,10 +459,7 @@ public:
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.Shader = std::make_unique<GraphicShader>(
-            ShaderLoader::LoadFromSourceFile("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
-            ShaderLoader::LoadFromSourceFile("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
-        );
+        pipeline.Shader = this->sharedResources.MainShader;
 
         pipeline.VertexBindings = {
             VertexBinding{
@@ -330,20 +471,16 @@ public:
         pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
         pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
 
-        pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.BRDFLUT, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.SkyboxIrradiance, ImageUsage::TRANSFER_DISTINATION);
-
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(3, this->textureArray, UniformType::SAMPLED_IMAGE)
-            .Bind(4, this->TextureSampler, UniformType::SAMPLER)
-            .Bind(5, this->sharedResources.BRDFLUT, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(6, this->sharedResources.Skybox, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(7, this->sharedResources.SkyboxIrradiance, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(1, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(2, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
+            .Bind(5, this->TextureSampler, UniformType::SAMPLER)
+            .Bind(6, this->sharedResources.BRDFLUT, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(7, this->sharedResources.Skybox, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(8, this->sharedResources.SkyboxIrradiance, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
         pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
         pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
@@ -354,10 +491,19 @@ public:
         auto& output = state.GetAttachment("Output"_id);
         state.Commands.SetRenderArea(output);
 
+        struct
+        {
+            Vector3 CameraPosition;
+            uint32_t MaterialIndex;
+        } pushConstants;
+
         for (const auto& submesh : this->sharedResources.Sponza.Submeshes)
         {
+            pushConstants.CameraPosition = sharedResources.CameraUniform.Position;
+            pushConstants.MaterialIndex = submesh.MaterialIndex;
+
             size_t indexCount = submesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
-            state.Commands.PushConstants(state.Pass, &submesh.MaterialIndex);
+            state.Commands.PushConstants(state.Pass, &pushConstants);
             state.Commands.BindVertexBuffers(submesh.VertexBuffer);
             state.Commands.BindIndexBufferUInt32(submesh.IndexBuffer);
             state.Commands.DrawIndexed((uint32_t)indexCount, 1);
@@ -397,7 +543,7 @@ public:
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->reflectionProbes, UniformType::SAMPLED_IMAGE)
+            .Bind(1, "OutputProbe"_id, UniformType::SAMPLED_IMAGE, ImageView::NATIVE)
             .Bind(2, this->textureSampler, UniformType::SAMPLER);
 
         pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
@@ -423,7 +569,7 @@ public:
             size_t indexCount = sphereMesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
 
             pushConstants.Position = probe.Position;
-            pushConstants.Size = 10.0f;
+            pushConstants.Size = 20.0f;
             pushConstants.ProbeIndex = probeIndex++;
 
             state.Commands.PushConstants(state.Pass, &pushConstants);
@@ -475,6 +621,7 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
         .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
+        .AddRenderPass("ReflectionCalculatePass"_id, std::make_unique<ReflectionCalculateRenderPass>(resources))
         .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
         .AddRenderPass("ReflectionProbePass"_id, std::make_unique<ReflectionProbeRenderPass>(resources))
         .AddRenderPass("SkyboxPass"_id, std::make_unique<SkyboxRenderPass>(resources))
@@ -485,58 +632,27 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
     return renderGraphBuilder.Build();
 }
 
-struct Camera
+Matrix4x4 GetReflectionProbeMatrix(const Vector3& position, uint32_t layer)
 {
-    Vector3 Position{ 40.0f, 200.0f, -90.0f };
-    Vector2 Rotation{ Pi, 0.0f };
-    float Fov = 65.0f;
-    float MovementSpeed = 250.0f;
-    float RotationMovementSpeed = 2.5f;
-    float AspectRatio = 16.0f / 9.0f;
-    float ZNear = 0.5f;
-    float ZFar = 100000.0f;
+    Camera camera;
+    camera.Position = position;
+    camera.AspectRatio = 1.0f;
+    camera.Fov = 90.0f;
+    if (layer == 0)
+        camera.Rotation = { HalfPi, 0.0f };
+    if (layer == 1)
+        camera.Rotation = { -HalfPi, 0.0f };
+    if (layer == 2)
+        camera.Rotation = { Pi, HalfPi - 0.001f };
+    if (layer == 3)
+        camera.Rotation = { Pi, -HalfPi + 0.001f };
+    if (layer == 4)
+        camera.Rotation = { Pi, 0.0f };
+    if (layer == 5)
+        camera.Rotation = { 0.0f, 0.0f };
 
-    void Rotate(const Vector2& delta)
-    {
-        this->Rotation += this->RotationMovementSpeed * delta;
-
-        constexpr float MaxAngleY = HalfPi - 0.001f;
-        constexpr float MaxAngleX = TwoPi;
-        this->Rotation.y = std::clamp(this->Rotation.y, -MaxAngleY, MaxAngleY);
-        this->Rotation.x = std::fmod(this->Rotation.x, MaxAngleX);
-    }
-    
-    void Move(const Vector3& direction)
-    {
-        Matrix3x3 view{
-            std::sin(Rotation.x), 0.0f, std::cos(Rotation.x), // forward
-            0.0f, 1.0f, 0.0f, // up
-            std::sin(Rotation.x - HalfPi), 0.0f, std::cos(Rotation.x - HalfPi) // right
-        };
-
-        this->Position += this->MovementSpeed * (view * direction);
-    }
-    
-    Matrix4x4 GetViewMatrix() const
-    {
-        Vector3 direction{
-            std::cos(this->Rotation.y) * std::sin(this->Rotation.x),
-            std::sin(this->Rotation.y),
-            std::cos(this->Rotation.y) * std::cos(this->Rotation.x)
-        };
-        return MakeLookAtMatrix(this->Position, direction, Vector3{0.0f, 1.0f, 0.0f});
-    }
-
-    Matrix4x4 GetProjectionMatrix() const
-    {
-        return MakePerspectiveMatrix(ToRadians(this->Fov), this->AspectRatio, this->ZNear, this->ZFar);
-    }
-
-    Matrix4x4 GetMatrix()
-    {
-        return this->GetProjectionMatrix() * this->GetViewMatrix();
-    }
-};
+    return camera.GetMatrix();
+}
 
 int main()
 {
@@ -572,14 +688,20 @@ int main()
         Buffer{ sizeof(CameraUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(ModelUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(Mesh::Material) * MaxMaterialCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(ReflectionProbeUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // sponza
         { }, // sphere
         { }, // camera uniform
         { }, // model uniform
+        { }, // reflection probe uniform
         { }, // reflection probes
         { }, // skybox
         { }, // skybox irradiance
         { }, // brdf lut
+        std::make_shared<GraphicShader>(
+            ShaderLoader::LoadFromSourceFile("main_vertex.glsl", ShaderType::VERTEX, ShaderLanguage::GLSL),
+            ShaderLoader::LoadFromSourceFile("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
+        ),
     };
 
     auto& testProbe = sharedResources.ReflectionProbes.emplace_back();
@@ -719,6 +841,11 @@ int main()
             for (auto& probe : sharedResources.ReflectionProbes)
             {
                 ImGui::DragFloat3("position", &probe.Position[0]);
+
+                for (size_t i = 0; i < sharedResources.ReflectionProbeUniform.Matrices.size(); i++)
+                {
+                    sharedResources.ReflectionProbeUniform.Matrices[i] = GetReflectionProbeMatrix(probe.Position, i);
+                }
             }
 
             ImGui::Separator();

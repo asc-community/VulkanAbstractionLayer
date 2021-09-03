@@ -177,6 +177,22 @@ namespace VulkanAbstractionLayer
         };
     }
 
+    uint32_t CalculateImageMipLevelCount(ImageOptions::Value options, uint32_t width, uint32_t height)
+    {
+        if (options & ImageOptions::MIPMAPS)
+            return (uint32_t)std::floor(std::log2(std::max(width, height))) + 1;
+        else
+            return 1;
+    }
+
+    uint32_t CalculateImageLayerCount(ImageOptions::Value options)
+    {
+        if (options & ImageOptions::CUBEMAP)
+            return 6;
+        else
+            return 1;
+    }
+
     void Image::Destroy()
     {
         if ((bool)this->handle)
@@ -186,15 +202,27 @@ namespace VulkanAbstractionLayer
                 DeallocateImage(this->handle, this->allocation);
             }
 
-            GetCurrentVulkanContext().GetDevice().destroyImageView(this->imageViews.NativeView);
-            if ((bool)this->imageViews.DepthOnlyView) 
-                GetCurrentVulkanContext().GetDevice().destroyImageView(this->imageViews.DepthOnlyView);
-            if ((bool)this->imageViews.StencilOnlyView)
-                GetCurrentVulkanContext().GetDevice().destroyImageView(this->imageViews.StencilOnlyView);
+            GetCurrentVulkanContext().GetDevice().destroyImageView(this->defaultImageViews.NativeView);
+            if ((bool)this->defaultImageViews.DepthOnlyView)
+                GetCurrentVulkanContext().GetDevice().destroyImageView(this->defaultImageViews.DepthOnlyView);
+            if ((bool)this->defaultImageViews.StencilOnlyView)
+                GetCurrentVulkanContext().GetDevice().destroyImageView(this->defaultImageViews.StencilOnlyView);
+
+            for (auto& imageViewLayer : this->cubemapImageViews)
+            {
+                GetCurrentVulkanContext().GetDevice().destroyImageView(imageViewLayer.NativeView);
+                if ((bool)imageViewLayer.DepthOnlyView)
+                    GetCurrentVulkanContext().GetDevice().destroyImageView(imageViewLayer.DepthOnlyView);
+                if ((bool)imageViewLayer.StencilOnlyView)
+                    GetCurrentVulkanContext().GetDevice().destroyImageView(imageViewLayer.StencilOnlyView);
+            }
 
             this->handle = vk::Image{ };
-            this->imageViews = { };
+            this->defaultImageViews = { };
+            this->cubemapImageViews.clear();
             this->extent = vk::Extent2D{ 0u, 0u };
+            this->mipLevelCount = 1;
+            this->layerCount = 1;
         }
     }
 
@@ -219,22 +247,64 @@ namespace VulkanAbstractionLayer
             })
             .setSubresourceRange(subresourceRange);
 
-        this->imageViews.NativeView = Vulkan.GetDevice().createImageView(imageViewCreateInfo);
+        auto nativeSubresourceRange = GetDefaultImageSubresourceRange(*this);
+        imageViewCreateInfo.setSubresourceRange(nativeSubresourceRange);
+        this->defaultImageViews.NativeView = Vulkan.GetDevice().createImageView(imageViewCreateInfo);
 
         auto depthSubresourceRange = GetDefaultImageSubresourceRange(*this);
-        depthSubresourceRange.aspectMask &= vk::ImageAspectFlagBits::eDepth;
+        depthSubresourceRange.setAspectMask(depthSubresourceRange.aspectMask & vk::ImageAspectFlagBits::eDepth);
         if (depthSubresourceRange.aspectMask != vk::ImageAspectFlags{ })
         {
             imageViewCreateInfo.setSubresourceRange(depthSubresourceRange);
-            this->imageViews.DepthOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+            this->defaultImageViews.DepthOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
         }
 
         auto stencilSubresourceRange = GetDefaultImageSubresourceRange(*this);
-        stencilSubresourceRange.aspectMask &= vk::ImageAspectFlagBits::eStencil;
+        stencilSubresourceRange.setAspectMask(stencilSubresourceRange.aspectMask & vk::ImageAspectFlagBits::eStencil);
         if (stencilSubresourceRange.aspectMask != vk::ImageAspectFlags{ })
         {
             imageViewCreateInfo.setSubresourceRange(stencilSubresourceRange);
-            this->imageViews.StencilOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+            this->defaultImageViews.StencilOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+        }
+
+        if (this->layerCount > 1)
+        {
+            this->cubemapImageViews.resize(this->layerCount);
+            imageViewCreateInfo.setViewType(vk::ImageViewType::e2D);
+        }
+        uint32_t layer = 0;
+        for (auto& imageViewLayer : this->cubemapImageViews)
+        {
+            auto nativeSubresourceRange = GetDefaultImageSubresourceRange(*this);
+            nativeSubresourceRange
+                .setBaseArrayLayer(layer)
+                .setLayerCount(VK_REMAINING_ARRAY_LAYERS);
+            imageViewCreateInfo.setSubresourceRange(nativeSubresourceRange);
+            imageViewLayer.NativeView = Vulkan.GetDevice().createImageView(imageViewCreateInfo);
+
+            auto depthSubresourceRange = GetDefaultImageSubresourceRange(*this);
+            depthSubresourceRange
+                .setAspectMask(depthSubresourceRange.aspectMask & vk::ImageAspectFlagBits::eDepth)
+                .setBaseArrayLayer(layer)
+                .setLayerCount(VK_REMAINING_ARRAY_LAYERS);
+            if (depthSubresourceRange.aspectMask != vk::ImageAspectFlags{ })
+            {
+                imageViewCreateInfo.setSubresourceRange(depthSubresourceRange);
+                imageViewLayer.DepthOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+            }
+
+            auto stencilSubresourceRange = GetDefaultImageSubresourceRange(*this);
+            stencilSubresourceRange
+                .setAspectMask(stencilSubresourceRange.aspectMask & vk::ImageAspectFlagBits::eStencil)
+                .setBaseArrayLayer(layer)
+                .setLayerCount(VK_REMAINING_ARRAY_LAYERS);
+            if (stencilSubresourceRange.aspectMask != vk::ImageAspectFlags{ })
+            {
+                imageViewCreateInfo.setSubresourceRange(stencilSubresourceRange);
+                imageViewLayer.StencilOnlyView = GetCurrentVulkanContext().GetDevice().createImageView(imageViewCreateInfo);
+            }
+
+            layer++;
         }
     }
 
@@ -253,18 +323,22 @@ namespace VulkanAbstractionLayer
     Image::Image(Image&& other) noexcept
     {
         this->handle = other.handle;
-        this->imageViews = other.imageViews;
+        this->defaultImageViews = other.defaultImageViews;
+        this->cubemapImageViews = std::move(other.cubemapImageViews);
         this->extent = other.extent;
         this->format = other.format;
         this->allocation = other.allocation;
         this->mipLevelCount = other.mipLevelCount;
+        this->layerCount = other.layerCount;
 
         other.handle = vk::Image{ };
-        other.imageViews = { };
+        other.defaultImageViews = { };
+        other.cubemapImageViews.clear();
         other.extent = vk::Extent2D{ 0u, 0u };
         other.format = Format::UNDEFINED;
         other.allocation = { };
         other.mipLevelCount = 1;
+        other.layerCount = 1;
     }
 
     Image& Image::operator=(Image&& other) noexcept
@@ -272,18 +346,22 @@ namespace VulkanAbstractionLayer
         this->Destroy();
 
         this->handle = other.handle;
-        this->imageViews = other.imageViews;
+        this->defaultImageViews = other.defaultImageViews;
+        this->cubemapImageViews = std::move(other.cubemapImageViews);
         this->extent = other.extent;
         this->format = other.format;
         this->allocation = other.allocation;
         this->mipLevelCount = other.mipLevelCount;
+        this->layerCount = other.layerCount;
 
         other.handle = vk::Image{ };
-        other.imageViews = { };
+        other.defaultImageViews = { };
+        other.cubemapImageViews.clear();
         other.extent = vk::Extent2D{ 0u, 0u };
         other.format = Format::UNDEFINED;
         other.allocation = { };
         other.mipLevelCount = 1;
+        other.layerCount = 1;
 
         return *this;
     }
@@ -295,15 +373,8 @@ namespace VulkanAbstractionLayer
 
     void Image::Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, ImageOptions::Value options)
     {
-        if (options & ImageOptions::MIPMAPS)
-            this->mipLevelCount = (uint32_t)std::floor(std::log2(std::max(width, height))) + 1;
-        else
-            this->mipLevelCount = 1;
-
-        if (options & ImageOptions::CUBEMAP)
-            this->layerCount = 6;
-        else
-            this->layerCount = 1;
+        this->mipLevelCount = CalculateImageMipLevelCount(options, width, height);
+        this->layerCount = CalculateImageLayerCount(options);
 
         vk::ImageCreateInfo imageCreateInfo;
         imageCreateInfo
@@ -331,14 +402,33 @@ namespace VulkanAbstractionLayer
         switch (view)
         {
         case VulkanAbstractionLayer::ImageView::NATIVE:
-            return this->imageViews.NativeView;
-        case VulkanAbstractionLayer::ImageView::DEPTH:
-            return this->imageViews.DepthOnlyView;
-        case VulkanAbstractionLayer::ImageView::STENCIL:
-            return this->imageViews.StencilOnlyView;
+            return this->defaultImageViews.NativeView;
+        case VulkanAbstractionLayer::ImageView::DEPTH_ONLY:
+            return this->defaultImageViews.DepthOnlyView;
+        case VulkanAbstractionLayer::ImageView::STENCIL_ONLY:
+            return this->defaultImageViews.StencilOnlyView;
         default:
             assert(false);
-            return this->imageViews.NativeView;
+            return this->defaultImageViews.NativeView;
+        }
+    }
+
+    vk::ImageView Image::GetNativeView(ImageView view, uint32_t layer) const
+    {
+        if (this->layerCount == 1)
+            return this->GetNativeView(view);
+
+        switch (view)
+        {
+        case VulkanAbstractionLayer::ImageView::NATIVE:
+            return this->cubemapImageViews[layer].NativeView;
+        case VulkanAbstractionLayer::ImageView::DEPTH_ONLY:
+            return this->cubemapImageViews[layer].DepthOnlyView;
+        case VulkanAbstractionLayer::ImageView::STENCIL_ONLY:
+            return this->cubemapImageViews[layer].StencilOnlyView;
+        default:
+            assert(false);
+            return this->cubemapImageViews[layer].NativeView;
         }
     }
 

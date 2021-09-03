@@ -473,7 +473,7 @@ public:
             .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureSampler, UniformType::SAMPLER)
             .Bind(5, this->sharedResources.Textures, UniformType::SAMPLED_IMAGE)
-            .Bind(6, "ShadowDepth"_id, this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH)
+            .Bind(6, "ShadowDepth"_id, this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH_ONLY)
             .Bind(7, this->sharedResources.BRDFLUT, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(8, this->sharedResources.Skybox, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(9, this->sharedResources.SkyboxIrradiance, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);

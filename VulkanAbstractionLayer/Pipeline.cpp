@@ -80,49 +80,70 @@ namespace VulkanAbstractionLayer
 
 	void Pipeline::DeclareAttachment(StringId name, Format format)
 	{
-		this->attachmentDeclarations.push_back(AttachmentDeclaration{ 
-			name, 
-			format, 
-			0, 0 
-		});
+		this->DeclareAttachment(name, format, 0, 0, ImageOptions::DEFAULT);
 	}
 
 	void Pipeline::DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height)
 	{
-		this->attachmentDeclarations.push_back(AttachmentDeclaration{ 
-			name, 
-			format, 
-			width, height 
+		this->DeclareAttachment(name, format, width, height, ImageOptions::DEFAULT);
+	}
+
+	void Pipeline::DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height, ImageOptions::Value options)
+	{
+		this->attachmentDeclarations.push_back(AttachmentDeclaration{
+			name,
+			format,
+			width, 
+			height,
+			options
 		});
 	}
 
 	void Pipeline::AddOutputAttachment(StringId name, ClearColor clear)
 	{
-		this->outputAttachments.push_back(OutputAttachment{ 
-			name, 
-			clear, 
-			ClearDepthStencil{ }, 
-			AttachmentState::CLEAR_COLOR 
-		});
+		this->AddOutputAttachment(name, clear, OutputAttachment::ALL_LAYERS);
 	}
 
 	void Pipeline::AddOutputAttachment(StringId name, ClearDepthStencil clear)
+	{
+		this->AddOutputAttachment(name, clear, OutputAttachment::ALL_LAYERS);
+	}
+
+	void Pipeline::AddOutputAttachment(StringId name, AttachmentState onLoad)
+	{
+		this->AddOutputAttachment(name, onLoad, OutputAttachment::ALL_LAYERS);
+	}
+
+	void Pipeline::AddOutputAttachment(StringId name, ClearColor clear, uint32_t layer)
+	{
+		this->outputAttachments.push_back(OutputAttachment{
+			name,
+			clear,
+			ClearDepthStencil{ },
+			AttachmentState::CLEAR_COLOR,
+			layer
+		});
+	}
+
+	void Pipeline::AddOutputAttachment(StringId name, ClearDepthStencil clear, uint32_t layer)
 	{
 		this->outputAttachments.push_back(OutputAttachment{ 
 			name, 
 			ClearColor{ },
 			clear, 
-			AttachmentState::CLEAR_DEPTH_SPENCIL 
+			AttachmentState::CLEAR_DEPTH_SPENCIL,
+			layer
 		});
 	}
 
-	void Pipeline::AddOutputAttachment(StringId name, AttachmentState onLoad)
+	void Pipeline::AddOutputAttachment(StringId name, AttachmentState onLoad, uint32_t layer)
 	{
 		this->outputAttachments.push_back(OutputAttachment{ 
 			name, 
 			ClearColor{ }, 
 			ClearDepthStencil{ }, 
-			onLoad 
+			onLoad,
+			layer
 		});
 	}
 }
