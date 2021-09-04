@@ -258,6 +258,7 @@ namespace VulkanAbstractionLayer
 
         vk::PhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures;
         descriptorIndexingFeatures.descriptorBindingPartiallyBound = true;
+        descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = true;
 
         vk::PhysicalDeviceMultiviewFeatures multiviewFeatures;
         multiviewFeatures.multiview = true;

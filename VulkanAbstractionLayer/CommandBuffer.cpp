@@ -442,7 +442,6 @@ namespace VulkanAbstractionLayer
         auto sourceLayers = GetDefaultImageSubresourceLayers(image);
         auto distanceLayers = GetDefaultImageSubresourceLayers(image);
         auto sourceUsage = initialUsage;
-        auto distanceUsage = initialUsage;
         uint32_t sourceWidth = image.GetWidth();
         uint32_t sourceHeight = image.GetHeight();
         uint32_t distanceWidth = image.GetWidth();
@@ -463,25 +462,22 @@ namespace VulkanAbstractionLayer
             distanceRange.setBaseMipLevel(i + 1);
             distanceRange.setLevelCount(1);
 
-            sourceUsage = distanceUsage;
-            distanceUsage = ImageUsage::UNKNOWN;
-
             std::array<vk::ImageMemoryBarrier, 2> imageBarriers;
             imageBarriers[0] // to transfer source
                 .setSrcAccessMask(ImageUsageToAccessFlags(sourceUsage))
-                .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
+                .setDstAccessMask(ImageUsageToAccessFlags(ImageUsage::TRANSFER_SOURCE))
                 .setOldLayout(ImageUsageToImageLayout(sourceUsage))
-                .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
+                .setNewLayout(ImageUsageToImageLayout(ImageUsage::TRANSFER_SOURCE))
                 .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setImage(image.GetNativeHandle())
                 .setSubresourceRange(sourceRange);
 
             imageBarriers[1] // to transfer distance
-                .setSrcAccessMask(ImageUsageToAccessFlags(distanceUsage))
-                .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
-                .setOldLayout(ImageUsageToImageLayout(distanceUsage))
-                .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
+                .setSrcAccessMask(ImageUsageToAccessFlags(ImageUsage::UNKNOWN))
+                .setDstAccessMask(ImageUsageToAccessFlags(ImageUsage::TRANSFER_DISTINATION))
+                .setOldLayout(ImageUsageToImageLayout(ImageUsage::UNKNOWN))
+                .setNewLayout(ImageUsageToImageLayout(ImageUsage::TRANSFER_DISTINATION))
                 .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setImage(image.GetNativeHandle())
@@ -495,6 +491,7 @@ namespace VulkanAbstractionLayer
                 { }, // buffer barriers,
                 imageBarriers
             );
+            sourceUsage = ImageUsage::TRANSFER_DISTINATION;
 
             vk::ImageBlit imageBlitInfo;
             imageBlitInfo

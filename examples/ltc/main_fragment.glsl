@@ -1,5 +1,7 @@
 #version 460
 
+#extension GL_EXT_nonuniform_qualifier : enable
+
 layout(location = 0) in vec3 vPosition;
 layout(location = 1) in vec2 vTexCoord;
 layout(location = 2) in mat3 vNormalMatrix;
@@ -388,6 +390,11 @@ void main()
     vec2 schlick = texture(uLookupLTCAmplitude, uv).xy;
 
     Rect lightRects[LIGHT_COUNT];
+    for (int i = 0; i < LIGHT_COUNT; i++)
+    {            
+        InitRect(lightRects[i], uLights[i].Position_Width.xyz, uLights[i].Rotation, uLights[i].Position_Width.w, uLights[i].Color_Height.w);
+    }
+
     vec3 totalColor = vec3(0.0);
 
     Ray reflectRay;
@@ -413,7 +420,6 @@ void main()
 
     for (int i = 0; i < LIGHT_COUNT; i++)
     {            
-        InitRect(lightRects[i], uLights[i].Position_Width.xyz, uLights[i].Rotation, uLights[i].Position_Width.w, uLights[i].Color_Height.w);
         vec3 points[4];
         InitRectPoints(lightRects[i], points);
 
@@ -453,7 +459,7 @@ void main()
     if (nearestRectIndex != -1)
     {
         LightData light = uLights[nearestRectIndex];
-        vec3 lightColor = light.Color_Height.rgb * FetchDiffuseTexture(uLightTextures[light.TextureIndex], uTextureSampler, intersectUV);
+        vec3 lightColor = light.Color_Height.rgb * FetchDiffuseTexture(uLightTextures[nonuniformEXT(light.TextureIndex)], uTextureSampler, intersectUV);
         totalColor = pow(lightColor, vec3(GAMMA));
     }
 
