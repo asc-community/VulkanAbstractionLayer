@@ -256,9 +256,19 @@ namespace VulkanAbstractionLayer
 
 	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type)
 	{
+		return this->Bind(binding, images, type, ImageView::NATIVE);
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Image> images, UniformType type)
+	{
+		return this->Bind(binding, images, type, ImageView::NATIVE);
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type, ImageView view)
+	{
 		size_t index = 0;
 		for (const auto& image : images)
-			index = this->AllocateBinding(image.get(), ImageView::NATIVE, type);
+			index = this->AllocateBinding(image.get(), view, type);
 
 		this->descriptorWrites.push_back({
 			type,
@@ -270,7 +280,7 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Image> images, UniformType type)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Image> images, UniformType type, ImageView view)
 	{
 		size_t index = 0;
 		for (const auto& image : images)

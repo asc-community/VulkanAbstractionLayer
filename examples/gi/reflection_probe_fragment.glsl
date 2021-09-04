@@ -11,7 +11,7 @@ layout(set = 0, binding = 0) uniform uCameraBuffer
     vec3 uCameraPosition;
 };
 
-layout(set = 0, binding = 1) uniform textureCube uProbeArray[256];
+layout(set = 0, binding = 1) uniform textureCube uProbeArray[2048];
 
 layout(push_constant) uniform uProbeContant
 {
@@ -24,6 +24,8 @@ layout(set = 0, binding = 2) uniform sampler uTextureSampler;
 
 void main()
 {
-    vec3 probeColor = texture(samplerCube(uProbeArray[uProbeCubemapIndex], uTextureSampler), vNormal).rgb;
+    vec3 direction = vNormal;
+    direction.z *= -1.0;
+    vec3 probeColor = textureLod(samplerCube(uProbeArray[uProbeCubemapIndex], uTextureSampler), direction, 0.0).rgb;
     oColor = vec4(probeColor, 1.0);
 }
