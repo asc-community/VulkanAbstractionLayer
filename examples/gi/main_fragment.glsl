@@ -31,13 +31,17 @@ layout(set = 0, binding = 4) uniform texture2D uTextures[4096];
 layout(set = 0, binding = 5) uniform sampler uImageSampler;
 
 layout(set = 0, binding = 6) uniform sampler2D uBRDFLUT;
-layout(set = 0, binding = 7) uniform samplerCube uSkybox;
-layout(set = 0, binding = 8) uniform samplerCube uSkyboxIrradiance;
+layout(set = 0, binding = 7) uniform textureCube uLightProbes[2048];
+layout(set = 0, binding = 8) uniform textureCube uSkybox;
+layout(set = 0, binding = 9) uniform textureCube uSkyboxIrradiance;
 
 layout(push_constant) uniform uPushConstant
 {
-    vec3 uCameraPosition;
-    uint uMaterialIndex;
+     vec3 uCameraPosition;
+     uint uMaterialIndex;
+     vec3 uProbeGridOffset;
+     vec3 uProbeGridDensity;
+     vec3 uProbeGridSize;
 };
 
 #define PI 3.1415926535
@@ -122,34 +126,35 @@ float getTextureLodLevel(vec2 uv)
     return 0.5 * log2(deltaMax2);
 }
 
-vec3 calcReflectionColor(samplerCube reflectionMap, vec3 viewDirection, vec3 normal, float lod)
+vec3 calcReflectionColor(textureCube reflectionMap, vec3 viewDirection, vec3 normal, float lod, sampler cubeSampler)
 {
     vec3 I = -viewDirection;
     vec3 reflectionRay = reflect(I, normal);
     reflectionRay = dot(viewDirection, normal) < 0.0 ? -reflectionRay : reflectionRay;
+    reflectionRay.z *= -1.0;
 
     float defaultLod = getTextureLodLevel(reflectionRay.xy);
-    vec3 color = textureLod(reflectionMap, reflectionRay, max(lod, defaultLod)).rgb;
+    vec3 color = textureLod(samplerCube(reflectionMap, cubeSampler), reflectionRay, max(lod, defaultLod)).rgb;
     return color;
 }
 
-vec3 calculateIBL(Fragment fragment, vec3 viewDirection, samplerCube env, samplerCube envIrradiance, sampler2D envBRDFLUT)
+vec3 calculateIBL(Fragment fragment, vec3 viewDirection, textureCube probe, textureCube probeIrradiance, sampler2D envBRDFLUT, sampler cubeSampler)
 {
     float roughness = clamp(fragment.Roughness, 0.05, 0.95);
     float metallic = clamp(fragment.Metallic, 0.05, 0.95);
 
     float NV = clamp(dot(fragment.Normal, viewDirection), 0.0, 0.999);
     
-    float lod = log2(textureSize(env, 0).x * roughness * roughness);
+    float lod = log2(textureSize(samplerCube(probe, cubeSampler), 0).x * roughness * roughness);
     vec3 F0 = mix(vec3(0.04), fragment.Albedo, metallic);
     vec3 F = fresnelSchlickRoughness(F0, NV, roughness);
     
-    vec3 prefilteredColor = calcReflectionColor(env, viewDirection, fragment.Normal, lod);
+    vec3 prefilteredColor = calcReflectionColor(probe, viewDirection, fragment.Normal, lod, cubeSampler);
     prefilteredColor = pow(prefilteredColor, vec3(GAMMA));
     vec2 envBRDF = texture(envBRDFLUT, vec2(NV, 1.0 - roughness)).rg;
     vec3 specularColor = prefilteredColor * (F * envBRDF.x + envBRDF.y);
 
-    vec3 irradianceColor = calcReflectionColor(envIrradiance, viewDirection, fragment.Normal, 0.0);
+    vec3 irradianceColor = calcReflectionColor(probeIrradiance, viewDirection, fragment.Normal, 0.0, cubeSampler);
     irradianceColor = pow(irradianceColor, vec3(GAMMA));
     
     float diffuseCoef = 1.0 - metallic;
@@ -157,6 +162,20 @@ vec3 calculateIBL(Fragment fragment, vec3 viewDirection, samplerCube env, sample
     vec3 iblColor = diffuseColor + specularColor;
 
     return iblColor;
+}
+
+int GetProbeIndex(vec3 position, vec3 probeGridSize, vec3 probeGridDensity)
+{
+    ivec3 gridLength = 2 * ivec3(probeGridSize) + 1;
+    vec3 halfGridSize = probeGridDensity * probeGridSize;
+    ivec3 index3D = ivec3(round((position + halfGridSize) / (2.0 * halfGridSize) * vec3(gridLength - 1)));
+
+    if(index3D.x < 0 || index3D.x >= gridLength.x ||
+       index3D.y < 0 || index3D.y >= gridLength.y ||
+       index3D.z < 0 || index3D.z >= gridLength.z)
+        return -1;
+
+    return index3D.z + index3D.y * gridLength.z + index3D.x * gridLength.z * gridLength.y;
 }
 
 void main() 
@@ -169,6 +188,7 @@ void main()
     if(albedoColor.a < 0.5)
         discard;
 
+    uint probeIndex = GetProbeIndex(vPosition - uProbeGridOffset, uProbeGridSize, uProbeGridDensity);
     vec3 viewDirection = normalize(uCameraPosition - vPosition);
 
     Fragment fragment;
@@ -177,6 +197,10 @@ void main()
     fragment.Metallic = 1.0 - metallicRoughnessColor.b;
     fragment.Roughness = material.RoughnessScale * metallicRoughnessColor.g;
 
-    vec3 color = calculateIBL(fragment, viewDirection, uSkybox, uSkyboxIrradiance, uBRDFLUT);
+    vec3 color;
+    if(probeIndex != -1)
+        color = calculateIBL(fragment, viewDirection, uLightProbes[probeIndex], uSkyboxIrradiance, uBRDFLUT, uImageSampler);
+    else
+        color = calculateIBL(fragment, viewDirection, uSkybox, uSkyboxIrradiance, uBRDFLUT, uImageSampler);
     oColor = vec4(pow(color, vec3(1.0 / GAMMA)), 1.0);
 }

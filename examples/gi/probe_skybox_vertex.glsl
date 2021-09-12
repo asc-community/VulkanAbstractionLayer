@@ -51,7 +51,7 @@ const vec3 SkyboxVertices[] = vec3[](
     vec3( 1.0, -1.0,  1.0)
 );
 
-layout(set = 0, binding = 1) uniform uProbeViewsBuffer
+layout(set = 0, binding = 2) uniform uProbeViewsBuffer
 {
     mat4 uProbeMatrices[6];
 };

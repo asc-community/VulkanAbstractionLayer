@@ -19,8 +19,11 @@ layout(location = 2) out mat3 vNormalMatrix;
 
 layout(push_constant) uniform uPushConstant
 {
-    vec3 uCameraPosition;
-    uint uMaterialIndex;
+     vec3 uCameraPosition;
+     uint uMaterialIndex;
+     vec3 uProbeGridOffset;
+     vec3 uProbeGridDensity;
+     vec3 uProbeGridSize;
 };
 
 layout(set = 0, binding = 0) uniform uCameraBuffer

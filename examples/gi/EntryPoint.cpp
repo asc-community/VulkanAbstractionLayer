@@ -30,8 +30,10 @@ void WindowErrorCallback(const std::string& message)
 }
 
 constexpr size_t MaxMaterialCount = 256;
-constexpr size_t ProbeResolution = 256;
-constexpr int ProbeGridSize = 1;
+constexpr size_t ProbeResolution = 1024;
+constexpr Vector3 ProbeGridSize = { 1.0f, 1.0f, 3.0f };
+constexpr Vector3 ProbeGridDensity = { 500.0f, 500.0f, 400.0 };
+constexpr Vector3 ProbeGridOffset = { -50.0f, 600.0f, 50.0f };
 
 struct Mesh
 {
@@ -66,12 +68,6 @@ struct ModelUniformData
     Matrix3x4 Matrix;
 };
 
-struct ReflectionProbe
-{
-    Vector3 Position;
-    Image Cubemap;
-};
-
 struct ReflectionProbeUniformData
 {
     std::array<Matrix4x4, 6> Matrices;
@@ -80,7 +76,6 @@ struct ReflectionProbeUniformData
 struct Camera
 {
     Vector3 Position{ 40.0f, 200.0f, -90.0f };
-    //Vector3 Position{ -2000.0f, 3000.0f, -2500.0f };
     Vector2 Rotation{ Pi, 0.0f };
     float Fov = 65.0f;
     float MovementSpeed = 250.0f;
@@ -131,6 +126,12 @@ struct Camera
     }
 };
 
+struct ReflectionProbesData
+{
+    std::vector<Image> Cubemaps;
+    std::vector<Vector4> Positions;
+};
+
 struct SharedResources
 {
     Buffer CameraUniformBuffer;
@@ -142,7 +143,7 @@ struct SharedResources
     CameraUniformData CameraUniform;
     ModelUniformData ModelUniform;
     ReflectionProbeUniformData ReflectionProbeUniform;
-    std::vector<ReflectionProbe> ReflectionProbes;
+    ReflectionProbesData ReflectionProbes;
     size_t CurrentProbeIndex;
     Image Skybox;
     Image SkyboxIrradiance;
@@ -326,10 +327,10 @@ public:
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,          BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer,           BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer,        BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.ReflectionProbeUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,           BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer,            BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer,         BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.ReflectionProbeUniformBuffer,  BufferUsage::TRANSFER_DESTINATION);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -365,36 +366,33 @@ public:
 class ReflectionProbeCopyRenderPass : public RenderPass
 {
     SharedResources& sharedResources;
-    std::vector<ImageReference> reflectionProbes;
 public:
     ReflectionProbeCopyRenderPass(SharedResources& sharedResources)
-        : sharedResources(sharedResources)
-    {
-        for (const auto& reflectionProbe : this->sharedResources.ReflectionProbes)
-            this->reflectionProbes.push_back(std::ref(reflectionProbe.Cubemap));
-    }
+        : sharedResources(sharedResources) { }
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.DeclareImages(this->reflectionProbes, ImageUsage::UNKNOWN);
+        pipeline.DeclareImages(this->sharedResources.ReflectionProbes.Cubemaps, ImageUsage::UNKNOWN);
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
         depedencies.AddImage("OutputProbe"_id, ImageUsage::TRANSFER_SOURCE);
-        depedencies.AddImages(this->reflectionProbes, ImageUsage::TRANSFER_DISTINATION);
+        depedencies.AddImages(this->sharedResources.ReflectionProbes.Cubemaps, ImageUsage::TRANSFER_DISTINATION);
     }
 
     virtual void OnRender(RenderPassState state) override
     {
         auto& renderedProbe = state.GetAttachment("OutputProbe"_id);
+        auto& reflectionProbe = this->sharedResources.ReflectionProbes.Cubemaps[this->sharedResources.CurrentProbeIndex];
         for (uint32_t layer = 0; layer < renderedProbe.GetLayerCount(); layer++)
         {
             state.Commands.CopyImage(
                 ImageInfo{ renderedProbe, ImageUsage::TRANSFER_SOURCE, 0, layer },
-                ImageInfo{ this->reflectionProbes[this->sharedResources.CurrentProbeIndex], ImageUsage::TRANSFER_DISTINATION, 0, layer }
+                ImageInfo{ reflectionProbe, ImageUsage::TRANSFER_DISTINATION, 0, layer }
             );
         }
+        state.Commands.GenerateMipLevels(reflectionProbe, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
     }
 };
 
@@ -446,8 +444,9 @@ public:
             .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
             .Bind(5, this->TextureSampler, UniformType::SAMPLER)
             .Bind(6, this->sharedResources.BRDFLUT, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(7, this->sharedResources.Skybox, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(8, this->sharedResources.SkyboxIrradiance, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(7, this->sharedResources.ReflectionProbes.Cubemaps, UniformType::SAMPLED_IMAGE)
+            .Bind(8, this->sharedResources.Skybox, UniformType::SAMPLED_IMAGE)
+            .Bind(9, this->sharedResources.SkyboxIrradiance, UniformType::SAMPLED_IMAGE);
 
         pipeline.AddOutputAttachment("OutputProbe"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
         pipeline.AddOutputAttachment("OutputProbeDepth"_id, ClearDepthStencil{ });
@@ -462,12 +461,20 @@ public:
         {
             Vector3 CameraPosition;
             uint32_t MaterialIndex;
+            Vector3 ProbeGridOffset;
+            float Padding1;
+            Vector3 ProbeGridDensity;
+            float Padding2;
+            Vector3 ProbeGridSize;
         } pushConstants;
 
         for (const auto& submesh : this->sharedResources.Sponza.Submeshes)
         {
-            pushConstants.CameraPosition = sharedResources.ReflectionProbes[this->sharedResources.CurrentProbeIndex].Position;
+            pushConstants.CameraPosition = sharedResources.ReflectionProbes.Positions[this->sharedResources.CurrentProbeIndex];
             pushConstants.MaterialIndex = submesh.MaterialIndex;
+            pushConstants.ProbeGridSize = ProbeGridSize;
+            pushConstants.ProbeGridDensity = ProbeGridDensity;
+            pushConstants.ProbeGridOffset = ProbeGridOffset;
 
             size_t indexCount = submesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
             state.Commands.PushConstants(state.Pass, &pushConstants);
@@ -482,6 +489,7 @@ class OpaqueRenderPass : public RenderPass
 {    
     SharedResources& sharedResources;
     std::vector<ImageReference> textureArray;
+    std::vector<ImageReference> reflectionProbeArray;
 public:
     Sampler TextureSampler;
 
@@ -491,9 +499,7 @@ public:
         this->TextureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
 
         for (const auto& texture : this->sharedResources.Sponza.Textures)
-        {
             this->textureArray.push_back(std::ref(texture));
-        }
     }
 
     virtual void SetupPipeline(PipelineState pipeline) override
@@ -518,8 +524,9 @@ public:
             .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
             .Bind(5, this->TextureSampler, UniformType::SAMPLER)
             .Bind(6, this->sharedResources.BRDFLUT, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(7, this->sharedResources.Skybox, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(8, this->sharedResources.SkyboxIrradiance, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(7, this->sharedResources.ReflectionProbes.Cubemaps, UniformType::SAMPLED_IMAGE)
+            .Bind(8, this->sharedResources.Skybox, UniformType::SAMPLED_IMAGE)
+            .Bind(9, this->sharedResources.SkyboxIrradiance, UniformType::SAMPLED_IMAGE);
 
         pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
         pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
@@ -534,12 +541,20 @@ public:
         {
             Vector3 CameraPosition;
             uint32_t MaterialIndex;
+            Vector3 ProbeGridOffset;
+            float Padding1;
+            Vector3 ProbeGridDensity;
+            float Padding2;
+            Vector3 ProbeGridSize;
         } pushConstants;
 
         for (const auto& submesh : this->sharedResources.Sponza.Submeshes)
         {
             pushConstants.CameraPosition = sharedResources.CameraUniform.Position;
             pushConstants.MaterialIndex = submesh.MaterialIndex;
+            pushConstants.ProbeGridSize = ProbeGridSize;
+            pushConstants.ProbeGridDensity = ProbeGridDensity;
+            pushConstants.ProbeGridOffset = ProbeGridOffset;
 
             size_t indexCount = submesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
             state.Commands.PushConstants(state.Pass, &pushConstants);
@@ -553,15 +568,12 @@ public:
 class ReflectionProbeDebugRenderPass : public RenderPass
 {
     SharedResources& sharedResources;
-    std::vector<ImageReference> reflectionProbes;
     Sampler textureSampler;
 public:
     ReflectionProbeDebugRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
         this->textureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
-        for (const auto& probe : this->sharedResources.ReflectionProbes)
-            reflectionProbes.push_back(std::ref(probe.Cubemap));
     }
 
     virtual void SetupPipeline(PipelineState pipeline) override
@@ -580,7 +592,7 @@ public:
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->reflectionProbes, UniformType::SAMPLED_IMAGE)
+            .Bind(1, this->sharedResources.ReflectionProbes.Cubemaps, UniformType::SAMPLED_IMAGE)
             .Bind(2, this->textureSampler, UniformType::SAMPLER);
 
         pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
@@ -600,12 +612,12 @@ public:
         } pushConstants;
 
         uint32_t probeIndex = 0;
-        for (const auto& probe : this->sharedResources.ReflectionProbes)
+        for (const auto& probePosition : this->sharedResources.ReflectionProbes.Positions)
         {
             const auto& sphereMesh = this->sharedResources.Sphere.Submeshes[0];
             size_t indexCount = sphereMesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
 
-            pushConstants.Position = probe.Position;
+            pushConstants.Position = probePosition;
             pushConstants.Size = 10.0f;
             pushConstants.ProbeIndex = probeIndex++;
 
@@ -637,7 +649,7 @@ public:
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(8, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(1, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
         pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
         pipeline.AddOutputAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
@@ -663,7 +675,7 @@ public:
     {
         this->skyboxSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::CLAMP_TO_EDGE, Sampler::MipFilter::LINEAR);
     }
-
+    
     virtual void SetupPipeline(PipelineState pipeline) override
     {
         pipeline.Shader = std::make_unique<GraphicShader>(
@@ -672,8 +684,8 @@ public:
         );
 
         pipeline.DescriptorBindings
-            .Bind(1, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(8, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(1, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(2, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER);
 
         pipeline.AddOutputAttachment("OutputProbe"_id, AttachmentState::LOAD_COLOR);
         pipeline.AddOutputAttachment("OutputProbeDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
@@ -685,7 +697,7 @@ public:
         state.Commands.SetRenderArea(output);
 
         constexpr uint32_t SkyboxVertexCount = 36;
-        state.Commands.PushConstants(state.Pass, &this->sharedResources.ReflectionProbes[this->sharedResources.CurrentProbeIndex].Position);
+        state.Commands.PushConstants(state.Pass, &this->sharedResources.ReflectionProbes.Positions[this->sharedResources.CurrentProbeIndex]);
         state.Commands.Draw(SkyboxVertexCount, 1);
     }
 };
@@ -730,16 +742,16 @@ Matrix4x4 GetReflectionProbeMatrix(const Vector3& position, uint32_t layer)
     return camera.GetMatrix();
 }
 
-void InitReflectionProbe(ReflectionProbe& probe, const Vector3& position)
+void AddReflectionProbe(ReflectionProbesData& probes, const Vector3& position)
 {
-    probe.Position = position;
-    probe.Cubemap.Init(
+    probes.Positions.push_back(Vector4(position, 0.0f));
+    probes.Cubemaps.emplace_back(
         ProbeResolution,
         ProbeResolution, 
         Format::R8G8B8A8_UNORM, 
-        ImageUsage::TRANSFER_DISTINATION | ImageUsage::SHADER_READ, 
+        ImageUsage::TRANSFER_DISTINATION | ImageUsage::TRANSFER_SOURCE | ImageUsage::SHADER_READ, 
         MemoryUsage::GPU_ONLY, 
-        ImageOptions::CUBEMAP
+        ImageOptions::CUBEMAP | ImageOptions::MIPMAPS
     );
 }
 
@@ -794,14 +806,12 @@ int main()
         ),
     };
 
-    Vector3 baseOffset = { -50.0f, 150.0f, 0.0f };
-
-    for(int x = -ProbeGridSize; x <= ProbeGridSize; x++)
-        for(int y = -ProbeGridSize; y <= ProbeGridSize; y++)
-            for (int z = -ProbeGridSize; z <= ProbeGridSize; z++)
+    for(int x = -ProbeGridSize.x; x <= ProbeGridSize.x; x++)
+        for(int y = -ProbeGridSize.y; y <= ProbeGridSize.y; y++)
+            for (int z = -ProbeGridSize.z; z <= ProbeGridSize.z; z++)
             {
-                Vector3 offset = baseOffset + Vector3{ (float)x, (float)y, (float)z } * 300.0f;
-                InitReflectionProbe(sharedResources.ReflectionProbes.emplace_back(), offset);
+                Vector3 offset = ProbeGridOffset + Vector3{ (float)x, (float)y, (float)z } * ProbeGridDensity;
+                AddReflectionProbe(sharedResources.ReflectionProbes, offset);
             }
 
     LoadModel(sharedResources.Sphere, "../models/sphere/sphere.obj");
@@ -858,7 +868,7 @@ int main()
 
             auto dt = ImGui::GetIO().DeltaTime;
 
-            sharedResources.CurrentProbeIndex = (sharedResources.CurrentProbeIndex + 1) % sharedResources.ReflectionProbes.size();
+            sharedResources.CurrentProbeIndex = (sharedResources.CurrentProbeIndex + 1) % sharedResources.ReflectionProbes.Cubemaps.size();
 
             auto mouseMovement = ImGui::GetMouseDragDelta(MouseButton::RIGHT, 0.0f);
             ImGui::ResetMouseDragDelta(MouseButton::RIGHT);
@@ -934,10 +944,10 @@ int main()
 
             ImGui::Begin("Reflection probes");
             int reflectionProbeIndex = 0;
-            for (auto& probe : sharedResources.ReflectionProbes)
+            for (auto& probePosition : sharedResources.ReflectionProbes.Positions)
             {
                 ImGui::PushID(reflectionProbeIndex++);
-                ImGui::DragFloat3("position", &probe.Position[0]);
+                ImGui::DragFloat3("position", &probePosition[0]);
                 ImGui::PopID();
                 ImGui::Separator();
             }
@@ -945,8 +955,8 @@ int main()
 
             for (size_t i = 0; i < sharedResources.ReflectionProbeUniform.Matrices.size(); i++)
             {
-                auto& currentProbe = sharedResources.ReflectionProbes[sharedResources.CurrentProbeIndex];
-                sharedResources.ReflectionProbeUniform.Matrices[i] = GetReflectionProbeMatrix(currentProbe.Position, i);
+                auto& currentProbePosition = sharedResources.ReflectionProbes.Positions[sharedResources.CurrentProbeIndex];
+                sharedResources.ReflectionProbeUniform.Matrices[i] = GetReflectionProbeMatrix(currentProbePosition, i);
             }
 
             renderGraph->Execute(Vulkan.GetCurrentCommandBuffer());
