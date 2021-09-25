@@ -54,7 +54,7 @@ constexpr size_t MaxMaterialCount = 256;
 struct SharedResources
 {
     Buffer CameraUniformBuffer;
-    Buffer ModelUniformBuffer;
+    Buffer MeshDataUniformBuffer;
     Buffer LightUniformBuffer;
     Buffer MaterialUniformBuffer;
     std::vector<Mesh> Meshes;
@@ -331,7 +331,7 @@ public:
     virtual void SetupPipeline(PipelineState pipeline) override
     {
         pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer);
+        pipeline.DeclareBuffer(this->sharedResources.MeshDataUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer);
     }
@@ -339,7 +339,7 @@ public:
     virtual void SetupDependencies(DependencyState depedencies) override
     {
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.MeshDataUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
     }
@@ -369,7 +369,7 @@ public:
         };
 
         FillUniform(this->CameraUniform, this->sharedResources.CameraUniformBuffer);
-        FillUniform(this->ModelUniform, this->sharedResources.ModelUniformBuffer);
+        FillUniform(this->ModelUniform, this->sharedResources.MeshDataUniformBuffer);
         FillUniform(this->LightUniform, this->sharedResources.LightUniformBuffer);
         FillUniformArray(this->sharedResources.Materials, this->sharedResources.MaterialUniformBuffer);
     }
@@ -406,7 +406,7 @@ public:
         };
 
         pipeline.DescriptorBindings
-            .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER);
 
         pipeline.AddOutputAttachment("ShadowDepth"_id, ClearDepthStencil{ });
@@ -468,7 +468,7 @@ public:
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureSampler, UniformType::SAMPLER)

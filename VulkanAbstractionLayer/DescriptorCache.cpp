@@ -70,7 +70,7 @@ namespace VulkanAbstractionLayer
         auto& vulkan = GetCurrentVulkanContext();
         if ((bool)this->descriptorPool) vulkan.GetDevice().destroyDescriptorPool(this->descriptorPool);
 
-        for (const auto& [specification, descriptor] : this->cache)
+        for (const auto& descriptor : this->cache)
         {
             this->DestroyDescriptorSetLayout(descriptor.SetLayout);
             // descriptor sets are already freed when pool is destroyed
@@ -153,38 +153,8 @@ namespace VulkanAbstractionLayer
 
     DescriptorCache::Descriptor DescriptorCache::GetDescriptor(ArrayView<const ShaderUniforms> specification)
     {
-        auto searchIt = std::find_if(this->cache.begin(), this->cache.end(), [&specification](const DescriptorCacheEntry& e)
-        {
-            return std::equal(e.Specification.begin(), e.Specification.end(), specification.begin(), specification.end(),
-                [](const ShaderUniforms& u1, const ShaderUniforms& u2) 
-                {
-                    return u1.ShaderStage == u2.ShaderStage && IsLayoutSubSet(u1.Uniforms, u2.Uniforms);
-                });
-        });
-        if (searchIt != this->cache.end()) return searchIt->SetInfo;
-
-        auto removeIt = std::remove_if(this->cache.begin(), this->cache.end(), [&specification](const DescriptorCacheEntry& e)
-        {
-            return std::equal(e.Specification.begin(), e.Specification.end(), specification.begin(), specification.end(),
-                [](const ShaderUniforms& u1, const ShaderUniforms& u2)
-                {
-                    return u1.ShaderStage == u2.ShaderStage && IsLayoutSubSet(u2.Uniforms, u1.Uniforms);
-                });
-        });
-        for (auto it = removeIt; it != this->cache.end(); it++)
-        {
-            this->FreeDescriptorSet(it->SetInfo.Set);
-            this->DestroyDescriptorSetLayout(it->SetInfo.SetLayout);
-        }
-        this->cache.erase(removeIt, this->cache.end());
-
         auto descriptorSetLayout = this->CreateDescriptorSetLayout(specification);
         auto descriptorSet = this->AllocateDescriptorSet(descriptorSetLayout);
-        this->cache.push_back({ 
-            LayoutSpecification{ specification.begin(), specification.end() }, 
-            Descriptor{ descriptorSetLayout, descriptorSet }
-        });
-
-        return Descriptor{ descriptorSetLayout, descriptorSet };
+        return this->cache.emplace_back(Descriptor{ descriptorSetLayout, descriptorSet });
     }
 }

@@ -30,10 +30,12 @@ void WindowErrorCallback(const std::string& message)
 }
 
 constexpr size_t MaxMaterialCount = 256;
-constexpr size_t ProbeResolution = 1024;
+constexpr size_t MaxMeshCount = 256;
+constexpr size_t ProbeResolution = 256;
 constexpr Vector3 ProbeGridSize = { 1.0f, 1.0f, 3.0f };
-constexpr Vector3 ProbeGridDensity = { 500.0f, 500.0f, 400.0 };
-constexpr Vector3 ProbeGridOffset = { -50.0f, 600.0f, 50.0f };
+Vector3 ProbeGridDensity = { 545.0f, 535.0f, 400.0 };
+Vector3 ProbeGridOffset = { -50.0f, 600.0f, 50.0f };
+bool DrawProbes = false;
 
 struct Mesh
 {
@@ -43,6 +45,8 @@ struct Mesh
         uint32_t NormalIndex;
         uint32_t MetallicRoughnessIndex;
         float RoughnessScale;
+        float MetallicScale;
+        uint32_t Padding[3];
     };
 
     struct Submesh
@@ -55,17 +59,17 @@ struct Mesh
     std::vector<Submesh> Submeshes;
     std::vector<Material> Materials;
     std::vector<Image> Textures;
+
+    struct MeshData
+    {
+        Matrix4x4 Transform = Matrix4x4(1.0f);
+    } Data;
 };
 
 struct CameraUniformData
 {
     Matrix4x4 Matrix;
     Vector3 Position;
-};
-
-struct ModelUniformData
-{
-    Matrix3x4 Matrix;
 };
 
 struct ReflectionProbeUniformData
@@ -135,13 +139,12 @@ struct ReflectionProbesData
 struct SharedResources
 {
     Buffer CameraUniformBuffer;
-    Buffer ModelUniformBuffer;
+    Buffer MeshDataUniformBuffer;
     Buffer MaterialUniformBuffer;
     Buffer ReflectionProbeUniformBuffer;
-    Mesh Sponza;
+    std::vector<Mesh> WorldMeshes;
     Mesh Sphere;
     CameraUniformData CameraUniform;
-    ModelUniformData ModelUniform;
     ReflectionProbeUniformData ReflectionProbeUniform;
     ReflectionProbesData ReflectionProbes;
     size_t CurrentProbeIndex;
@@ -296,7 +299,7 @@ void LoadModel(Mesh& mesh, const std::string& filepath)
         LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.NormalTexture, ImageOptions::MIPMAPS);
         LoadImage(commandBuffer, mesh.Textures.emplace_back(), material.MetallicRoughness, ImageOptions::MIPMAPS);
 
-        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, material.RoughnessScale });
+        mesh.Materials.push_back(Mesh::Material{ textureIndex, textureIndex + 1, textureIndex + 2, 1.0f, 1.0f });
         textureIndex += 3;
 
         stageBuffer.Flush();
@@ -310,17 +313,19 @@ class UniformSubmitRenderPass : public RenderPass
 {
     SharedResources& sharedResources;
 
+    std::vector<Mesh::Material> materials;
+    std::vector<Mesh::MeshData> meshDatas;
 public:
     UniformSubmitRenderPass(SharedResources& sharedResources)
         : sharedResources(sharedResources)
     {
-
+        
     }
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
         pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer);
+        pipeline.DeclareBuffer(this->sharedResources.MeshDataUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.ReflectionProbeUniformBuffer);
     }
@@ -328,7 +333,7 @@ public:
     virtual void SetupDependencies(DependencyState depedencies) override
     {
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,           BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer,            BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.MeshDataUniformBuffer,            BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer,         BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.ReflectionProbeUniformBuffer,  BufferUsage::TRANSFER_DESTINATION);
     }
@@ -356,9 +361,18 @@ public:
             );
         };
 
+        this->meshDatas.clear();
+        for (const auto& mesh : this->sharedResources.WorldMeshes)
+            this->meshDatas.push_back(mesh.Data);
+
+        this->materials.clear();
+        for (const auto& mesh : this->sharedResources.WorldMeshes)
+            for (const auto& material : mesh.Materials)
+                this->materials.push_back(material);
+
         FillUniform(this->sharedResources.CameraUniform, this->sharedResources.CameraUniformBuffer);
-        FillUniform(this->sharedResources.ModelUniform, this->sharedResources.ModelUniformBuffer);
-        FillUniformArray(this->sharedResources.Sponza.Materials, this->sharedResources.MaterialUniformBuffer);
+        FillUniformArray(this->meshDatas, this->sharedResources.MeshDataUniformBuffer);
+        FillUniformArray(this->materials, this->sharedResources.MaterialUniformBuffer);
         FillUniform(this->sharedResources.ReflectionProbeUniform, this->sharedResources.ReflectionProbeUniformBuffer);
     }
 };
@@ -400,6 +414,8 @@ class ReflectionProbeCalculateRenderPass : public RenderPass
 {
     SharedResources& sharedResources;
     std::vector<ImageReference> textureArray;
+    std::vector<uint32_t> materialIndexOffsets;
+    std::vector<uint32_t> textureIndexOffsets;
     Sampler TextureSampler;
 public:
 
@@ -408,9 +424,16 @@ public:
     {
         this->TextureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
 
-        for (const auto& texture : this->sharedResources.Sponza.Textures)
+        uint32_t totalMaterials = 0;
+        uint32_t totalTextures = 0;
+        for (const auto& mesh : this->sharedResources.WorldMeshes)
         {
-            this->textureArray.push_back(std::ref(texture));
+            this->materialIndexOffsets.push_back(totalMaterials);
+            this->textureIndexOffsets.push_back(totalTextures);
+            for (const auto& texture : mesh.Textures)
+                this->textureArray.push_back(std::ref(texture));
+            totalMaterials += mesh.Materials.size();
+            totalTextures += mesh.Textures.size();
         }
     }
 
@@ -439,7 +462,7 @@ public:
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(2, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
             .Bind(5, this->TextureSampler, UniformType::SAMPLER)
@@ -462,25 +485,32 @@ public:
             Vector3 CameraPosition;
             uint32_t MaterialIndex;
             Vector3 ProbeGridOffset;
-            float Padding1;
+            uint32_t ModelIndex;
             Vector3 ProbeGridDensity;
-            float Padding2;
+            uint32_t TextureOffset;
             Vector3 ProbeGridSize;
         } pushConstants;
 
-        for (const auto& submesh : this->sharedResources.Sponza.Submeshes)
+        size_t meshIndex = 0;
+        for (const auto& mesh : this->sharedResources.WorldMeshes)
         {
-            pushConstants.CameraPosition = sharedResources.ReflectionProbes.Positions[this->sharedResources.CurrentProbeIndex];
-            pushConstants.MaterialIndex = submesh.MaterialIndex;
-            pushConstants.ProbeGridSize = ProbeGridSize;
-            pushConstants.ProbeGridDensity = ProbeGridDensity;
-            pushConstants.ProbeGridOffset = ProbeGridOffset;
+            for (const auto& submesh : mesh.Submeshes)
+            {
+                pushConstants.CameraPosition = this->sharedResources.ReflectionProbes.Positions[this->sharedResources.CurrentProbeIndex];
+                pushConstants.MaterialIndex = this->materialIndexOffsets[meshIndex] + submesh.MaterialIndex;
+                pushConstants.TextureOffset = this->textureIndexOffsets[meshIndex];
+                pushConstants.ProbeGridSize = ProbeGridSize;
+                pushConstants.ModelIndex = meshIndex;
+                pushConstants.ProbeGridDensity = ProbeGridDensity;
+                pushConstants.ProbeGridOffset = ProbeGridOffset;
 
-            size_t indexCount = submesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
-            state.Commands.PushConstants(state.Pass, &pushConstants);
-            state.Commands.BindVertexBuffers(submesh.VertexBuffer);
-            state.Commands.BindIndexBufferUInt32(submesh.IndexBuffer);
-            state.Commands.DrawIndexed((uint32_t)indexCount, 1);
+                size_t indexCount = submesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
+                state.Commands.PushConstants(state.Pass, &pushConstants);
+                state.Commands.BindVertexBuffers(submesh.VertexBuffer);
+                state.Commands.BindIndexBufferUInt32(submesh.IndexBuffer);
+                state.Commands.DrawIndexed((uint32_t)indexCount, 1);
+            }
+            meshIndex++;
         }
     }
 };
@@ -490,6 +520,8 @@ class OpaqueRenderPass : public RenderPass
     SharedResources& sharedResources;
     std::vector<ImageReference> textureArray;
     std::vector<ImageReference> reflectionProbeArray;
+    std::vector<uint32_t> materialIndexOffsets;
+    std::vector<uint32_t> textureIndexOffsets;
 public:
     Sampler TextureSampler;
 
@@ -498,8 +530,17 @@ public:
     {
         this->TextureSampler.Init(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
 
-        for (const auto& texture : this->sharedResources.Sponza.Textures)
-            this->textureArray.push_back(std::ref(texture));
+        uint32_t totalMaterials = 0;
+        uint32_t totalTextures = 0;
+        for (const auto& mesh : this->sharedResources.WorldMeshes)
+        {
+            this->materialIndexOffsets.push_back(totalMaterials);
+            this->textureIndexOffsets.push_back(totalTextures);
+            for (const auto& texture : mesh.Textures)
+                this->textureArray.push_back(std::ref(texture));
+            totalMaterials += mesh.Materials.size();
+            totalTextures += mesh.Textures.size();
+        }
     }
 
     virtual void SetupPipeline(PipelineState pipeline) override
@@ -519,7 +560,7 @@ public:
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(2, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
             .Bind(5, this->TextureSampler, UniformType::SAMPLER)
@@ -542,25 +583,32 @@ public:
             Vector3 CameraPosition;
             uint32_t MaterialIndex;
             Vector3 ProbeGridOffset;
-            float Padding1;
+            uint32_t ModelIndex;
             Vector3 ProbeGridDensity;
-            float Padding2;
+            uint32_t TextureOffset;
             Vector3 ProbeGridSize;
         } pushConstants;
 
-        for (const auto& submesh : this->sharedResources.Sponza.Submeshes)
+        size_t meshIndex = 0;
+        for (const auto& mesh : this->sharedResources.WorldMeshes)
         {
-            pushConstants.CameraPosition = sharedResources.CameraUniform.Position;
-            pushConstants.MaterialIndex = submesh.MaterialIndex;
-            pushConstants.ProbeGridSize = ProbeGridSize;
-            pushConstants.ProbeGridDensity = ProbeGridDensity;
-            pushConstants.ProbeGridOffset = ProbeGridOffset;
+            for (const auto& submesh : mesh.Submeshes)
+            {
+                pushConstants.CameraPosition = this->sharedResources.CameraUniform.Position;
+                pushConstants.MaterialIndex = this->materialIndexOffsets[meshIndex] + submesh.MaterialIndex;
+                pushConstants.TextureOffset = this->textureIndexOffsets[meshIndex];
+                pushConstants.ProbeGridSize = ProbeGridSize;
+                pushConstants.ModelIndex = meshIndex;
+                pushConstants.ProbeGridDensity = ProbeGridDensity;
+                pushConstants.ProbeGridOffset = ProbeGridOffset;
 
-            size_t indexCount = submesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
-            state.Commands.PushConstants(state.Pass, &pushConstants);
-            state.Commands.BindVertexBuffers(submesh.VertexBuffer);
-            state.Commands.BindIndexBufferUInt32(submesh.IndexBuffer);
-            state.Commands.DrawIndexed((uint32_t)indexCount, 1);
+                size_t indexCount = submesh.IndexBuffer.GetByteSize() / sizeof(ModelData::Index);
+                state.Commands.PushConstants(state.Pass, &pushConstants);
+                state.Commands.BindVertexBuffers(submesh.VertexBuffer);
+                state.Commands.BindIndexBufferUInt32(submesh.IndexBuffer);
+                state.Commands.DrawIndexed((uint32_t)indexCount, 1);
+            }
+            meshIndex++;
         }
     }
 };
@@ -601,6 +649,8 @@ public:
 
     virtual void OnRender(RenderPassState state) override
     {
+        if (!DrawProbes) return;
+
         auto& output = state.GetAttachment("Output"_id);
         state.Commands.SetRenderArea(output);
 
@@ -742,10 +792,10 @@ Matrix4x4 GetReflectionProbeMatrix(const Vector3& position, uint32_t layer)
     return camera.GetMatrix();
 }
 
-void AddReflectionProbe(ReflectionProbesData& probes, const Vector3& position)
+void AddReflectionProbe(CommandBuffer& commandBuffer, ReflectionProbesData& probes, const Vector3& position, const Image& defaultCubemap)
 {
     probes.Positions.push_back(Vector4(position, 0.0f));
-    probes.Cubemaps.emplace_back(
+    auto& probe = probes.Cubemaps.emplace_back(
         ProbeResolution,
         ProbeResolution, 
         Format::R8G8B8A8_UNORM, 
@@ -753,6 +803,7 @@ void AddReflectionProbe(ReflectionProbesData& probes, const Vector3& position)
         MemoryUsage::GPU_ONLY, 
         ImageOptions::CUBEMAP | ImageOptions::MIPMAPS
     );
+    commandBuffer.BlitImage(defaultCubemap, ImageUsage::TRANSFER_SOURCE, probe, ImageUsage::UNKNOWN, BlitFilter::LINEAR);
 }
 
 int main()
@@ -787,13 +838,12 @@ int main()
 
     SharedResources sharedResources{
         Buffer{ sizeof(CameraUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
-        Buffer{ sizeof(ModelUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
+        Buffer{ sizeof(Mesh::MeshData) * MaxMeshCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(Mesh::Material) * MaxMaterialCount, BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         Buffer{ sizeof(ReflectionProbeUniformData), BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DESTINATION, MemoryUsage::GPU_ONLY },
         { }, // sponza
         { }, // sphere
         { }, // camera uniform
-        { }, // model uniform
         { }, // reflection probe uniform
         { }, // reflection probes
         { }, // current probe index
@@ -806,27 +856,45 @@ int main()
         ),
     };
 
+    LoadCubemap(sharedResources.Skybox, "../textures/skybox.png");
+    LoadCubemap(sharedResources.SkyboxIrradiance, "../textures/skybox_irradiance.png");
+    LoadImage(sharedResources.BRDFLUT, "../textures/brdf_lut.dds", ImageOptions::DEFAULT);
+
+    auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
+    commandBuffer.Begin();
+    commandBuffer.TransferLayout(sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION, ImageUsage::TRANSFER_SOURCE);
     for(int x = -ProbeGridSize.x; x <= ProbeGridSize.x; x++)
         for(int y = -ProbeGridSize.y; y <= ProbeGridSize.y; y++)
             for (int z = -ProbeGridSize.z; z <= ProbeGridSize.z; z++)
             {
                 Vector3 offset = ProbeGridOffset + Vector3{ (float)x, (float)y, (float)z } * ProbeGridDensity;
-                AddReflectionProbe(sharedResources.ReflectionProbes, offset);
+                AddReflectionProbe(commandBuffer, sharedResources.ReflectionProbes, offset, sharedResources.Skybox);
             }
+    commandBuffer.TransferLayout(sharedResources.Skybox, ImageUsage::TRANSFER_SOURCE, ImageUsage::TRANSFER_DISTINATION);
+    commandBuffer.End();
+    GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
 
     LoadModel(sharedResources.Sphere, "../models/sphere/sphere.obj");
-    LoadModel(sharedResources.Sponza, "../models/Sponza/glTF/Sponza.gltf");
 
-    LoadCubemap(sharedResources.Skybox, "../textures/skybox.png");
-    LoadCubemap(sharedResources.SkyboxIrradiance, "../textures/skybox_irradiance.png");
-    LoadImage(sharedResources.BRDFLUT, "../textures/brdf_lut.dds", ImageOptions::DEFAULT);
+    auto& cubeMesh = sharedResources.WorldMeshes.emplace_back();
+    LoadModel(cubeMesh, "../models/cube/cube.obj");
+    cubeMesh.Data.Transform = MakeScaleMatrix(Vector3{ 100.0f, 100.0f, 100.0f });
+    cubeMesh.Data.Transform[3] = Vector4{ 0.0f, 50.0f, 0.0f, 1.0f };
+    cubeMesh.Submeshes[0].MaterialIndex = 0;
+    cubeMesh.Materials.push_back(Mesh::Material{ 0, 1, 2, 0.0f, 1.0f });
+    LoadImage(cubeMesh.Textures.emplace_back(), "../textures/default_albedo.png", ImageOptions::MIPMAPS);
+    LoadImage(cubeMesh.Textures.emplace_back(), "../textures/default_normal.png", ImageOptions::MIPMAPS);
+    LoadImage(cubeMesh.Textures.emplace_back(), "../textures/default_metallic_roughness.png", ImageOptions::MIPMAPS);
+
+    auto& sponzaMesh = sharedResources.WorldMeshes.emplace_back();
+    sponzaMesh.Data.Transform = MakeRotationMatrix(Vector3{ 0.0f, HalfPi - 0.01f, 0.0f });
+    LoadModel(sponzaMesh, "../models/Sponza/glTF/Sponza.gltf");
 
     Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
 
     std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
 
     Camera camera;
-    Vector3 modelRotation{ 0.0f, HalfPi, 0.0f };
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
@@ -837,24 +905,31 @@ int main()
     
     ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
 
-    std::map<size_t, ImTextureID> ImGuiRegisteredImages;
-    for (const auto& material : sharedResources.Sponza.Materials)
+    std::map<VkImage, ImTextureID> ImGuiRegisteredImages;
+    for (const auto& mesh : sharedResources.WorldMeshes)
     {
-        if (ImGuiRegisteredImages.find(material.AlbedoIndex) == ImGuiRegisteredImages.end())
-            ImGuiRegisteredImages.emplace(
-                material.AlbedoIndex,
-                ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.AlbedoIndex], ImGuiImageSampler)
-            );
-        if (ImGuiRegisteredImages.find(material.NormalIndex) == ImGuiRegisteredImages.end())
-            ImGuiRegisteredImages.emplace(
-                material.NormalIndex,
-                ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.NormalIndex], ImGuiImageSampler)
-            );
-        if (ImGuiRegisteredImages.find(material.MetallicRoughnessIndex) == ImGuiRegisteredImages.end())
-            ImGuiRegisteredImages.emplace(
-                material.MetallicRoughnessIndex,
-                ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.MetallicRoughnessIndex], ImGuiImageSampler)
-            );
+        for (const auto& material : mesh.Materials)
+        {
+            auto& albedoTexture = mesh.Textures[material.AlbedoIndex];
+            auto& normalTexture = mesh.Textures[material.NormalIndex];
+            auto& metallicRoughnessTexture = mesh.Textures[material.MetallicRoughnessIndex];
+            
+            if (ImGuiRegisteredImages.find(albedoTexture.GetNativeHandle()) == ImGuiRegisteredImages.end())
+                ImGuiRegisteredImages.emplace(
+                    albedoTexture.GetNativeHandle(),
+                    ImGuiVulkanContext::RegisterImage(albedoTexture, ImGuiImageSampler)
+                );
+            if (ImGuiRegisteredImages.find(normalTexture.GetNativeHandle()) == ImGuiRegisteredImages.end())
+                ImGuiRegisteredImages.emplace(
+                    normalTexture.GetNativeHandle(),
+                    ImGuiVulkanContext::RegisterImage(normalTexture, ImGuiImageSampler)
+                );
+            if (ImGuiRegisteredImages.find(metallicRoughnessTexture.GetNativeHandle()) == ImGuiRegisteredImages.end())
+                ImGuiRegisteredImages.emplace(
+                    metallicRoughnessTexture.GetNativeHandle(),
+                    ImGuiVulkanContext::RegisterImage(metallicRoughnessTexture, ImGuiImageSampler)
+                );
+        }
     }
 
     while (!window.ShouldClose())
@@ -901,55 +976,102 @@ int main()
             sharedResources.CameraUniform.Matrix = camera.GetMatrix();
             sharedResources.CameraUniform.Position = camera.Position;
 
-
-            ImGui::Begin("Model");
-            ImGui::DragFloat3("rotation", &modelRotation[0], 0.01f);
-            ImGui::End();
-
-            sharedResources.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);
-
             ImGui::Begin("Performace");
             ImGui::Text("FPS: %f", ImGui::GetIO().Framerate);
             ImGui::End();
 
-            int materialIndex = 0;
-            ImGui::Begin("Sponza materials");
-            for (auto& material : sharedResources.Sponza.Materials)
+            ImGui::Begin("meshes");
+            int meshIndex = 0;
+            for (auto& mesh : sharedResources.WorldMeshes)
             {
-                ImGui::PushID(materialIndex++);
+                ImGui::PushID(meshIndex++);
 
-                ImGui::BeginTable(("material_" + std::to_string(materialIndex)).c_str(), 4);
+                auto& transform = mesh.Data.Transform;
+                Vector3 position = transform[3];
+                Vector3 scale = Vector3{ Length(transform[0]), Length(transform[1]), Length(transform[2]) };
+                Matrix3x4 rotationMatrix = transform * MakeScaleMatrix(1.0f / scale);
+                Vector3 rotation = MakeRotationAngles(rotationMatrix);
 
-                ImGui::TableSetupColumn("roughness");
-                ImGui::TableSetupColumn("albedo image");
-                ImGui::TableSetupColumn("normal image");
-                ImGui::TableSetupColumn("metallic-roughness image");
-                ImGui::TableHeadersRow();
+                ImGui::DragFloat3("position", &position[0]);
+                ImGui::DragFloat3("rotation", &rotation[0], 0.01f);
+                ImGui::DragFloat3("scale",    &scale[0], 1.0f, 0.0f, 100000.0f);
 
-                ImGui::TableNextColumn();
-                ImGui::DragFloat("scale", &material.RoughnessScale, 0.01f, 0.0f, 1.0f);
-                ImGui::TableNextColumn();
-                ImGui::Image(ImGuiRegisteredImages.at(material.AlbedoIndex), { 128.0f, 128.0f });
-                ImGui::TableNextColumn();
-                ImGui::Image(ImGuiRegisteredImages.at(material.NormalIndex), { 128.0f, 128.0f });
-                ImGui::TableNextColumn();
-                ImGui::Image(ImGuiRegisteredImages.at(material.MetallicRoughnessIndex), { 128.0f, 128.0f });
+                // update transform reference
+                transform = MakeRotationMatrix(rotation);
+                transform[0] *= scale.x;
+                transform[1] *= scale.y;
+                transform[2] *= scale.z;
+                transform[3] = Vector4(position, 1.0f);
 
-                ImGui::EndTable();
-
-                ImGui::Separator();
                 ImGui::PopID();
+                ImGui::Separator();
+            }
+            ImGui::End();
+
+            int materialIndex = 0;
+            ImGui::Begin("materials");
+            for (auto& mesh : sharedResources.WorldMeshes)
+            {
+                for (auto& material : mesh.Materials)
+                {
+                    ImGui::PushID(materialIndex++);
+
+                    ImGui::BeginTable(("material_" + std::to_string(materialIndex)).c_str(), 4);
+
+                    ImGui::TableSetupColumn("roughness");
+                    ImGui::TableSetupColumn("albedo image");
+                    ImGui::TableSetupColumn("normal image");
+                    ImGui::TableSetupColumn("metallic-roughness image");
+                    ImGui::TableHeadersRow();
+
+                    ImGui::TableNextColumn();
+                    ImGui::DragFloat("roughness scale", &material.RoughnessScale, 0.01f, 0.0f, 1.0f);
+                    ImGui::DragFloat("metallic scale", &material.MetallicScale, 0.01f, 0.0f, 1.0f);
+                    ImGui::TableNextColumn();
+                    ImGui::Image(ImGuiRegisteredImages.at(mesh.Textures[material.AlbedoIndex].GetNativeHandle()), { 128.0f, 128.0f });
+                    ImGui::TableNextColumn();
+                    ImGui::Image(ImGuiRegisteredImages.at(mesh.Textures[material.NormalIndex].GetNativeHandle()), { 128.0f, 128.0f });
+                    ImGui::TableNextColumn();
+                    ImGui::Image(ImGuiRegisteredImages.at(mesh.Textures[material.MetallicRoughnessIndex].GetNativeHandle()), { 128.0f, 128.0f });
+
+                    ImGui::EndTable();
+
+                    ImGui::Separator();
+                    ImGui::PopID();
+                }
             }
             ImGui::End();
 
             ImGui::Begin("Reflection probes");
             int reflectionProbeIndex = 0;
-            for (auto& probePosition : sharedResources.ReflectionProbes.Positions)
+
+            bool gridInvalidated = false;
+            ImGui::Checkbox("draw probes", &DrawProbes);
+            gridInvalidated |= ImGui::DragFloat3("grid density", &ProbeGridDensity[0]);
+            gridInvalidated |= ImGui::DragFloat3("grid offset", &ProbeGridOffset[0]);
+            if (gridInvalidated)
             {
-                ImGui::PushID(reflectionProbeIndex++);
-                ImGui::DragFloat3("position", &probePosition[0]);
-                ImGui::PopID();
-                ImGui::Separator();
+                size_t probeIndex = 0;
+                for (int x = -ProbeGridSize.x; x <= ProbeGridSize.x; x++)
+                    for (int y = -ProbeGridSize.y; y <= ProbeGridSize.y; y++)
+                        for (int z = -ProbeGridSize.z; z <= ProbeGridSize.z; z++)
+                        {
+                            Vector3 offset = ProbeGridOffset + Vector3{ (float)x, (float)y, (float)z } * ProbeGridDensity;
+                            sharedResources.ReflectionProbes.Positions[probeIndex] = Vector4(offset, 0.0f);
+                            probeIndex++;
+                        }
+            }
+
+            if (ImGui::TreeNode("probes"))
+            {
+                for (auto& probePosition : sharedResources.ReflectionProbes.Positions)
+                {
+                    ImGui::PushID(reflectionProbeIndex++);
+                    ImGui::DragFloat3("position", &probePosition[0]);
+                    ImGui::PopID();
+                    ImGui::Separator();
+                }
+                ImGui::TreePop();
             }
             ImGui::End();
 

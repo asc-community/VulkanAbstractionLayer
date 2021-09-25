@@ -94,6 +94,15 @@ namespace VulkanAbstractionLayer
         return result;
     }
 
+    inline Matrix4x4 MakeScaleMatrix(const Vector3& scale)
+    {
+        Matrix4x4 result{ 1.0f };
+        result[0][0] = scale.x;
+        result[1][1] = scale.y;
+        result[2][2] = scale.z;
+        return result;
+    }
+
     inline Matrix4x4 MakePerspectiveMatrix(float fov, float aspect, float znear, float zfar)
     {
         return glm::perspective(fov, aspect, znear, zfar);

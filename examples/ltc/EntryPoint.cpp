@@ -79,7 +79,7 @@ struct LightUniformData
 struct SharedResources
 {
     Buffer CameraUniformBuffer;
-    Buffer ModelUniformBuffer;
+    Buffer MeshDataUniformBuffer;
     Buffer MaterialUniformBuffer;
     Buffer LightUniformBuffer;
     Mesh Sponza;
@@ -224,7 +224,7 @@ public:
     virtual void SetupPipeline(PipelineState pipeline) override
     {
         pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.ModelUniformBuffer);
+        pipeline.DeclareBuffer(this->sharedResources.MeshDataUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer);
         pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer);
     }
@@ -232,7 +232,7 @@ public:
     virtual void SetupDependencies(DependencyState depedencies) override
     {
         depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,   BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.ModelUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
+        depedencies.AddBuffer(this->sharedResources.MeshDataUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.LightUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
         depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
     }
@@ -261,7 +261,7 @@ public:
         };
 
         FillUniform(this->sharedResources.CameraUniform, this->sharedResources.CameraUniformBuffer);
-        FillUniform(this->sharedResources.ModelUniform, this->sharedResources.ModelUniformBuffer);
+        FillUniform(this->sharedResources.ModelUniform, this->sharedResources.MeshDataUniformBuffer);
         FillUniformArray(this->sharedResources.LightUniformArray, this->sharedResources.LightUniformBuffer);
         FillUniformArray(this->sharedResources.Sponza.Materials, this->sharedResources.MaterialUniformBuffer);
     }
@@ -309,7 +309,7 @@ public:
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.ModelUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(1, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(2, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(3, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)

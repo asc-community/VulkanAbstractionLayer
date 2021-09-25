@@ -22,7 +22,9 @@ layout(push_constant) uniform uPushConstant
      vec3 uCameraPosition;
      uint uMaterialIndex;
      vec3 uProbeGridOffset;
+     uint uModelIndex;
      vec3 uProbeGridDensity;
+     uint uTextureOffset;
      vec3 uProbeGridSize;
 };
 
@@ -39,13 +41,13 @@ layout(set = 0, binding = 1) uniform uProbeViewsBuffer
 
 layout(set = 0, binding = 2) uniform uModelBuffer
 {
-    mat3 uModel;
+    mat4 uModels[256];
 };
 
 void main() 
 {
-    vPosition = uModel * iPosition;
+    vPosition = (uModels[uModelIndex] * vec4(iPosition, 1.0)).xyz;
     gl_Position = uProbeMatrices[gl_ViewIndex] * vec4(vPosition, 1.0);
     vTexCoord = iTexCoord;
-    vNormalMatrix = uModel * mat3(iTangent, iBitangent, iNormal);
+    vNormalMatrix = mat3(uModels[uModelIndex]) * mat3(iTangent, iBitangent, iNormal);
 }

@@ -962,13 +962,6 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    void PreWarmDescriptorSets(const Shader& shader)
-    {
-        auto& descriptorCache = GetCurrentVulkanContext().GetDescriptorCache();
-        auto uniforms = shader.GetShaderUniforms();
-        (void)descriptorCache.GetDescriptor(uniforms);
-    }
-
     RenderGraphBuilder::PipelineHashMap RenderGraphBuilder::CreatePipelines()
     {
         PipelineHashMap pipelines;
@@ -976,8 +969,6 @@ namespace VulkanAbstractionLayer
         {  
             auto& pipeline = pipelines[renderPassReference.Name];
             renderPassReference.Pass->SetupPipeline(pipeline);
-            if ((bool)pipeline.Shader) PreWarmDescriptorSets(*pipeline.Shader);
-            
             this->SetupExternalResources(pipeline);
         }
         return pipelines;

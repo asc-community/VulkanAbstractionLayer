@@ -45,16 +45,8 @@ namespace VulkanAbstractionLayer
 		};
 
 	private:
-		using LayoutSpecification = std::vector<ShaderUniforms>;
-
-		struct DescriptorCacheEntry
-		{
-			LayoutSpecification Specification;
-			Descriptor SetInfo;
-		};
-
 		vk::DescriptorPool descriptorPool;
-		std::vector<DescriptorCacheEntry> cache;
+		std::vector<Descriptor> cache;
 
 		vk::DescriptorSetLayout CreateDescriptorSetLayout(ArrayView<const ShaderUniforms> specification);
 		vk::DescriptorSet AllocateDescriptorSet(vk::DescriptorSetLayout layout);
@@ -66,7 +58,6 @@ namespace VulkanAbstractionLayer
 		void Destroy();
 
 		const auto& GetDescriptorPool() const { return this->descriptorPool; }
-
 		Descriptor GetDescriptor(ArrayView<const ShaderUniforms> specification);
 	};
 }

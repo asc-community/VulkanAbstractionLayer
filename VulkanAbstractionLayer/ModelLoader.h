@@ -54,6 +54,7 @@ namespace VulkanAbstractionLayer
             ImageData NormalTexture;
             ImageData MetallicRoughness;
             float RoughnessScale = 1.0f;
+            float MetallicScale = 1.0f;
         };
 
         using Index = uint32_t;
@@ -63,7 +64,7 @@ namespace VulkanAbstractionLayer
             std::string Name;
             std::vector<Vertex> Vertices;
             std::vector<Index> Indices;
-            uint32_t MaterialIndex = 0;
+            uint32_t MaterialIndex = -1;
         };
 
         std::vector<Shape> Shapes;

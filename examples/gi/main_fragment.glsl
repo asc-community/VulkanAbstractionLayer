@@ -12,6 +12,7 @@ struct Material
     uint NormalTextureIndex;
     uint MetallicRoughnessTextureIndex;
     float RoughnessScale;
+    float MetallicScale;
 };
 
 struct Fragment
@@ -40,7 +41,9 @@ layout(push_constant) uniform uPushConstant
      vec3 uCameraPosition;
      uint uMaterialIndex;
      vec3 uProbeGridOffset;
+     uint uModelIndex;
      vec3 uProbeGridDensity;
+     uint uTextureOffset;
      vec3 uProbeGridSize;
 };
 
@@ -181,9 +184,9 @@ int GetProbeIndex(vec3 position, vec3 probeGridSize, vec3 probeGridDensity)
 void main() 
 {
     Material material = uMaterials[uMaterialIndex];
-    vec4 albedoColor   = texture(sampler2D(uTextures[material.AlbedoTextureIndex], uImageSampler), vTexCoord);
-    vec4 normalColor   = texture(sampler2D(uTextures[material.NormalTextureIndex], uImageSampler), vTexCoord);
-    vec4 metallicRoughnessColor = texture(sampler2D(uTextures[material.MetallicRoughnessTextureIndex], uImageSampler), vTexCoord);
+    vec4 albedoColor   = texture(sampler2D(uTextures[uTextureOffset + material.AlbedoTextureIndex], uImageSampler), vTexCoord);
+    vec4 normalColor   = texture(sampler2D(uTextures[uTextureOffset + material.NormalTextureIndex], uImageSampler), vTexCoord);
+    vec4 metallicRoughnessColor = texture(sampler2D(uTextures[uTextureOffset + material.MetallicRoughnessTextureIndex], uImageSampler), vTexCoord);
     
     if(albedoColor.a < 0.5)
         discard;
@@ -194,7 +197,7 @@ void main()
     Fragment fragment;
     fragment.Albedo = pow(albedoColor.rgb, vec3(GAMMA));
     fragment.Normal = vNormalMatrix * vec3(2.0 * normalColor.rgb - 1.0);
-    fragment.Metallic = 1.0 - metallicRoughnessColor.b;
+    fragment.Metallic = material.MetallicScale * (1.0 - metallicRoughnessColor.b);
     fragment.Roughness = material.RoughnessScale * metallicRoughnessColor.g;
 
     vec3 color;
