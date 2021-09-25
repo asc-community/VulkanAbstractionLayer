@@ -35,14 +35,14 @@ namespace VulkanAbstractionLayer
 {
 	class ImGuiRenderPass : public RenderPass
 	{
-		StringId outputImageName;
+		std::string outputImageName;
 		AttachmentState onLoad;
 
 	public:
-		ImGuiRenderPass(StringId outputImageName)
+		ImGuiRenderPass(const std::string& outputImageName)
 			: ImGuiRenderPass(outputImageName, AttachmentState::LOAD_COLOR) { }
 
-		ImGuiRenderPass(StringId outputImageName, AttachmentState onLoad)
+		ImGuiRenderPass(const std::string& outputImageName, AttachmentState onLoad)
 			: outputImageName(outputImageName), onLoad(onLoad) { }
 
 		virtual void SetupPipeline(PipelineState pipeline) override

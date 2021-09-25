@@ -186,12 +186,12 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 	
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, StringId attachment, UniformType type, ImageView view)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::string& attachment, UniformType type, ImageView view)
 	{
 		return this->Bind(binding, attachment, EmptySampler, type, view);
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, StringId attachment, const Sampler& sampler, UniformType type, ImageView view)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::string& attachment, const Sampler& sampler, UniformType type, ImageView view)
 	{
 		this->attachmentWriteInfos.push_back(AttachmentResolveInfo{
 			attachment,
@@ -236,7 +236,7 @@ namespace VulkanAbstractionLayer
 		return *this;
 	}
 
-	void DescriptorBinding::ResolveAttachments(const std::unordered_map<StringId, Image>& mappings)
+	void DescriptorBinding::ResolveAttachments(const std::unordered_map<std::string, Image>& mappings)
 	{
 		for (const auto& attachmentInfo : this->attachmentWriteInfos)
 		{
@@ -245,7 +245,7 @@ namespace VulkanAbstractionLayer
 		this->attachmentWriteInfos.clear();
 	}
 
-	void DescriptorBinding::ResolveAttachments(const std::unordered_map<StringId, ImageReference>& mappings)
+	void DescriptorBinding::ResolveAttachments(const std::unordered_map<std::string, ImageReference>& mappings)
 	{
 		for (const auto& attachmentInfo : this->attachmentWriteInfos)
 		{

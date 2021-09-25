@@ -28,10 +28,12 @@
 
 #pragma once
 
+#include <vector>
+#include <string>
+
 #include "Buffer.h"
 #include "Image.h"
 #include "Sampler.h"
-#include "StringId.h"
 #include "ShaderReflection.h"
 #include "ArrayUtils.h"
 
@@ -63,7 +65,7 @@ namespace VulkanAbstractionLayer
 
 		struct AttachmentResolveInfo
 		{
-			StringId Name;
+			std::string Name;
 			uint32_t Binding;
 			UniformType Type;
 			ImageUsage::Bits Usage;
@@ -97,10 +99,10 @@ namespace VulkanAbstractionLayer
 		DescriptorBinding& Bind(uint32_t binding, ArrayView<SamplerReference> samplers, UniformType type);
 		DescriptorBinding& Bind(uint32_t binding, ArrayView<Sampler> samplers, UniformType type);
 
-		DescriptorBinding& Bind(uint32_t binding, StringId attachment, UniformType type, ImageView view);
-		DescriptorBinding& Bind(uint32_t binding, StringId attachment, const Sampler& sampler, UniformType type, ImageView view);
-		void ResolveAttachments(const std::unordered_map<StringId, Image>& mappings);
-		void ResolveAttachments(const std::unordered_map<StringId, ImageReference>& mappings);
+		DescriptorBinding& Bind(uint32_t binding, const std::string& attachment, UniformType type, ImageView view);
+		DescriptorBinding& Bind(uint32_t binding, const std::string& attachment, const Sampler& sampler, UniformType type, ImageView view);
+		void ResolveAttachments(const std::unordered_map<std::string, Image>& mappings);
+		void ResolveAttachments(const std::unordered_map<std::string, ImageReference>& mappings);
 
 		void Write(const vk::DescriptorSet& descriptorSet) const;
 		const auto& GetBufferDescriptors() const { return this->bufferWriteInfos; }

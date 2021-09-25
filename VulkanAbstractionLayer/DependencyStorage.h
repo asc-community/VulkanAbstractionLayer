@@ -29,8 +29,8 @@
 #pragma once
 
 #include <vector>
+#include <string>
 
-#include "StringId.h"
 #include "Buffer.h"
 #include "Image.h"
 #include "ArrayUtils.h"
@@ -39,31 +39,50 @@ namespace VulkanAbstractionLayer
 {
 	class DependencyStorage
 	{
-		struct BufferDependency
+		struct BufferDependencyByValue
 		{
             VkBuffer BufferNativeHandle;
             BufferUsage::Bits Usage;
 		};
 
-        struct ImageDependency
+        struct ImageDependencyByValue
         {
             VkImage ImageNativeHandle;
             ImageUsage::Bits Usage;
         };
 
-        std::vector<BufferDependency> bufferDependencies;
-        std::vector<ImageDependency> imageDependencies;
+        struct ImageDependencyByName
+        {
+            std::string Name;
+            ImageUsage::Bits Usage;
+        };
+
+        struct BufferDependencyByName
+        {
+            std::string Name;
+            BufferUsage::Bits Usage;
+        };
+
+        std::vector<BufferDependencyByValue> bufferDependenciesByValue;
+        std::vector<ImageDependencyByValue> imageDependenciesByValue;
+        std::vector<BufferDependencyByName> bufferDependenciesByName;
+        std::vector<ImageDependencyByName> imageDependenciesByName;
     public:
         void AddBuffer(const Buffer& buffer, BufferUsage::Bits usage);
+        void AddBuffer(const std::string& buffer, BufferUsage::Bits usage);
         void AddBuffers(ArrayView<BufferReference> buffers, BufferUsage::Bits usage);
         void AddBuffers(ArrayView<Buffer> buffers, BufferUsage::Bits usage);
+        void AddBuffers(ArrayView<std::string> buffers, BufferUsage::Bits usage);
+        
         void AddImage(const Image& image, ImageUsage::Bits usage);
-        void AddImage(StringId name, ImageUsage::Bits usage);
+        void AddImage(const std::string& buffer, ImageUsage::Bits usage);
         void AddImages(ArrayView<ImageReference> images, ImageUsage::Bits usage);
         void AddImages(ArrayView<Image> images, ImageUsage::Bits usage);
-        void AddImages(ArrayView<StringId> images, ImageUsage::Bits usage);
+        void AddImages(ArrayView<std::string> images, ImageUsage::Bits usage);
 
-        const auto& GetBufferDependencies() const { return this->bufferDependencies; }
-        const auto& GetImageDependencies() const { return this->imageDependencies; }
+        const auto& GetBufferDependenciesByName() const { return this->bufferDependenciesByName; }
+        const auto& GetImageDependenciesByName() const { return this->imageDependenciesByName; }
+        const auto& GetBufferDependenciesByValue() const { return this->bufferDependenciesByValue; }
+        const auto& GetImageDependenciesByValue() const { return this->imageDependenciesByValue; }
 	};
 }

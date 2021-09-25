@@ -31,7 +31,6 @@
 #include "DependencyStorage.h"
 #include "Pipeline.h"
 #include "CommandBuffer.h"
-#include "StringId.h"
 
 namespace VulkanAbstractionLayer
 {
@@ -55,7 +54,7 @@ namespace VulkanAbstractionLayer
         CommandBuffer& Commands;
         const PassNative& Pass;
 
-        const Image& GetAttachment(StringId name);
+        const Image& GetAttachment(const std::string& name);
     };
 
     using DependencyState = DependencyStorage&;

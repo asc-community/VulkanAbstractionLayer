@@ -30,17 +30,26 @@
 
 namespace VulkanAbstractionLayer
 {
-	VkImage AttachmentNameToImageHandle(StringId name);
-
 	void DependencyStorage::AddBuffer(const Buffer& buffer, BufferUsage::Bits usage)
 	{
-		this->bufferDependencies.push_back({ (VkBuffer)buffer.GetNativeHandle(), usage });
+		this->bufferDependenciesByValue.push_back({ (VkBuffer)buffer.GetNativeHandle(), usage });
+	}
+
+	void DependencyStorage::AddBuffer(const std::string& buffer, BufferUsage::Bits usage)
+	{
+		this->bufferDependenciesByName.push_back({ buffer, usage });
 	}
 
 	void DependencyStorage::AddBuffers(ArrayView<BufferReference> buffers, BufferUsage::Bits usage)
 	{
 		for (const auto& buffer : buffers)
 			this->AddBuffer(buffer.get(), usage);
+	}
+
+	void DependencyStorage::AddBuffers(ArrayView<std::string> buffers, BufferUsage::Bits usage)
+	{
+		for (const auto& buffer : buffers)
+			this->AddBuffer(buffer, usage);
 	}
 
 	void DependencyStorage::AddBuffers(ArrayView<Buffer> buffers, BufferUsage::Bits usage)
@@ -51,12 +60,12 @@ namespace VulkanAbstractionLayer
 
 	void DependencyStorage::AddImage(const Image& image, ImageUsage::Bits usage)
 	{
-		this->imageDependencies.push_back({ (VkImage)image.GetNativeHandle(), usage });
+		this->imageDependenciesByValue.push_back({ (VkImage)image.GetNativeHandle(), usage });
 	}
 
-	void DependencyStorage::AddImage(StringId name, ImageUsage::Bits usage)
+	void DependencyStorage::AddImage(const std::string& image, ImageUsage::Bits usage)
 	{
-		this->imageDependencies.push_back({ AttachmentNameToImageHandle(name), usage });
+		this->imageDependenciesByName.push_back({ image, usage });
 	}
 
 	void DependencyStorage::AddImages(ArrayView<ImageReference> images, ImageUsage::Bits usage)
@@ -71,7 +80,7 @@ namespace VulkanAbstractionLayer
 			this->AddImage(image, usage);
 	}
 
-	void DependencyStorage::AddImages(ArrayView<StringId> images, ImageUsage::Bits usage)
+	void DependencyStorage::AddImages(ArrayView<std::string> images, ImageUsage::Bits usage)
 	{
 		for (const auto& image : images)
 			this->AddImage(image, usage);

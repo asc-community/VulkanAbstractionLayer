@@ -32,7 +32,7 @@
 
 namespace VulkanAbstractionLayer
 {
-    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> attachments, StringId outputName, PresentCallback onPresent, CreateCallback onCreate)
+    RenderGraph::RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<std::string, Image> attachments, const std::string& outputName, PresentCallback onPresent, CreateCallback onCreate)
         : nodes(std::move(nodes)), attachments(std::move(attachments)), outputName(std::move(outputName)), onPresent(std::move(onPresent)), onCreate(std::move(onCreate))
     {
 
@@ -77,16 +77,16 @@ namespace VulkanAbstractionLayer
         this->onPresent(commandBuffer, this->attachments.at(this->outputName), presentImage);
     }
 
-    const RenderGraphNode& RenderGraph::GetNodeByName(StringId name) const
+    const RenderGraphNode& RenderGraph::GetNodeByName(const std::string& name) const
     {
-        auto it = std::find_if(this->nodes.begin(), this->nodes.end(), [name](const RenderGraphNode& node) { return node.Name == name; });
+        auto it = std::find_if(this->nodes.begin(), this->nodes.end(), [&name](const RenderGraphNode& node) { return node.Name == name; });
         assert(it != this->nodes.end());
         return *it;
     }
 
-    RenderGraphNode& RenderGraph::GetNodeByName(StringId name)
+    RenderGraphNode& RenderGraph::GetNodeByName(const std::string& name)
     {
-        auto it = std::find_if(this->nodes.begin(), this->nodes.end(), [name](const RenderGraphNode& node) { return node.Name == name; });
+        auto it = std::find_if(this->nodes.begin(), this->nodes.end(), [&name](const RenderGraphNode& node) { return node.Name == name; });
         assert(it != this->nodes.end());
         return *it;
     }
@@ -108,7 +108,7 @@ namespace VulkanAbstractionLayer
         this->attachments.clear();
     }
 
-    const Image& RenderGraph::GetAttachmentByName(StringId name) const
+    const Image& RenderGraph::GetAttachmentByName(const std::string& name) const
     {
         return this->attachments.at(name);
     }

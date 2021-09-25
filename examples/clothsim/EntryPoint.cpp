@@ -216,15 +216,15 @@ public:
             ShaderLoader::LoadFromSourceFile("main_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
         );
 
-        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
-        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
+        pipeline.DeclareAttachment("Output", Format::R8G8B8A8_UNORM);
+        pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DescriptorBindings
             .Bind(0, sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, sharedResources.PositionImage, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
-        pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.3f, 0.4f, 0.7f });
-        pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
+        pipeline.AddOutputAttachment("Output", ClearColor{ 0.3f, 0.4f, 0.7f });
+        pipeline.AddOutputAttachment("OutputDepth", ClearDepthStencil{ });
     }
 
     virtual void SetupDependencies(DependencyState depedencies) override
@@ -233,7 +233,7 @@ public:
 
     virtual void OnRender(RenderPassState state) override
     {
-        state.Commands.SetRenderArea(state.GetAttachment("Output"_id));
+        state.Commands.SetRenderArea(state.GetAttachment("Output"));
 
         uint32_t width = sharedResources.PositionImage.GetWidth();
         uint32_t height = sharedResources.PositionImage.GetHeight();
@@ -282,13 +282,13 @@ public:
             .Bind(0, sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, sharedResources.BallStorageBuffer, UniformType::UNIFORM_BUFFER);
 
-        pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
-        pipeline.AddOutputAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+        pipeline.AddOutputAttachment("Output", AttachmentState::LOAD_COLOR);
+        pipeline.AddOutputAttachment("OutputDepth", AttachmentState::LOAD_DEPTH_SPENCIL);
     }
 
     virtual void OnRender(RenderPassState state) override
     {
-        state.Commands.SetRenderArea(state.GetAttachment("Output"_id));
+        state.Commands.SetRenderArea(state.GetAttachment("Output"));
 
         struct
         {
@@ -309,13 +309,13 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
-        .AddRenderPass("ComputePass"_id, std::make_unique<ComputeRenderPass>(resources))
-        .AddRenderPass("ClothPass"_id, std::make_unique<OpaqueRenderPass>(resources))
-        .AddRenderPass("BallPass"_id, std::make_unique<BallRenderPass>(resources))
-        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
+        .AddRenderPass("UniformSubmitPass", std::make_unique<UniformSubmitRenderPass>(resources))
+        .AddRenderPass("ComputePass", std::make_unique<ComputeRenderPass>(resources))
+        .AddRenderPass("ClothPass", std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("BallPass", std::make_unique<BallRenderPass>(resources))
+        .AddRenderPass("ImGuiPass", std::make_unique<ImGuiRenderPass>("Output"))
         .SetOptions(options)
-        .SetOutputName("Output"_id);
+        .SetOutputName("Output");
 
     return renderGraphBuilder.Build();
 }
@@ -520,7 +520,7 @@ int main()
         camera.AspectRatio = size.x / size.y;
     });
     
-    ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
+    ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass").PassNative.RenderPassHandle);
 
     while (!window.ShouldClose())
     {

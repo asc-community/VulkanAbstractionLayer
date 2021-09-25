@@ -299,8 +299,8 @@ public:
             }
         };
 
-        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
-        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
+        pipeline.DeclareAttachment("Output", Format::R8G8B8A8_UNORM);
+        pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareImage(this->sharedResources.LookupLTCMatrix, ImageUsage::TRANSFER_DISTINATION);
@@ -318,13 +318,13 @@ public:
             .Bind(7, this->sharedResources.LookupLTCAmplitude, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(8, this->sharedResources.LightTextures, UniformType::SAMPLED_IMAGE);
 
-        pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
-        pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
+        pipeline.AddOutputAttachment("Output", ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
+        pipeline.AddOutputAttachment("OutputDepth", ClearDepthStencil{ });
     }
     
     virtual void OnRender(RenderPassState state) override
     {
-        auto& output = state.GetAttachment("Output"_id);
+        auto& output = state.GetAttachment("Output");
         state.Commands.SetRenderArea(output);
 
         for (const auto& submesh : this->sharedResources.Sponza.Submeshes)
@@ -342,11 +342,11 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
-        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
-        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
+        .AddRenderPass("UniformSubmitPass", std::make_unique<UniformSubmitRenderPass>(resources))
+        .AddRenderPass("OpaquePass", std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("ImGuiPass", std::make_unique<ImGuiRenderPass>("Output"))
         .SetOptions(options)
-        .SetOutputName("Output"_id);
+        .SetOutputName("Output");
 
     return renderGraphBuilder.Build();
 }
@@ -493,7 +493,7 @@ int main()
         camera.AspectRatio = size.x / size.y;
     });
     
-    ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
+    ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass").PassNative.RenderPassHandle);
 
     std::map<size_t, ImTextureID> ImGuiRegisteredImages;
     for (const auto& material : sharedResources.Sponza.Materials)

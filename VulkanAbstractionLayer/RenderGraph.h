@@ -31,7 +31,6 @@
 #include "RenderPass.h"
 #include "Image.h"
 #include "CommandBuffer.h"
-#include "StringId.h"
 
 #include <vector>
 #include <functional>
@@ -41,7 +40,7 @@ namespace VulkanAbstractionLayer
 {
     struct RenderGraphNode
     {
-        StringId Name;
+        std::string Name;
         PassNative PassNative;
         std::unique_ptr<RenderPass> PassCustom;
         std::function<void(CommandBuffer&)> PipelineBarrierCallback;
@@ -55,14 +54,14 @@ namespace VulkanAbstractionLayer
         using DestroyCallback = std::function<void(CommandBuffer&)>;
 
         std::vector<RenderGraphNode> nodes;
-        std::unordered_map<StringId, Image> attachments;
-        StringId outputName;
+        std::unordered_map<std::string, Image> attachments;
+        std::string outputName;
         PresentCallback onPresent;
         CreateCallback onCreate;
 
         void InitializeOnFirstFrame(CommandBuffer& commandBuffer);
     public:
-        RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<StringId, Image> attachments, StringId outputName, PresentCallback onPresent, CreateCallback onCreate);
+        RenderGraph(std::vector<RenderGraphNode> nodes, std::unordered_map<std::string, Image> attachments, const std::string& outputName, PresentCallback onPresent, CreateCallback onCreate);
         ~RenderGraph();
         RenderGraph(RenderGraph&&) = default;
         RenderGraph& operator=(RenderGraph&& other) = delete;
@@ -70,12 +69,12 @@ namespace VulkanAbstractionLayer
         void ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer);
         void Execute(CommandBuffer& commandBuffer);
         void Present(CommandBuffer& commandBuffer, const Image& presentImage);
-        const RenderGraphNode& GetNodeByName(StringId name) const;
-        RenderGraphNode& GetNodeByName(StringId name);
-        const Image& GetAttachmentByName(StringId name) const;
+        const RenderGraphNode& GetNodeByName(const std::string& name) const;
+        RenderGraphNode& GetNodeByName(const std::string& name);
+        const Image& GetAttachmentByName(const std::string& name) const;
 
         template<typename T>
-        T& GetRenderPassByName(StringId name)
+        T& GetRenderPassByName(const std::string& name)
         {
             auto& node = this->GetNodeByName(name);
             assert(dynamic_cast<T*>(node.PassCustom.get()) != nullptr);
@@ -83,7 +82,7 @@ namespace VulkanAbstractionLayer
         }
 
         template<typename T>
-        const T& GetRenderPassByName(StringId name) const
+        const T& GetRenderPassByName(const std::string& name) const
         {
             const auto& node = this->GetNodeByName(name);
             assert(dynamic_cast<const T*>(node.PassCustom.get()) != nullptr);

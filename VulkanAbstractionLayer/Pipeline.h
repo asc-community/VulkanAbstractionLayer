@@ -30,7 +30,6 @@
 
 #include "Shader.h"
 #include "DescriptorBinding.h"
-#include "StringId.h"
 #include "CommandBuffer.h"
 
 namespace VulkanAbstractionLayer
@@ -65,7 +64,7 @@ namespace VulkanAbstractionLayer
 
         struct AttachmentDeclaration
         {
-            StringId Name;
+            std::string Name;
             Format ImageFormat;
             uint32_t Width;
             uint32_t Height;
@@ -76,7 +75,7 @@ namespace VulkanAbstractionLayer
         {
             constexpr static uint32_t ALL_LAYERS = uint32_t(-1);
 
-            StringId Name;
+            std::string Name;
             ClearColor ColorClear;
             ClearDepthStencil DepthSpencilClear;
             AttachmentState OnLoad;
@@ -94,12 +93,12 @@ namespace VulkanAbstractionLayer
         std::vector<VertexBinding> VertexBindings;
         DescriptorBinding DescriptorBindings;
 
-        void AddOutputAttachment(StringId name, ClearColor clear);
-        void AddOutputAttachment(StringId name, ClearDepthStencil clear);
-        void AddOutputAttachment(StringId name, AttachmentState onLoad);
-        void AddOutputAttachment(StringId name, ClearColor clear, uint32_t layer);
-        void AddOutputAttachment(StringId name, ClearDepthStencil clear, uint32_t layer);
-        void AddOutputAttachment(StringId name, AttachmentState onLoad, uint32_t layer);
+        void AddOutputAttachment(const std::string& name, ClearColor clear);
+        void AddOutputAttachment(const std::string& name, ClearDepthStencil clear);
+        void AddOutputAttachment(const std::string& name, AttachmentState onLoad);
+        void AddOutputAttachment(const std::string& name, ClearColor clear, uint32_t layer);
+        void AddOutputAttachment(const std::string& name, ClearDepthStencil clear, uint32_t layer);
+        void AddOutputAttachment(const std::string& name, AttachmentState onLoad, uint32_t layer);
 
         void DeclareBuffer(const Buffer& buffer);
         void DeclareImage(const Image& image, ImageUsage::Bits oldUsage);
@@ -109,9 +108,9 @@ namespace VulkanAbstractionLayer
         void DeclareImages(ArrayView<ImageReference> images, ImageUsage::Bits oldUsage);
         void DeclareImages(ArrayView<Image> images, ImageUsage::Bits oldUsage);
 
-        void DeclareAttachment(StringId name, Format format);
-        void DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height);
-        void DeclareAttachment(StringId name, Format format, uint32_t width, uint32_t height, ImageOptions::Value options);
+        void DeclareAttachment(const std::string& name, Format format);
+        void DeclareAttachment(const std::string& name, Format format, uint32_t width, uint32_t height);
+        void DeclareAttachment(const std::string& name, Format format, uint32_t width, uint32_t height, ImageOptions::Value options);
 
         const auto& GetBufferDeclarations() const { return this->bufferDeclarations; }
         const auto& GetImageDeclarations() const { return this->imageDeclarations; }

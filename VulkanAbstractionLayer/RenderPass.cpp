@@ -31,7 +31,7 @@
 
 namespace VulkanAbstractionLayer
 {
-    const Image& RenderPassState::GetAttachment(StringId name)
+    const Image& RenderPassState::GetAttachment(const std::string& name)
     {
         return this->Graph.GetAttachmentByName(name);
     }

@@ -392,7 +392,7 @@ public:
             ShaderLoader::LoadFromSourceFile("shadow_fragment.glsl", ShaderType::FRAGMENT, ShaderLanguage::GLSL)
         );
         
-        pipeline.DeclareAttachment("ShadowDepth"_id, Format::D32_SFLOAT_S8_UINT, 2048, 2048);
+        pipeline.DeclareAttachment("ShadowDepth", Format::D32_SFLOAT_S8_UINT, 2048, 2048);
 
         pipeline.VertexBindings = {
             VertexBinding{
@@ -409,12 +409,12 @@ public:
             .Bind(1, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER);
 
-        pipeline.AddOutputAttachment("ShadowDepth"_id, ClearDepthStencil{ });
+        pipeline.AddOutputAttachment("ShadowDepth", ClearDepthStencil{ });
     }
 
     virtual void OnRender(RenderPassState state) override
     {
-        auto& output = state.GetAttachment("ShadowDepth"_id);
+        auto& output = state.GetAttachment("ShadowDepth");
         state.Commands.SetRenderArea(output);
 
         for (const auto& mesh : this->sharedResources.Meshes)
@@ -463,8 +463,8 @@ public:
         pipeline.DeclareImage(this->sharedResources.BRDFLUT, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareImage(this->sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareImage(this->sharedResources.SkyboxIrradiance, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
-        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
+        pipeline.DeclareAttachment("Output", Format::R8G8B8A8_UNORM);
+        pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
@@ -473,18 +473,18 @@ public:
             .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureSampler, UniformType::SAMPLER)
             .Bind(5, this->sharedResources.Textures, UniformType::SAMPLED_IMAGE)
-            .Bind(6, "ShadowDepth"_id, this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH_ONLY)
+            .Bind(6, "ShadowDepth", this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH_ONLY)
             .Bind(7, this->sharedResources.BRDFLUT, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(8, this->sharedResources.Skybox, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(9, this->sharedResources.SkyboxIrradiance, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
-        pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
-        pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
+        pipeline.AddOutputAttachment("Output", ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
+        pipeline.AddOutputAttachment("OutputDepth", ClearDepthStencil{ });
     }
     
     virtual void OnRender(RenderPassState state) override
     {
-        auto& output = state.GetAttachment("Output"_id);
+        auto& output = state.GetAttachment("Output");
         state.Commands.SetRenderArea(output);
 
         for (const auto& mesh : this->sharedResources.Meshes)
@@ -520,13 +520,13 @@ public:
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(8, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
-        pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
-        pipeline.AddOutputAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+        pipeline.AddOutputAttachment("Output", AttachmentState::LOAD_COLOR);
+        pipeline.AddOutputAttachment("OutputDepth", AttachmentState::LOAD_DEPTH_SPENCIL);
     }
 
     virtual void OnRender(RenderPassState state) override
     {
-        auto& output = state.GetAttachment("Output"_id);
+        auto& output = state.GetAttachment("Output");
         state.Commands.SetRenderArea(output);
 
         constexpr uint32_t SkyboxVertexCount = 36;
@@ -538,13 +538,13 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
-        .AddRenderPass("ShadowPass"_id, std::make_unique<ShadowRenderPass>(resources))
-        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
-        .AddRenderPass("SkyboxPass"_id, std::make_unique<SkyboxRenderPass>(resources))
-        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
+        .AddRenderPass("UniformSubmitPass", std::make_unique<UniformSubmitRenderPass>(resources))
+        .AddRenderPass("ShadowPass", std::make_unique<ShadowRenderPass>(resources))
+        .AddRenderPass("OpaquePass", std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("SkyboxPass", std::make_unique<SkyboxRenderPass>(resources))
+        .AddRenderPass("ImGuiPass", std::make_unique<ImGuiRenderPass>("Output"))
         .SetOptions(options)
-        .SetOutputName("Output"_id);
+        .SetOutputName("Output");
 
     return renderGraphBuilder.Build();
 }
@@ -668,7 +668,7 @@ int main()
         camera.AspectRatio = size.x / size.y;
     });
     
-    ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
+    ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass").PassNative.RenderPassHandle);
 
     std::unordered_map<uint32_t, ImTextureID> imguiMappings;
     Sampler imguiSampler = Sampler{ Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::CLAMP_TO_EDGE, Sampler::MipFilter::LINEAR };
@@ -775,7 +775,7 @@ int main()
             Vector3 low { -lightBounds, -lightBounds, -lightBounds };
             Vector3 high{ lightBounds, lightBounds, lightBounds };
 
-            auto& uniformSubmitPass = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass"_id);
+            auto& uniformSubmitPass = renderGraph->GetRenderPassByName<UniformSubmitRenderPass>("UniformSubmitPass");
             uniformSubmitPass.CameraUniform.Matrix = camera.GetMatrix();
             uniformSubmitPass.CameraUniform.Position = camera.Position;
             uniformSubmitPass.ModelUniform.Matrix = MakeRotationMatrix(modelRotation);

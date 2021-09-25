@@ -391,13 +391,13 @@ public:
 
     virtual void SetupDependencies(DependencyState depedencies) override
     {
-        depedencies.AddImage("OutputProbe"_id, ImageUsage::TRANSFER_SOURCE);
+        depedencies.AddImage("OutputProbe", ImageUsage::TRANSFER_SOURCE);
         depedencies.AddImages(this->sharedResources.ReflectionProbes.Cubemaps, ImageUsage::TRANSFER_DISTINATION);
     }
 
     virtual void OnRender(RenderPassState state) override
     {
-        auto& renderedProbe = state.GetAttachment("OutputProbe"_id);
+        auto& renderedProbe = state.GetAttachment("OutputProbe");
         auto& reflectionProbe = this->sharedResources.ReflectionProbes.Cubemaps[this->sharedResources.CurrentProbeIndex];
         for (uint32_t layer = 0; layer < renderedProbe.GetLayerCount(); layer++)
         {
@@ -451,8 +451,8 @@ public:
             }
         };
 
-        pipeline.DeclareAttachment("OutputProbe"_id, Format::R8G8B8A8_UNORM, ProbeResolution, ProbeResolution, ImageOptions::CUBEMAP);
-        pipeline.DeclareAttachment("OutputProbeDepth"_id, Format::D32_SFLOAT_S8_UINT, ProbeResolution, ProbeResolution, ImageOptions::CUBEMAP);
+        pipeline.DeclareAttachment("OutputProbe", Format::R8G8B8A8_UNORM, ProbeResolution, ProbeResolution, ImageOptions::CUBEMAP);
+        pipeline.DeclareAttachment("OutputProbeDepth", Format::D32_SFLOAT_S8_UINT, ProbeResolution, ProbeResolution, ImageOptions::CUBEMAP);
 
         pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareImage(this->sharedResources.BRDFLUT, ImageUsage::TRANSFER_DISTINATION);
@@ -471,13 +471,13 @@ public:
             .Bind(8, this->sharedResources.Skybox, UniformType::SAMPLED_IMAGE)
             .Bind(9, this->sharedResources.SkyboxIrradiance, UniformType::SAMPLED_IMAGE);
 
-        pipeline.AddOutputAttachment("OutputProbe"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
-        pipeline.AddOutputAttachment("OutputProbeDepth"_id, ClearDepthStencil{ });
+        pipeline.AddOutputAttachment("OutputProbe", ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
+        pipeline.AddOutputAttachment("OutputProbeDepth", ClearDepthStencil{ });
     }
 
     virtual void OnRender(RenderPassState state) override
     {
-        auto& output = state.GetAttachment("OutputProbe"_id);
+        auto& output = state.GetAttachment("OutputProbe");
         state.Commands.SetRenderArea(output);
 
         struct
@@ -554,8 +554,8 @@ public:
             }
         };
 
-        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
-        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
+        pipeline.DeclareAttachment("Output", Format::R8G8B8A8_UNORM);
+        pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DescriptorBindings
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
@@ -569,13 +569,13 @@ public:
             .Bind(8, this->sharedResources.Skybox, UniformType::SAMPLED_IMAGE)
             .Bind(9, this->sharedResources.SkyboxIrradiance, UniformType::SAMPLED_IMAGE);
 
-        pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
-        pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthStencil{ });
+        pipeline.AddOutputAttachment("Output", ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
+        pipeline.AddOutputAttachment("OutputDepth", ClearDepthStencil{ });
     }
     
     virtual void OnRender(RenderPassState state) override
     {
-        auto& output = state.GetAttachment("Output"_id);
+        auto& output = state.GetAttachment("Output");
         state.Commands.SetRenderArea(output);
 
         struct
@@ -643,15 +643,15 @@ public:
             .Bind(1, this->sharedResources.ReflectionProbes.Cubemaps, UniformType::SAMPLED_IMAGE)
             .Bind(2, this->textureSampler, UniformType::SAMPLER);
 
-        pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
-        pipeline.AddOutputAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+        pipeline.AddOutputAttachment("Output", AttachmentState::LOAD_COLOR);
+        pipeline.AddOutputAttachment("OutputDepth", AttachmentState::LOAD_DEPTH_SPENCIL);
     }
 
     virtual void OnRender(RenderPassState state) override
     {
         if (!DrawProbes) return;
 
-        auto& output = state.GetAttachment("Output"_id);
+        auto& output = state.GetAttachment("Output");
         state.Commands.SetRenderArea(output);
 
         struct
@@ -701,13 +701,13 @@ public:
             .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
             .Bind(1, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
-        pipeline.AddOutputAttachment("Output"_id, AttachmentState::LOAD_COLOR);
-        pipeline.AddOutputAttachment("OutputDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+        pipeline.AddOutputAttachment("Output", AttachmentState::LOAD_COLOR);
+        pipeline.AddOutputAttachment("OutputDepth", AttachmentState::LOAD_DEPTH_SPENCIL);
     }
 
     virtual void OnRender(RenderPassState state) override
     {
-        auto& output = state.GetAttachment("Output"_id);
+        auto& output = state.GetAttachment("Output");
         state.Commands.SetRenderArea(output);
 
         constexpr uint32_t SkyboxVertexCount = 36;
@@ -737,13 +737,13 @@ public:
             .Bind(1, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER)
             .Bind(2, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER);
 
-        pipeline.AddOutputAttachment("OutputProbe"_id, AttachmentState::LOAD_COLOR);
-        pipeline.AddOutputAttachment("OutputProbeDepth"_id, AttachmentState::LOAD_DEPTH_SPENCIL);
+        pipeline.AddOutputAttachment("OutputProbe", AttachmentState::LOAD_COLOR);
+        pipeline.AddOutputAttachment("OutputProbeDepth", AttachmentState::LOAD_DEPTH_SPENCIL);
     }
 
     virtual void OnRender(RenderPassState state) override
     {
-        auto& output = state.GetAttachment("OutputProbe"_id);
+        auto& output = state.GetAttachment("OutputProbe");
         state.Commands.SetRenderArea(output);
 
         constexpr uint32_t SkyboxVertexCount = 36;
@@ -756,16 +756,16 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddRenderPass("UniformSubmitPass"_id, std::make_unique<UniformSubmitRenderPass>(resources))
-        .AddRenderPass("ReflectionProbeCalculatePass"_id, std::make_unique<ReflectionProbeCalculateRenderPass>(resources))
-        .AddRenderPass("ReflectionProbeSkyboxPass"_id, std::make_unique<ReflectionProbeSkyboxRenderPass>(resources))
-        .AddRenderPass("OpaquePass"_id, std::make_unique<OpaqueRenderPass>(resources))
-        .AddRenderPass("ReflectionProbeCopyPass"_id, std::make_unique<ReflectionProbeCopyRenderPass>(resources))
-        .AddRenderPass("ReflectionProbeDebugPass"_id, std::make_unique<ReflectionProbeDebugRenderPass>(resources))
-        .AddRenderPass("SkyboxPass"_id, std::make_unique<SkyboxRenderPass>(resources))
-        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
+        .AddRenderPass("UniformSubmitPass", std::make_unique<UniformSubmitRenderPass>(resources))
+        .AddRenderPass("ReflectionProbeCalculatePass", std::make_unique<ReflectionProbeCalculateRenderPass>(resources))
+        .AddRenderPass("ReflectionProbeSkyboxPass", std::make_unique<ReflectionProbeSkyboxRenderPass>(resources))
+        .AddRenderPass("OpaquePass", std::make_unique<OpaqueRenderPass>(resources))
+        .AddRenderPass("ReflectionProbeCopyPass", std::make_unique<ReflectionProbeCopyRenderPass>(resources))
+        .AddRenderPass("ReflectionProbeDebugPass", std::make_unique<ReflectionProbeDebugRenderPass>(resources))
+        .AddRenderPass("SkyboxPass", std::make_unique<SkyboxRenderPass>(resources))
+        .AddRenderPass("ImGuiPass", std::make_unique<ImGuiRenderPass>("Output"))
         .SetOptions(options)
-        .SetOutputName("Output"_id);
+        .SetOutputName("Output");
 
     return renderGraphBuilder.Build();
 }
@@ -903,7 +903,7 @@ int main()
         camera.AspectRatio = size.x / size.y;
     });
     
-    ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass"_id).PassNative.RenderPassHandle);
+    ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass").PassNative.RenderPassHandle);
 
     std::map<VkImage, ImTextureID> ImGuiRegisteredImages;
     for (const auto& mesh : sharedResources.WorldMeshes)
