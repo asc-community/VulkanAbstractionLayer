@@ -108,8 +108,8 @@ public:
         // declare external graph resources (buffers, images, attachments) with their initial state
         pipeline.DeclareBuffer(uniformBuffer);
         pipeline.DeclareImages(textures, ImageUsage::TRANSFER_DESTIONATION);
-        pipeline.DeclareAttachment("Output"_id, Format::R8G8B8A8_UNORM);
-        pipeline.DeclareAttachment("OutputDepth"_id, Format::D32_SFLOAT_S8_UINT);
+        pipeline.DeclareAttachment("Output", Format::R8G8B8A8_UNORM);
+        pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
 
         // describe descriptor bindings per descriptor set
         pipeline.DescriptorBindings
@@ -118,13 +118,13 @@ public:
             .Bind(2, textures, UniformType::SAMPLED_IMAGE);
 
         // add output attachments
-        pipeline.AddOutputAttachment("Output"_id, ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
-        pipeline.AddOutputAttachment("OutputDepth"_id, ClearDepthSpencil{ });
+        pipeline.AddOutputAttachment("Output", ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
+        pipeline.AddOutputAttachment("OutputDepth", ClearDepthSpencil{ });
     }
     
     virtual void OnRender(RenderPassState state) override
     {
-        state.Commands.SetRenderArea(state.GetAttachment("Output"_id));
+        state.Commands.SetRenderArea(state.GetAttachment("Output"));
 
         // draw some stuff
         state.Commands.BindVertexBuffers(vertexBuffer);
@@ -141,9 +141,9 @@ Build render graph from render passes:
 
 RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
-        .AddRenderPass("SomePass"_id, std::make_unique<SomeRenderPass>(parameters))
-        .AddRenderPass("ImGuiPass"_id, std::make_unique<ImGuiRenderPass>("Output"_id))
-        .SetOutputName("Output"_id);
+        .AddRenderPass("SomePass", std::make_unique<SomeRenderPass>(parameters))
+        .AddRenderPass("ImGuiPass", std::make_unique<ImGuiRenderPass>("Output"))
+        .SetOutputName("Output");
 
 RenderGraph renderGraph = renderGraphBuilder.Build();
 ```
