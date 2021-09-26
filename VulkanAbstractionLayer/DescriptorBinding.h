@@ -57,6 +57,13 @@ namespace VulkanAbstractionLayer
 		const auto& GetImages() const { return this->imageResolves; }
 	};
 
+	enum class ResolveOptions
+	{
+		RESOLVE_EACH_FRAME,
+		RESOLVE_ONCE,
+		ALREADY_RESOLVED,
+	};
+
 	class DescriptorBinding
 	{
 		struct DescriptorWriteInfo
@@ -113,6 +120,8 @@ namespace VulkanAbstractionLayer
 		std::vector<ImageToResolve> imagesToResolve;
 		std::vector<SamplerToResolve> samplersToResolve;
 
+		ResolveOptions options = ResolveOptions::RESOLVE_EACH_FRAME;
+
 		size_t AllocateBinding(const Buffer& buffer, UniformType type);
 		size_t AllocateBinding(const Image& image, ImageView view, UniformType type);
 		size_t AllocateBinding(const Image& image, const Sampler& sampler, ImageView view, UniformType type);
@@ -125,9 +134,11 @@ namespace VulkanAbstractionLayer
 
 		DescriptorBinding& Bind(uint32_t binding, const Sampler& sampler, UniformType type);
 
+		void SetOptions(ResolveOptions options) { this->options = options; }
+
 		void Resolve(const ResolveInfo& resolveInfo);
 
-		void Write(const vk::DescriptorSet& descriptorSet) const;
+		void Write(const vk::DescriptorSet& descriptorSet);
 		const auto& GetBoundBuffers() const { return this->buffersToResolve; }
 		const auto& GetBoundImages() const { return this->imagesToResolve; }
 	};

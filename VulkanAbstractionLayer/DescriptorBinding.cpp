@@ -314,8 +314,13 @@ namespace VulkanAbstractionLayer
 		}
 	}
 
-	void DescriptorBinding::Write(const vk::DescriptorSet& descriptorSet) const
+	void DescriptorBinding::Write(const vk::DescriptorSet& descriptorSet)
 	{
+		if (this->options == ResolveOptions::ALREADY_RESOLVED)
+			return;
+		if (this->options == ResolveOptions::RESOLVE_ONCE)
+			this->options = ResolveOptions::ALREADY_RESOLVED;
+
 		std::vector<vk::WriteDescriptorSet> writesDescriptorSet;
 		std::vector<vk::DescriptorBufferInfo> descriptorBufferInfos;
 		std::vector<vk::DescriptorImageInfo> descriptorImageInfos;
