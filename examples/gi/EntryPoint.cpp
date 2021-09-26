@@ -191,6 +191,7 @@ void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imag
             }
         }
     }
+    commandBuffer.TransferLayout(image, ImageUsage::TRANSFER_DISTINATION, ImageUsage::SHADER_READ);
 }
 
 void LoadImage(Image& image, const std::string& filepath, ImageOptions::Value options)
@@ -236,6 +237,7 @@ void LoadCubemap(Image& image, const std::string& filepath)
     }
 
     commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
+    commandBuffer.TransferLayout(image, ImageUsage::TRANSFER_DISTINATION, ImageUsage::SHADER_READ);
 
     stageBuffer.Flush();
     commandBuffer.End();
@@ -324,18 +326,18 @@ public:
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.MeshDataUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.ReflectionProbeUniformBuffer);
+        pipeline.AddDependency("CameraUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("MeshDataUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("MaterialUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("ReflectionProbeUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
     }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
+    virtual void ResolveResources(ResolveState resolve) override
     {
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,           BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.MeshDataUniformBuffer,            BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer,         BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.ReflectionProbeUniformBuffer,  BufferUsage::TRANSFER_DESTINATION);
+        resolve.Resolve("CameraUniformBuffer", this->sharedResources.CameraUniformBuffer);
+        resolve.Resolve("MeshDataUniformBuffer", this->sharedResources.MeshDataUniformBuffer);
+        resolve.Resolve("MaterialUniformBuffer", this->sharedResources.MaterialUniformBuffer);
+        resolve.Resolve("ReflectionProbeUniformBuffer", this->sharedResources.ReflectionProbeUniformBuffer);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -386,13 +388,8 @@ public:
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.DeclareImages(this->sharedResources.ReflectionProbes.Cubemaps, ImageUsage::UNKNOWN);
-    }
-
-    virtual void SetupDependencies(DependencyState depedencies) override
-    {
-        depedencies.AddImage("OutputProbe", ImageUsage::TRANSFER_SOURCE);
-        depedencies.AddImages(this->sharedResources.ReflectionProbes.Cubemaps, ImageUsage::TRANSFER_DISTINATION);
+        pipeline.AddDependency("OutputProbe", ImageUsage::TRANSFER_SOURCE);
+        pipeline.AddDependency("ReflectionProbesCubemaps", ImageUsage::TRANSFER_DISTINATION);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -454,25 +451,29 @@ public:
         pipeline.DeclareAttachment("OutputProbe", Format::R8G8B8A8_UNORM, ProbeResolution, ProbeResolution, ImageOptions::CUBEMAP);
         pipeline.DeclareAttachment("OutputProbeDepth", Format::D32_SFLOAT_S8_UINT, ProbeResolution, ProbeResolution, ImageOptions::CUBEMAP);
 
-        pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.BRDFLUT, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.SkyboxIrradiance, ImageUsage::TRANSFER_DISTINATION);
-
         pipeline.DescriptorBindings
-            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
+            .Bind(0, "CameraUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(1, "ReflectionProbeUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(2, "MeshDataUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(3, "MaterialUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(4, "TextureArray", UniformType::SAMPLED_IMAGE)
             .Bind(5, this->TextureSampler, UniformType::SAMPLER)
-            .Bind(6, this->sharedResources.BRDFLUT, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(7, this->sharedResources.ReflectionProbes.Cubemaps, UniformType::SAMPLED_IMAGE)
-            .Bind(8, this->sharedResources.Skybox, UniformType::SAMPLED_IMAGE)
-            .Bind(9, this->sharedResources.SkyboxIrradiance, UniformType::SAMPLED_IMAGE);
+            .Bind(6, "BRDFLUT", this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(7, "ReflectionProbesCubemaps", UniformType::SAMPLED_IMAGE)
+            .Bind(8, "Skybox", UniformType::SAMPLED_IMAGE)
+            .Bind(9, "SkyboxIrradiance", UniformType::SAMPLED_IMAGE);
 
         pipeline.AddOutputAttachment("OutputProbe", ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
         pipeline.AddOutputAttachment("OutputProbeDepth", ClearDepthStencil{ });
+    }
+
+    virtual void ResolveResources(ResolveState resolve) override
+    {
+        resolve.Resolve("TextureArray", this->textureArray);
+        resolve.Resolve("BRDFLUT", this->sharedResources.BRDFLUT);
+        resolve.Resolve("Skybox", this->sharedResources.Skybox);
+        resolve.Resolve("SkyboxIrradiance", this->sharedResources.SkyboxIrradiance);
+        resolve.Resolve("ReflectionProbesCubemaps", this->sharedResources.ReflectionProbes.Cubemaps);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -558,16 +559,16 @@ public:
         pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DescriptorBindings
-            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
+            .Bind(0, "CameraUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(1, "ReflectionProbeUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(2, "MeshDataUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(3, "MaterialUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(4, "TextureArray", UniformType::SAMPLED_IMAGE)
             .Bind(5, this->TextureSampler, UniformType::SAMPLER)
-            .Bind(6, this->sharedResources.BRDFLUT, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(7, this->sharedResources.ReflectionProbes.Cubemaps, UniformType::SAMPLED_IMAGE)
-            .Bind(8, this->sharedResources.Skybox, UniformType::SAMPLED_IMAGE)
-            .Bind(9, this->sharedResources.SkyboxIrradiance, UniformType::SAMPLED_IMAGE);
+            .Bind(6, "BRDFLUT", this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(7, "ReflectionProbesCubemaps", UniformType::SAMPLED_IMAGE)
+            .Bind(8, "Skybox", UniformType::SAMPLED_IMAGE)
+            .Bind(9, "SkyboxIrradiance", UniformType::SAMPLED_IMAGE);
 
         pipeline.AddOutputAttachment("Output", ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
         pipeline.AddOutputAttachment("OutputDepth", ClearDepthStencil{ });
@@ -639,8 +640,8 @@ public:
         };
 
         pipeline.DescriptorBindings
-            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.ReflectionProbes.Cubemaps, UniformType::SAMPLED_IMAGE)
+            .Bind(0, "CameraUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(1, "ReflectionProbesCubemaps", UniformType::SAMPLED_IMAGE)
             .Bind(2, this->textureSampler, UniformType::SAMPLER);
 
         pipeline.AddOutputAttachment("Output", AttachmentState::LOAD_COLOR);
@@ -698,8 +699,8 @@ public:
         );
 
         pipeline.DescriptorBindings
-            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(0, "CameraUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(1, "Skybox", this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
         pipeline.AddOutputAttachment("Output", AttachmentState::LOAD_COLOR);
         pipeline.AddOutputAttachment("OutputDepth", AttachmentState::LOAD_DEPTH_SPENCIL);
@@ -734,8 +735,8 @@ public:
         );
 
         pipeline.DescriptorBindings
-            .Bind(1, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(2, this->sharedResources.ReflectionProbeUniformBuffer, UniformType::UNIFORM_BUFFER);
+            .Bind(1, "Skybox", this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(2, "ReflectionProbeUniformBuffer", UniformType::UNIFORM_BUFFER);
 
         pipeline.AddOutputAttachment("OutputProbe", AttachmentState::LOAD_COLOR);
         pipeline.AddOutputAttachment("OutputProbeDepth", AttachmentState::LOAD_DEPTH_SPENCIL);
@@ -752,7 +753,7 @@ public:
     }
 };
 
-auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value options)
+auto CreateRenderGraph(SharedResources& resources)
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
@@ -764,7 +765,6 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
         .AddRenderPass("ReflectionProbeDebugPass", std::make_unique<ReflectionProbeDebugRenderPass>(resources))
         .AddRenderPass("SkyboxPass", std::make_unique<SkyboxRenderPass>(resources))
         .AddRenderPass("ImGuiPass", std::make_unique<ImGuiRenderPass>("Output"))
-        .SetOptions(options)
         .SetOutputName("Output");
 
     return renderGraphBuilder.Build();
@@ -862,7 +862,7 @@ int main()
 
     auto& commandBuffer = GetCurrentVulkanContext().GetCurrentCommandBuffer();
     commandBuffer.Begin();
-    commandBuffer.TransferLayout(sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION, ImageUsage::TRANSFER_SOURCE);
+    commandBuffer.TransferLayout(sharedResources.Skybox, ImageUsage::SHADER_READ, ImageUsage::TRANSFER_SOURCE);
     for(int x = -ProbeGridSize.x; x <= ProbeGridSize.x; x++)
         for(int y = -ProbeGridSize.y; y <= ProbeGridSize.y; y++)
             for (int z = -ProbeGridSize.z; z <= ProbeGridSize.z; z++)
@@ -870,7 +870,8 @@ int main()
                 Vector3 offset = ProbeGridOffset + Vector3{ (float)x, (float)y, (float)z } * ProbeGridDensity;
                 AddReflectionProbe(commandBuffer, sharedResources.ReflectionProbes, offset, sharedResources.Skybox);
             }
-    commandBuffer.TransferLayout(sharedResources.Skybox, ImageUsage::TRANSFER_SOURCE, ImageUsage::TRANSFER_DISTINATION);
+    commandBuffer.TransferLayout(sharedResources.Skybox, ImageUsage::TRANSFER_SOURCE, ImageUsage::SHADER_READ);
+    commandBuffer.TransferLayout(sharedResources.ReflectionProbes.Cubemaps, ImageUsage::TRANSFER_DISTINATION, ImageUsage::SHADER_READ);
     commandBuffer.End();
     GetCurrentVulkanContext().SubmitCommandsImmediate(commandBuffer);
 
@@ -892,14 +893,14 @@ int main()
 
     Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
 
-    std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
+    std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources);
 
     Camera camera;
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
-        renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::ON_SWAPCHAIN_RESIZE);
+        renderGraph = CreateRenderGraph(sharedResources);
         camera.AspectRatio = size.x / size.y;
     });
     

@@ -49,17 +49,24 @@ namespace VulkanAbstractionLayer
     public:
         struct BufferDeclaration
         {
-            VkBuffer BufferNativeHandle;
-            BufferUsage::Bits InitialUsage;
+            std::string Name;
         };
 
         struct ImageDeclaration
         {
-            VkImage ImageNativeHandle;
-            ImageUsage::Bits InitialUsage;
-            Format ImageFormat;
-            uint32_t MipLevelCount;
-            uint32_t LayerCount;
+            std::string Name;
+        };
+
+        struct ImageDependency
+        {
+            std::string Name;
+            ImageUsage::Bits Usage;
+        };
+
+        struct BufferDependency
+        {
+            std::string Name;
+            BufferUsage::Bits Usage;
         };
 
         struct AttachmentDeclaration
@@ -83,8 +90,9 @@ namespace VulkanAbstractionLayer
         };
 
     private:
-        std::vector<BufferDeclaration> bufferDeclarations;
-        std::vector<ImageDeclaration> imageDeclarations;
+        std::vector<BufferDependency> bufferDependencies;
+        std::vector<ImageDependency> imageDependencies;
+
         std::vector<AttachmentDeclaration> attachmentDeclarations;
         std::vector<OutputAttachment> outputAttachments;
 
@@ -100,20 +108,15 @@ namespace VulkanAbstractionLayer
         void AddOutputAttachment(const std::string& name, ClearDepthStencil clear, uint32_t layer);
         void AddOutputAttachment(const std::string& name, AttachmentState onLoad, uint32_t layer);
 
-        void DeclareBuffer(const Buffer& buffer);
-        void DeclareImage(const Image& image, ImageUsage::Bits oldUsage);
-
-        void DeclareBuffers(ArrayView<BufferReference> buffers);
-        void DeclareBuffers(ArrayView<Buffer> buffers);
-        void DeclareImages(ArrayView<ImageReference> images, ImageUsage::Bits oldUsage);
-        void DeclareImages(ArrayView<Image> images, ImageUsage::Bits oldUsage);
+        void AddDependency(const std::string& name, BufferUsage::Bits usage);
+        void AddDependency(const std::string& name, ImageUsage::Bits usage);
 
         void DeclareAttachment(const std::string& name, Format format);
         void DeclareAttachment(const std::string& name, Format format, uint32_t width, uint32_t height);
         void DeclareAttachment(const std::string& name, Format format, uint32_t width, uint32_t height, ImageOptions::Value options);
 
-        const auto& GetBufferDeclarations() const { return this->bufferDeclarations; }
-        const auto& GetImageDeclarations() const { return this->imageDeclarations; }
+        const auto& GetBufferDependencies() const { return this->bufferDependencies; }
+        const auto& GetImageDependencies() const { return this->imageDependencies; }
         const auto& GetAttachmentDeclarations() const { return this->attachmentDeclarations; }
         const auto& GetOutputAttachments() const { return this->outputAttachments; }
     };

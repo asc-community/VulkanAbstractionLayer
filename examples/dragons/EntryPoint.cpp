@@ -96,6 +96,8 @@ void LoadCubemap(Image& image, const std::string& filepath)
 
     commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
 
+    commandBuffer.TransferLayout(image, ImageUsage::TRANSFER_DISTINATION, ImageUsage::SHADER_READ);
+
     stageBuffer.Flush();
     commandBuffer.End();
     
@@ -127,6 +129,8 @@ void LoadImage(Image& image, const std::string& filepath)
         BufferInfo{ stageBuffer.GetBuffer(), textureAllocation.Offset },
         ImageInfo{ image, ImageUsage::UNKNOWN, 0, 0 }
     );
+
+    commandBuffer.TransferLayout(image, ImageUsage::TRANSFER_DISTINATION, ImageUsage::SHADER_READ);
 
     stageBuffer.Flush();
     commandBuffer.End();
@@ -188,6 +192,8 @@ Mesh CreateMesh(ArrayView<ModelData::Vertex> vertices, ArrayView<ModelData::Inde
             ImageInfo{ image, ImageUsage::UNKNOWN, 0, 0 }
         );
         commandBuffer.GenerateMipLevels(image, ImageUsage::TRANSFER_DISTINATION, BlitFilter::LINEAR);
+        
+        commandBuffer.TransferLayout(image, ImageUsage::TRANSFER_DISTINATION, ImageUsage::SHADER_READ);
     }
 
     stageBuffer.Flush();
@@ -330,18 +336,18 @@ public:
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.MeshDataUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer);
+        pipeline.AddDependency("CameraUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("MeshDataUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("LightUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("MaterialUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
     }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
+    virtual void ResolveResources(ResolveState resolve) override
     {
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.MeshDataUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.LightUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        resolve.Resolve("CameraUniformBuffer", this->sharedResources.CameraUniformBuffer);
+        resolve.Resolve("MeshDataUniformBuffer", this->sharedResources.MeshDataUniformBuffer);
+        resolve.Resolve("LightUniformBuffer", this->sharedResources.LightUniformBuffer);
+        resolve.Resolve("MaterialUniformBuffer", this->sharedResources.MaterialUniformBuffer);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -406,10 +412,15 @@ public:
         };
 
         pipeline.DescriptorBindings
-            .Bind(1, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER);
+            .Bind(1, "MeshDataUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(2, "LightUniformBuffer", UniformType::UNIFORM_BUFFER);
 
         pipeline.AddOutputAttachment("ShadowDepth", ClearDepthStencil{ });
+    }
+
+    virtual void ResolveResources(ResolveState resolve) override
+    {
+
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -459,27 +470,31 @@ public:
             },
         };
 
-        pipeline.DeclareImages(this->sharedResources.Textures, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.BRDFLUT, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.Skybox, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.SkyboxIrradiance, ImageUsage::TRANSFER_DISTINATION);
         pipeline.DeclareAttachment("Output", Format::R8G8B8A8_UNORM);
         pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DescriptorBindings
-            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(3, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(0, "CameraUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(1, "MeshDataUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(2, "LightUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(3, "MaterialUniformBuffer", UniformType::UNIFORM_BUFFER)
             .Bind(4, this->textureSampler, UniformType::SAMPLER)
-            .Bind(5, this->sharedResources.Textures, UniformType::SAMPLED_IMAGE)
+            .Bind(5, "Textures", UniformType::SAMPLED_IMAGE)
             .Bind(6, "ShadowDepth", this->depthSampler, UniformType::COMBINED_IMAGE_SAMPLER, ImageView::DEPTH_ONLY)
-            .Bind(7, this->sharedResources.BRDFLUT, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(8, this->sharedResources.Skybox, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(9, this->sharedResources.SkyboxIrradiance, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(7, "BRDFLUT", this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(8, "Skybox", this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(9, "SkyboxIrradiance", this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
         pipeline.AddOutputAttachment("Output", ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
         pipeline.AddOutputAttachment("OutputDepth", ClearDepthStencil{ });
+    }
+
+    virtual void ResolveResources(ResolveState resolve) override
+    {
+        resolve.Resolve("Textures", this->sharedResources.Textures);
+        resolve.Resolve("BRDFLUT", this->sharedResources.BRDFLUT);
+        resolve.Resolve("Skybox", this->sharedResources.Skybox);
+        resolve.Resolve("SkyboxIrradiance", this->sharedResources.SkyboxIrradiance);
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -517,11 +532,16 @@ public:
         );
 
         pipeline.DescriptorBindings
-            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(8, this->sharedResources.Skybox, this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(0, "CameraUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(8, "Skybox", this->skyboxSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
         pipeline.AddOutputAttachment("Output", AttachmentState::LOAD_COLOR);
         pipeline.AddOutputAttachment("OutputDepth", AttachmentState::LOAD_DEPTH_SPENCIL);
+    }
+
+    virtual void ResolveResources(ResolveState resolve) override
+    {
+
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -534,7 +554,7 @@ public:
     }
 };
 
-auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value options)
+auto CreateRenderGraph(SharedResources& resources)
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
@@ -543,7 +563,6 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
         .AddRenderPass("OpaquePass", std::make_unique<OpaqueRenderPass>(resources))
         .AddRenderPass("SkyboxPass", std::make_unique<SkyboxRenderPass>(resources))
         .AddRenderPass("ImGuiPass", std::make_unique<ImGuiRenderPass>("Output"))
-        .SetOptions(options)
         .SetOutputName("Output");
 
     return renderGraphBuilder.Build();
@@ -652,7 +671,7 @@ int main()
     sharedResources.Meshes.push_back(CreatePlaneMesh(sharedResources.Materials, sharedResources.Textures));
     sharedResources.Meshes.push_back(CreateDragonMesh(sharedResources.Materials, sharedResources.Textures));
 
-    std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
+    std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources);
 
     Camera camera;
     Vector3 modelRotation{ -HalfPi, Pi, 0.0f };
@@ -664,7 +683,7 @@ int main()
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
-        renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::ON_SWAPCHAIN_RESIZE);
+        renderGraph = CreateRenderGraph(sharedResources);
         camera.AspectRatio = size.x / size.y;
     });
     

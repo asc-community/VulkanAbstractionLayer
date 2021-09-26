@@ -58,7 +58,7 @@ namespace VulkanAbstractionLayer
         };
         vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
         descriptorPoolCreateInfo
-            .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+            .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet | vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind)
             .setPoolSizes(descriptorPoolSizes)
             .setMaxSets(2048 * (uint32_t)descriptorPoolSizes.size());
 
@@ -111,11 +111,12 @@ namespace VulkanAbstractionLayer
                     uniform.Count,
                     ToNative(uniformsPerStage.ShaderStage)
                 });
-                bindingFlags.push_back(
-                    uniform.Count > 1 ? 
-                    vk::DescriptorBindingFlagBits::ePartiallyBound :
-                    vk::DescriptorBindingFlagBits{ }
-                );
+
+                vk::DescriptorBindingFlags descriptorBindingFlags = { };
+                descriptorBindingFlags |= vk::DescriptorBindingFlagBits::eUpdateAfterBind;
+                if (uniform.Count > 1)
+                    descriptorBindingFlags |= vk::DescriptorBindingFlagBits::ePartiallyBound;
+                bindingFlags.push_back(descriptorBindingFlags);
             }
         }
 
@@ -123,6 +124,7 @@ namespace VulkanAbstractionLayer
         bindingFlagsCreateInfo.setBindingFlags(bindingFlags);
 
         vk::DescriptorSetLayoutCreateInfo layoutCreateInfo;
+        layoutCreateInfo.setFlags(vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool);
         layoutCreateInfo.setBindings(layoutBindings);
         layoutCreateInfo.setPNext(&bindingFlagsCreateInfo);
 

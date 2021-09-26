@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "DependencyStorage.h"
 #include "Pipeline.h"
 #include "CommandBuffer.h"
 
@@ -57,8 +56,8 @@ namespace VulkanAbstractionLayer
         const Image& GetAttachment(const std::string& name);
     };
 
-    using DependencyState = DependencyStorage&;
     using PipelineState = Pipeline&;
+    using ResolveState = ResolveInfo&;
 
     class RenderPass
     {
@@ -66,7 +65,7 @@ namespace VulkanAbstractionLayer
         virtual ~RenderPass() = default;
 
         virtual void SetupPipeline(PipelineState state) { }
-        virtual void SetupDependencies(DependencyState state) { }
+        virtual void ResolveResources(ResolveState resolve) { }
 
         virtual void BeforeRender(RenderPassState state) { }
         virtual void OnRender(RenderPassState state) { }

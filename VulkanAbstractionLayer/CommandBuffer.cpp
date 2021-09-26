@@ -590,4 +590,24 @@ namespace VulkanAbstractionLayer
             barriers
         );
     }
+
+    void CommandBuffer::TransferLayout(ArrayView<Image> images, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout)
+    {
+        std::vector<vk::ImageMemoryBarrier> barriers;
+        barriers.reserve(images.size());
+
+        for (const auto& image : images)
+        {
+            barriers.push_back(GetImageMemoryBarrier(image, oldLayout, newLayout));
+        }
+
+        this->handle.pipelineBarrier(
+            ImageUsageToPipelineStage(oldLayout),
+            ImageUsageToPipelineStage(newLayout),
+            { }, // dependecies
+            { }, // memory barriers
+            { }, // buffer barriers
+            barriers
+        );
+    }
 }

@@ -257,8 +257,23 @@ namespace VulkanAbstractionLayer
         deviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
 
         vk::PhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures;
-        descriptorIndexingFeatures.descriptorBindingPartiallyBound = true;
-        descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = true;
+        descriptorIndexingFeatures.descriptorBindingPartiallyBound                    = true;
+        descriptorIndexingFeatures.shaderInputAttachmentArrayDynamicIndexing          = true;
+        descriptorIndexingFeatures.shaderUniformTexelBufferArrayDynamicIndexing       = true;
+        descriptorIndexingFeatures.shaderStorageTexelBufferArrayDynamicIndexing       = true;
+        descriptorIndexingFeatures.shaderUniformBufferArrayNonUniformIndexing         = true;
+        descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing          = true;
+        descriptorIndexingFeatures.shaderStorageBufferArrayNonUniformIndexing         = true;
+        descriptorIndexingFeatures.shaderStorageImageArrayNonUniformIndexing          = true;
+        descriptorIndexingFeatures.shaderInputAttachmentArrayNonUniformIndexing       = true;
+        descriptorIndexingFeatures.shaderUniformTexelBufferArrayNonUniformIndexing    = true;
+        descriptorIndexingFeatures.shaderStorageTexelBufferArrayNonUniformIndexing    = true;
+        descriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind      = true;
+        descriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind       = true;
+        descriptorIndexingFeatures.descriptorBindingStorageImageUpdateAfterBind       = true;
+        descriptorIndexingFeatures.descriptorBindingStorageBufferUpdateAfterBind      = true;
+        descriptorIndexingFeatures.descriptorBindingUniformTexelBufferUpdateAfterBind = true;
+        descriptorIndexingFeatures.descriptorBindingStorageTexelBufferUpdateAfterBind = true;
 
         vk::PhysicalDeviceMultiviewFeatures multiviewFeatures;
         multiviewFeatures.multiview = true;

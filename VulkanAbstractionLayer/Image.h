@@ -111,7 +111,7 @@ namespace VulkanAbstractionLayer
         Image& operator=(Image&& other) noexcept;
         ~Image();
 
-        void Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, ImageOptions::Value mipmapping);
+        void Init(uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, MemoryUsage memoryUsage, ImageOptions::Value options);
 
         vk::ImageView GetNativeView(ImageView view) const;
         vk::ImageView GetNativeView(ImageView view, uint32_t layer) const;

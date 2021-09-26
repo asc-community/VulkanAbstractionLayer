@@ -128,6 +128,8 @@ void LoadImage(CommandBuffer& commandBuffer, Image& image, const ImageData& imag
             }
         }
     }
+
+    commandBuffer.TransferLayout(image, ImageUsage::TRANSFER_DISTINATION, ImageUsage::SHADER_READ);
 }
 
 void LoadImage(Image& image, const std::string& filepath, ImageOptions::Value options)
@@ -223,18 +225,18 @@ public:
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.MeshDataUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.LightUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.MaterialUniformBuffer);
+        pipeline.AddDependency("CameraUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("MeshDataUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("LightUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("MaterialUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
     }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
+    virtual void ResolveResources(ResolveState resolve) override
     {
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,   BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.MeshDataUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.LightUniformBuffer,    BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.MaterialUniformBuffer, BufferUsage::TRANSFER_DESTINATION);
+        resolve.Resolve("CameraUniformBuffer", this->sharedResources.CameraUniformBuffer);
+        resolve.Resolve("MeshDataUniformBuffer", this->sharedResources.MeshDataUniformBuffer);
+        resolve.Resolve("LightUniformBuffer", this->sharedResources.LightUniformBuffer);
+        resolve.Resolve("MaterialUniformBuffer", this->sharedResources.MaterialUniformBuffer);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -271,6 +273,7 @@ class OpaqueRenderPass : public RenderPass
 {    
     SharedResources& sharedResources;
     std::vector<ImageReference> textureArray;
+    std::vector<ImageReference> lightArray;
 public:
     Sampler TextureSampler;
 
@@ -282,6 +285,10 @@ public:
         for (const auto& texture : this->sharedResources.Sponza.Textures)
         {
             this->textureArray.push_back(std::ref(texture));
+        }
+        for (const auto& light : this->sharedResources.LightTextures)
+        {
+            this->lightArray.push_back(std::ref(light));
         }
     }
 
@@ -302,24 +309,27 @@ public:
         pipeline.DeclareAttachment("Output", Format::R8G8B8A8_UNORM);
         pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
 
-        pipeline.DeclareImages(this->textureArray, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.LookupLTCMatrix, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(this->sharedResources.LookupLTCAmplitude, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImages(this->sharedResources.LightTextures, ImageUsage::TRANSFER_DISTINATION);
-
         pipeline.DescriptorBindings
-            .Bind(0, this->sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, this->sharedResources.MeshDataUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(2, this->sharedResources.MaterialUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(3, this->sharedResources.LightUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(4, this->textureArray, UniformType::SAMPLED_IMAGE)
+            .Bind(0, "CameraUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(1, "MeshDataUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(2, "MaterialUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(3, "LightUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(4, "TextureArray", UniformType::SAMPLED_IMAGE)
             .Bind(5, this->TextureSampler, UniformType::SAMPLER)
-            .Bind(6, this->sharedResources.LookupLTCMatrix, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(7, this->sharedResources.LookupLTCAmplitude, this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
-            .Bind(8, this->sharedResources.LightTextures, UniformType::SAMPLED_IMAGE);
+            .Bind(6, "LookupLTCMatrix", this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(7, "LookupLTCAmplitude", this->TextureSampler, UniformType::COMBINED_IMAGE_SAMPLER)
+            .Bind(8, "LightArray", UniformType::SAMPLED_IMAGE);
 
         pipeline.AddOutputAttachment("Output", ClearColor{ 0.05f, 0.0f, 0.1f, 1.0f });
         pipeline.AddOutputAttachment("OutputDepth", ClearDepthStencil{ });
+    }
+
+    virtual void ResolveResources(ResolveState resolve) override
+    {
+        resolve.Resolve("TextureArray", this->textureArray);
+        resolve.Resolve("LookupLTCMatrix", this->sharedResources.LookupLTCMatrix);
+        resolve.Resolve("LookupLTCAmplitude", this->sharedResources.LookupLTCAmplitude);
+        resolve.Resolve("LightArray", this->lightArray);
     }
     
     virtual void OnRender(RenderPassState state) override
@@ -338,14 +348,13 @@ public:
     }
 };
 
-auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value options)
+auto CreateRenderGraph(SharedResources& resources)
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
         .AddRenderPass("UniformSubmitPass", std::make_unique<UniformSubmitRenderPass>(resources))
         .AddRenderPass("OpaquePass", std::make_unique<OpaqueRenderPass>(resources))
         .AddRenderPass("ImGuiPass", std::make_unique<ImGuiRenderPass>("Output"))
-        .SetOptions(options)
         .SetOutputName("Output");
 
     return renderGraphBuilder.Build();
@@ -451,7 +460,7 @@ int main()
     LoadImage(sharedResources.LightTextures.emplace_back(), "../textures/white_filtered.dds", ImageOptions::MIPMAPS);
     LoadImage(sharedResources.LightTextures.emplace_back(), "../textures/stained_glass_filtered.dds", ImageOptions::MIPMAPS);
 
-    std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
+    std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources);
 
     Camera camera;
     Vector3 modelRotation{ 0.0f, HalfPi, 0.0f };
@@ -489,7 +498,7 @@ int main()
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
-        renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::ON_SWAPCHAIN_RESIZE);
+        renderGraph = CreateRenderGraph(sharedResources);
         camera.AspectRatio = size.x / size.y;
     });
     

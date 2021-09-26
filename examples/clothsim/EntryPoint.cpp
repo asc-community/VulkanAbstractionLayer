@@ -71,14 +71,14 @@ public:
 
     virtual void SetupPipeline(PipelineState pipeline) override
     {
-        pipeline.DeclareBuffer(this->sharedResources.CameraUniformBuffer);
-        pipeline.DeclareBuffer(this->sharedResources.BallStorageBuffer);
+        pipeline.AddDependency("CameraUniformBuffer", BufferUsage::TRANSFER_DESTINATION);
+        pipeline.AddDependency("BallStorageBuffer", BufferUsage::TRANSFER_DESTINATION);
     }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
+    virtual void ResolveResources(ResolveState resolve) override
     {
-        depedencies.AddBuffer(this->sharedResources.CameraUniformBuffer,   BufferUsage::TRANSFER_DESTINATION);
-        depedencies.AddBuffer(this->sharedResources.BallStorageBuffer,     BufferUsage::TRANSFER_DESTINATION);
+        resolve.Resolve("CameraUniformBuffer", this->sharedResources.CameraUniformBuffer);
+        resolve.Resolve("BallStorageBuffer", this->sharedResources.BallStorageBuffer);
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -151,18 +151,16 @@ public:
             ShaderLoader::LoadFromSourceFile("main_compute.glsl", ShaderType::COMPUTE, ShaderLanguage::GLSL)
         );
 
-        pipeline.DeclareImage(sharedResources.PositionImage, ImageUsage::TRANSFER_DISTINATION);
-        pipeline.DeclareImage(sharedResources.VelocityImage, ImageUsage::TRANSFER_DISTINATION);
-
         pipeline.DescriptorBindings
-            .Bind(0, sharedResources.PositionImage, UniformType::STORAGE_IMAGE)
-            .Bind(1, sharedResources.VelocityImage, UniformType::STORAGE_IMAGE)
-            .Bind(2, sharedResources.BallStorageBuffer, UniformType::UNIFORM_BUFFER);
+            .Bind(0, "PositionImage", UniformType::STORAGE_IMAGE)
+            .Bind(1, "VelocityImage", UniformType::STORAGE_IMAGE)
+            .Bind(2, "BallStorageBuffer", UniformType::UNIFORM_BUFFER);
     }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
+    virtual void ResolveResources(ResolveState resolve) override
     {
-
+        resolve.Resolve("PositionImage", this->sharedResources.PositionImage);
+        resolve.Resolve("VelocityImage", this->sharedResources.VelocityImage);
     }
 
     virtual void BeforeRender(RenderPassState state) override
@@ -220,15 +218,16 @@ public:
         pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
 
         pipeline.DescriptorBindings
-            .Bind(0, sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, sharedResources.PositionImage, this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
+            .Bind(0, "CameraUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(1, "PositionImage", this->textureSampler, UniformType::COMBINED_IMAGE_SAMPLER);
 
         pipeline.AddOutputAttachment("Output", ClearColor{ 0.3f, 0.4f, 0.7f });
         pipeline.AddOutputAttachment("OutputDepth", ClearDepthStencil{ });
     }
 
-    virtual void SetupDependencies(DependencyState depedencies) override
+    virtual void ResolveResources(ResolveState resolve) override
     {
+
     }
 
     virtual void OnRender(RenderPassState state) override
@@ -279,8 +278,8 @@ public:
         };
 
         pipeline.DescriptorBindings
-            .Bind(0, sharedResources.CameraUniformBuffer, UniformType::UNIFORM_BUFFER)
-            .Bind(1, sharedResources.BallStorageBuffer, UniformType::UNIFORM_BUFFER);
+            .Bind(0, "CameraUniformBuffer", UniformType::UNIFORM_BUFFER)
+            .Bind(1, "BallStorageBuffer", UniformType::UNIFORM_BUFFER);
 
         pipeline.AddOutputAttachment("Output", AttachmentState::LOAD_COLOR);
         pipeline.AddOutputAttachment("OutputDepth", AttachmentState::LOAD_DEPTH_SPENCIL);
@@ -305,7 +304,7 @@ public:
     }
 };
 
-auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value options)
+auto CreateRenderGraph(SharedResources& resources)
 {
     RenderGraphBuilder renderGraphBuilder;
     renderGraphBuilder
@@ -314,7 +313,6 @@ auto CreateRenderGraph(SharedResources& resources, RenderGraphOptions::Value opt
         .AddRenderPass("ClothPass", std::make_unique<OpaqueRenderPass>(resources))
         .AddRenderPass("BallPass", std::make_unique<BallRenderPass>(resources))
         .AddRenderPass("ImGuiPass", std::make_unique<ImGuiRenderPass>("Output"))
-        .SetOptions(options)
         .SetOutputName("Output");
 
     return renderGraphBuilder.Build();
@@ -374,7 +372,7 @@ struct Camera
 };
 
 template<typename T>
-void LoadImageData(Image& image, uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, ArrayView<T> data)
+void LoadImageData(Image& image, uint32_t width, uint32_t height, Format format, ImageUsage::Value usage, ArrayView<T> data, ImageUsage::Bits layout)
 {
     assert(data.size() == width * height);
     image.Init(
@@ -395,6 +393,7 @@ void LoadImageData(Image& image, uint32_t width, uint32_t height, Format format,
         BufferInfo{ stagingBuffer.GetBuffer(), allocation.Offset },
         ImageInfo{ image, ImageUsage::UNKNOWN, 0, 0 }
     );
+    commandBuffer.TransferLayout(image, ImageUsage::TRANSFER_DISTINATION, layout);
 
     stagingBuffer.Flush();
     commandBuffer.End();
@@ -483,7 +482,8 @@ int main()
         ClothSizeY,
         Format::R32G32B32A32_SFLOAT,
         ImageUsage::STORAGE | ImageUsage::SHADER_READ,
-        MakeView(positions)
+        MakeView(positions),
+        ImageUsage::SHADER_READ
     );
     std::vector<Vector4> velocities(ClothSizeX * ClothSizeY, Vector4{ 0.0f, 0.0f, 0.0f, 0.0f });
     LoadImageData(
@@ -492,7 +492,8 @@ int main()
         ClothSizeY,
         Format::R32G32B32A32_SFLOAT,
         ImageUsage::STORAGE,
-        MakeView(velocities)
+        MakeView(velocities),
+        ImageUsage::STORAGE
     );
 
     auto ballModel = ModelLoader::LoadFromObj("../models/sphere/sphere.obj");
@@ -509,14 +510,14 @@ int main()
         MakeView(ballModel.Shapes[0].Indices)
     );
 
-    std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::Value{ });
+    std::unique_ptr<RenderGraph> renderGraph = CreateRenderGraph(sharedResources);
 
     Camera camera;
 
     window.OnResize([&Vulkan, &sharedResources, &renderGraph, &camera](Window& window, Vector2 size) mutable
     { 
         Vulkan.RecreateSwapchain((uint32_t)size.x, (uint32_t)size.y); 
-        renderGraph = CreateRenderGraph(sharedResources, RenderGraphOptions::ON_SWAPCHAIN_RESIZE);
+        renderGraph = CreateRenderGraph(sharedResources);
         camera.AspectRatio = size.x / size.y;
     });
     

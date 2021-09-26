@@ -30,51 +30,18 @@
 
 namespace VulkanAbstractionLayer
 {
-	void Pipeline::DeclareBuffer(const Buffer& buffer)
+	void Pipeline::AddDependency(const std::string& name, BufferUsage::Bits usage)
 	{
-		this->bufferDeclarations.push_back(BufferDeclaration{ 
-			(VkBuffer)buffer.GetNativeHandle(), 
-			BufferUsage::UNKNOWN 
-		});
+		this->bufferDependencies.push_back(
+			BufferDependency{ name, usage }
+		);
 	}
 
-	void Pipeline::DeclareImage(const Image& image, ImageUsage::Bits oldUsage)
+	void Pipeline::AddDependency(const std::string& name, ImageUsage::Bits usage)
 	{
-		this->imageDeclarations.push_back(ImageDeclaration{ 
-			(VkImage)image.GetNativeHandle(), 
-			oldUsage, 
-			image.GetFormat(), 
-			image.GetMipLevelCount(),
-			image.GetLayerCount()
-		});
-	}
-
-	void Pipeline::DeclareBuffers(ArrayView<BufferReference> buffers)
-	{
-		this->bufferDeclarations.reserve(this->bufferDeclarations.size() + buffers.size());
-		for (const auto& bufferReference : buffers)
-			this->DeclareBuffer(bufferReference.get());
-	}
-
-	void Pipeline::DeclareImages(ArrayView<ImageReference> images, ImageUsage::Bits oldUsage)
-	{
-		this->imageDeclarations.reserve(this->imageDeclarations.size() + images.size());
-		for (const auto& imageReference : images)
-			this->DeclareImage(imageReference.get(), oldUsage);
-	}
-
-	void Pipeline::DeclareBuffers(ArrayView<Buffer> buffers)
-	{
-		this->bufferDeclarations.reserve(this->bufferDeclarations.size() + buffers.size());
-		for (const auto& buffer : buffers)
-			this->DeclareBuffer(buffer);
-	}
-
-	void Pipeline::DeclareImages(ArrayView<Image> images, ImageUsage::Bits oldUsage)
-	{
-		this->imageDeclarations.reserve(this->imageDeclarations.size() + images.size());
-		for (const auto& image : images)
-			this->DeclareImage(image, oldUsage);
+		this->imageDependencies.push_back(
+			ImageDependency{ name, usage }
+		);
 	}
 
 	void Pipeline::DeclareAttachment(const std::string& name, Format format)

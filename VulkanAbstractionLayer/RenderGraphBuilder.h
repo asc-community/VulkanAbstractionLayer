@@ -40,14 +40,16 @@
 
 namespace VulkanAbstractionLayer
 {
-    struct RenderGraphOptions
+    struct ImageTransition
     {
-        using Value = uint32_t;
+        ImageUsage::Bits InitialUsage;
+        ImageUsage::Bits FinalUsage;
+    };
 
-        enum Bits
-        {
-            ON_SWAPCHAIN_RESIZE = 1 << 0,
-        };
+    struct BufferTransition
+    {
+        BufferUsage::Bits InitialUsage;
+        BufferUsage::Bits FinalUsage;
     };
 
     class RenderGraphBuilder
@@ -56,31 +58,6 @@ namespace VulkanAbstractionLayer
         {
             std::string Name;
             std::unique_ptr<RenderPass> Pass;
-        };
-
-        struct ExternalImage
-        {
-            ImageUsage::Bits InitialUsage;
-            Format ImageFormat;
-            uint32_t MipLevelCount;
-            uint32_t LayerCount;
-        };
-
-        struct ExternalBuffer
-        {
-            BufferUsage::Bits InitialUsage;
-        };
-
-        struct ImageTransition
-        {
-            ImageUsage::Bits InitialUsage;
-            ImageUsage::Bits FinalUsage;
-        };
-
-        struct BufferTransition
-        {
-            BufferUsage::Bits InitialUsage;
-            BufferUsage::Bits FinalUsage;
         };
 
         using RenderPassName = std::string;
@@ -100,42 +77,33 @@ namespace VulkanAbstractionLayer
 
         struct ResourceTransitions
         {
-            ResourceTypeTransitions<VkBuffer, BufferTransition> Buffers;
-            ResourceTypeTransitions<VkImage, ImageTransition> Images;
-            ResourceTypeTransitions<std::string, ImageTransition> Attachments;
+            ResourceTypeTransitions<std::string, BufferTransition> Buffers;
+            ResourceTypeTransitions<std::string, ImageTransition> Images;
         };
 
         using AttachmentHashMap = std::unordered_map<std::string, Image>;
-        using DependencyHashMap = std::unordered_map<RenderPassName, DependencyStorage>;
         using PipelineHashMap = std::unordered_map<RenderPassName, Pipeline>;
-        using InternalCallback = std::function<void(CommandBuffer&)>;
+        using PipelineBarrierCallback = std::function<void(CommandBuffer&, const ResolveInfo&)>;
         using PresentCallback = std::function<void(CommandBuffer&, const Image&, const Image&)>;
-        using ExternalImagesHashMap = std::unordered_map<VkImage, ExternalImage>;
-        using ExternalBuffersHashMap = std::unordered_map<VkBuffer, ExternalBuffer>;
+        using CreateCallback = std::function<void(CommandBuffer&)>;
 
-        ResourceTransitions resourceTransitions;
-        ExternalImagesHashMap externalImages;
-        ExternalBuffersHashMap externalBuffers;
         std::vector<RenderPassReference> renderPassReferences;
         std::string outputName;
-        RenderGraphOptions::Value options = { };
         
         PassNative BuildRenderPass(const RenderPassReference& renderPassReference, const PipelineHashMap& pipelines, const AttachmentHashMap& attachments, const ResourceTransitions& resourceTransitions);
-        DependencyHashMap AcquireRenderPassDependencies(const PipelineHashMap& pipelines);
-        InternalCallback CreateInternalOnRenderCallback(const std::string& renderPassName, const Pipeline& pipeline, const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
-        InternalCallback CreateOnCreatePipelineCallback(const ResourceTransitions& resourceTransitions, const AttachmentHashMap& attachments);
-        PresentCallback CreateOnPresentCallback(const std::string& outputName, const ResourceTransitions& transitions);
-        ResourceTransitions ResolveResourceTransitions(const DependencyHashMap& dependencies, const PipelineHashMap& pipelines);
-        AttachmentHashMap AllocateAttachments(const PipelineHashMap& pipelines, const ResourceTransitions& transitions, const DependencyHashMap& dependencies);
-        void ResolveDescriptorSets(const std::string& renderPassName, const PassNative& renderPass, PipelineHashMap& pipelines, const AttachmentHashMap& attachments);
+        PipelineBarrierCallback CreatePipelineBarrierCallback(const std::string& renderPassName, const Pipeline& pipeline, const ResourceTransitions& resourceTransitions);
+        PresentCallback CreatePresentCallback(const std::string& outputName, const ResourceTransitions& transitions);
+        CreateCallback CreateCreateCallback(const PipelineHashMap& pipelines, const ResourceTransitions& transitions, const AttachmentHashMap& attachments);
+        ResourceTransitions ResolveResourceTransitions(const PipelineHashMap& pipelines);
+        AttachmentHashMap AllocateAttachments(const PipelineHashMap& pipelines, const ResourceTransitions& transitions);
         void SetupOutputImage(ResourceTransitions& transitions, const std::string& outputImage);
         PipelineHashMap CreatePipelines();
-        void SetupExternalResources(const Pipeline& pipelineState);
         ImageTransition GetOutputImageFinalTransition(const std::string& outputName, const ResourceTransitions& resourceTransitions);
+        std::vector<std::string> GetRenderPassAttachmentNames(const std::string& renderPassName, const PipelineHashMap& pipelines);
+        DescriptorBinding GetRenderPassDescriptorBinding(const std::string& renderPassName, const PipelineHashMap& pipelines);
     public:
         RenderGraphBuilder& AddRenderPass(const std::string& name, std::unique_ptr<RenderPass> renderPass);
         RenderGraphBuilder& SetOutputName(const std::string& name);
-        RenderGraphBuilder& SetOptions(RenderGraphOptions::Value options);
         std::unique_ptr<RenderGraph> Build();
     };
 }

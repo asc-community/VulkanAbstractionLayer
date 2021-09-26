@@ -226,7 +226,6 @@ namespace VulkanAbstractionLayer
 
     const vk::DescriptorType& ToNative(UniformType type);
     UniformType FromNative(const vk::DescriptorType& type);
-    const vk::ImageLayout& UniformTypeToImageLayout(UniformType type);
 
     struct TypeSPIRV
     {

@@ -103,6 +103,54 @@ namespace VulkanAbstractionLayer
 		}
 	}
 
+	void ResolveInfo::Resolve(const std::string& name, const Buffer& buffer)
+	{
+		assert(this->bufferResolves.find(name) == this->bufferResolves.end());
+		this->bufferResolves[name] = { buffer };
+	}
+
+	void ResolveInfo::Resolve(const std::string& name, ArrayView<const Buffer> buffers)
+	{
+		assert(this->bufferResolves.find(name) == this->bufferResolves.end());
+		for (const auto& buffer : buffers)
+		{
+			this->bufferResolves[name].push_back(buffer);
+		}
+	}
+
+	void ResolveInfo::Resolve(const std::string& name, ArrayView<const BufferReference> buffers)
+	{
+		assert(this->bufferResolves.find(name) == this->bufferResolves.end());
+		for (const auto& buffer : buffers)
+		{
+			this->bufferResolves[name].push_back(buffer);
+		}
+	}
+
+	void ResolveInfo::Resolve(const std::string& name, const Image& image)
+	{
+		assert(this->imageResolves.find(name) == this->imageResolves.end());
+		this->imageResolves[name] = { image };
+	}
+
+	void ResolveInfo::Resolve(const std::string& name, ArrayView<const Image> images)
+	{
+		assert(this->imageResolves.find(name) == this->imageResolves.end());
+		for (const auto& image : images)
+		{
+			this->imageResolves[name].push_back(image);
+		}
+	}
+
+	void ResolveInfo::Resolve(const std::string& name, ArrayView<const ImageReference> images)
+	{
+		assert(this->imageResolves.find(name) == this->imageResolves.end());
+		for (const auto& image : images)
+		{
+			this->imageResolves[name].push_back(image);
+		}
+	}
+
 	size_t DescriptorBinding::AllocateBinding(const Buffer& buffer, UniformType type)
 	{
 		this->bufferWriteInfos.push_back(BufferWriteInfo{
@@ -145,187 +193,108 @@ namespace VulkanAbstractionLayer
 		return this->imageWriteInfos.size() - 1;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Buffer& buffer, UniformType type)
-	{
-		size_t index = this->AllocateBinding(buffer, type);
-		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
-		return *this;
-	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, UniformType type)
-	{
-		this->Bind(binding, image, type, ImageView::NATIVE);
-		return *this;
-	}
-
 	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Sampler& sampler, UniformType type)
 	{
-		size_t index = this->AllocateBinding(sampler);
-		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
+		this->samplersToResolve.push_back(SamplerToResolve{
+			std::addressof(sampler),
+			binding,
+			type,
+		});
 		return *this;
 	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, const Sampler& sampler, UniformType type)
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::string& name, const Sampler& sampler, UniformType type, ImageView view)
 	{
-		size_t index = this->AllocateBinding(image, sampler, ImageView::NATIVE, type);
-		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
-		return *this;
-	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, UniformType type, ImageView view)
-	{
-		size_t index = this->AllocateBinding(image, view, type);
-		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
-		return *this;
-	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const Image& image, const Sampler& sampler, UniformType type, ImageView view)
-	{
-		size_t index = this->AllocateBinding(image, sampler, view, type);
-		this->descriptorWrites.push_back({ type, binding, (uint16_t)index, 1, });
-		return *this;
-	}
-	
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::string& attachment, UniformType type, ImageView view)
-	{
-		return this->Bind(binding, attachment, EmptySampler, type, view);
-	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::string& attachment, const Sampler& sampler, UniformType type, ImageView view)
-	{
-		this->attachmentWriteInfos.push_back(AttachmentResolveInfo{
-			attachment,
+		this->imagesToResolve.push_back(ImageToResolve{
+			name,
 			binding,
 			type,
 			UniformTypeToImageUsage(type),
 			view,
-			sampler
+			std::addressof(sampler),
 		});
 		return *this;
 	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<BufferReference> buffers, UniformType type)
+	
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::string& name, UniformType type, ImageView view)
 	{
-		size_t index = 0;
-		for (const auto& buffer : buffers)
-			index = this->AllocateBinding(buffer.get(), type);
+		return this->Bind(binding, name, EmptySampler, type, view);
+	}
 
-		this->descriptorWrites.push_back({ 
-			type,
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::string& name, const Sampler& sampler, UniformType type)
+	{
+		return this->Bind(binding, name, sampler, type, ImageView::NATIVE);
+	}
+
+	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, const std::string& name, UniformType type)
+	{
+		if (UniformTypeToBufferUsage(type) == BufferUsage::UNKNOWN) // fall back to image
+			return this->Bind(binding, name, EmptySampler, type, ImageView::NATIVE);
+		
+		this->buffersToResolve.push_back(BufferToResolve{
+			name,
 			binding,
-			uint32_t(index + 1 - buffers.size()),
-			uint32_t(buffers.size())
-		});
-
-		return *this;
-	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Buffer> buffers, UniformType type)
-	{
-		size_t index = 0;
-		for (const auto& buffer : buffers)
-			index = this->AllocateBinding(buffer, type);
-
-		this->descriptorWrites.push_back({ 
 			type,
-			binding,
-			uint32_t(index + 1 - buffers.size()),
-			uint32_t(buffers.size())
+			UniformTypeToBufferUsage(type),
 		});
-
 		return *this;
 	}
 
-	void DescriptorBinding::ResolveAttachments(const std::unordered_map<std::string, Image>& mappings)
+	void DescriptorBinding::Resolve(const ResolveInfo& resolve)
 	{
-		for (const auto& attachmentInfo : this->attachmentWriteInfos)
+		this->imageWriteInfos.clear();
+		this->bufferWriteInfos.clear();
+		this->descriptorWrites.clear();
+
+		for (const auto& imageToResolve : this->imagesToResolve)
 		{
-			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name), attachmentInfo.SamplerHandle.get(), attachmentInfo.Type, attachmentInfo.View);
-		}
-		this->attachmentWriteInfos.clear();
-	}
+			auto& images = resolve.GetImages().at(imageToResolve.Name);
+			size_t index = 0;
+			if ((bool)imageToResolve.SamplerHandle->GetNativeHandle())
+			{
+				for (const auto& image : images)
+					index = this->AllocateBinding(image.get(), *imageToResolve.SamplerHandle, imageToResolve.View, imageToResolve.Type);
+			}
+			else
+			{
+				for (const auto& image : images)
+					index = this->AllocateBinding(image.get(), imageToResolve.View, imageToResolve.Type);
+			}
 
-	void DescriptorBinding::ResolveAttachments(const std::unordered_map<std::string, ImageReference>& mappings)
-	{
-		for (const auto& attachmentInfo : this->attachmentWriteInfos)
+			this->descriptorWrites.push_back({
+				imageToResolve.Type,
+				imageToResolve.Binding,
+				uint32_t(index + 1 - images.size()),
+				uint32_t(images.size())
+			});
+		}
+
+		for (const auto& bufferToResolve : this->buffersToResolve)
 		{
-			this->Bind(attachmentInfo.Binding, mappings.at(attachmentInfo.Name).get(), attachmentInfo.SamplerHandle.get(), attachmentInfo.Type, attachmentInfo.View);
+			auto& buffers = resolve.GetBuffers().at(bufferToResolve.Name);
+			size_t index = 0;
+			for (const auto& buffer : buffers)
+				index = this->AllocateBinding(buffer.get(), bufferToResolve.Type);
+
+			this->descriptorWrites.push_back({
+				bufferToResolve.Type,
+				bufferToResolve.Binding,
+				uint32_t(index + 1 - buffers.size()),
+				uint32_t(buffers.size())
+			});
 		}
-		this->attachmentWriteInfos.clear();
-	}
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type)
-	{
-		return this->Bind(binding, images, type, ImageView::NATIVE);
-	}
+		for (const auto& samplerToResolve : this->samplersToResolve)
+		{
+			size_t index = this->AllocateBinding(*samplerToResolve.SamplerHandle);
 
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Image> images, UniformType type)
-	{
-		return this->Bind(binding, images, type, ImageView::NATIVE);
-	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type, ImageView view)
-	{
-		size_t index = 0;
-		for (const auto& image : images)
-			index = this->AllocateBinding(image.get(), view, type);
-
-		this->descriptorWrites.push_back({
-			type,
-			binding,
-			uint32_t(index + 1 - images.size()),
-			uint32_t(images.size())
-		});
-
-		return *this;
-	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Image> images, UniformType type, ImageView view)
-	{
-		size_t index = 0;
-		for (const auto& image : images)
-			index = this->AllocateBinding(image, ImageView::NATIVE, type);
-
-		this->descriptorWrites.push_back({
-			type,
-			binding,
-			uint32_t(index + 1 - images.size()),
-			uint32_t(images.size())
-		});
-
-		return *this;
-	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<SamplerReference> samplers, UniformType type)
-	{
-		size_t index = 0;
-		for (const auto& sampler : samplers)
-			index = this->AllocateBinding(sampler.get());
-
-		this->descriptorWrites.push_back({
-			type,
-			binding,
-			uint32_t(index + 1 - samplers.size()),
-			uint32_t(samplers.size())
-		});
-
-		return *this;
-	}
-
-	DescriptorBinding& DescriptorBinding::Bind(uint32_t binding, ArrayView<Sampler> samplers, UniformType type)
-	{
-		size_t index = 0;
-		for (const auto& sampler : samplers)
-			index = this->AllocateBinding(sampler);
-
-		this->descriptorWrites.push_back({
-			type,
-			binding,
-			uint32_t(index + 1 - samplers.size()),
-			uint32_t(samplers.size())
-		});
-
-		return *this;
+			this->descriptorWrites.push_back({
+				samplerToResolve.Type,
+				samplerToResolve.Binding,
+				uint32_t(index),
+				uint32_t(1)
+			});
+		}
 	}
 
 	bool IsBufferType(UniformType type)

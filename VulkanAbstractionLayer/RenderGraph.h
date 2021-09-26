@@ -35,6 +35,7 @@
 #include <vector>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace VulkanAbstractionLayer
 {
@@ -43,7 +44,8 @@ namespace VulkanAbstractionLayer
         std::string Name;
         PassNative PassNative;
         std::unique_ptr<RenderPass> PassCustom;
-        std::function<void(CommandBuffer&)> PipelineBarrierCallback;
+        std::vector<std::string> UsedAttachments;
+        std::function<void(CommandBuffer&, const ResolveInfo&)> PipelineBarrierCallback;
         DescriptorBinding Descriptors;
     };
 
@@ -51,7 +53,6 @@ namespace VulkanAbstractionLayer
     {
         using PresentCallback = std::function<void(CommandBuffer&, const Image&, const Image&)>;
         using CreateCallback = std::function<void(CommandBuffer&)>;
-        using DestroyCallback = std::function<void(CommandBuffer&)>;
 
         std::vector<RenderGraphNode> nodes;
         std::unordered_map<std::string, Image> attachments;
@@ -66,7 +67,7 @@ namespace VulkanAbstractionLayer
         RenderGraph(RenderGraph&&) = default;
         RenderGraph& operator=(RenderGraph&& other) = delete;
 
-        void ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer);
+        void ExecuteRenderGraphNode(RenderGraphNode& node, CommandBuffer& commandBuffer, ResolveInfo& resolve);
         void Execute(CommandBuffer& commandBuffer);
         void Present(CommandBuffer& commandBuffer, const Image& presentImage);
         const RenderGraphNode& GetNodeByName(const std::string& name) const;

@@ -39,6 +39,24 @@
 
 namespace VulkanAbstractionLayer
 {
+	class ResolveInfo
+	{
+		std::unordered_map<std::string, std::vector<BufferReference>> bufferResolves;
+		std::unordered_map<std::string, std::vector<ImageReference>> imageResolves;
+
+	public:
+		void Resolve(const std::string& name, const Buffer& buffer);
+		void Resolve(const std::string& name, ArrayView<const Buffer> buffers);
+		void Resolve(const std::string& name, ArrayView<const BufferReference> buffers);
+
+		void Resolve(const std::string& name, const Image& image);
+		void Resolve(const std::string& name, ArrayView<const Image> images);
+		void Resolve(const std::string& name, ArrayView<const ImageReference> images);
+
+		const auto& GetBuffers() const { return this->bufferResolves; }
+		const auto& GetImages() const { return this->imageResolves; }
+	};
+
 	class DescriptorBinding
 	{
 		struct DescriptorWriteInfo
@@ -63,50 +81,54 @@ namespace VulkanAbstractionLayer
 			const Sampler* SamplerHandle;
 		};
 
-		struct AttachmentResolveInfo
+		struct ImageToResolve
 		{
 			std::string Name;
 			uint32_t Binding;
 			UniformType Type;
 			ImageUsage::Bits Usage;
 			ImageView View;
-			SamplerReference SamplerHandle;
+			const Sampler* SamplerHandle;
+		};
+
+		struct BufferToResolve
+		{
+			std::string Name;
+			uint32_t Binding;
+			UniformType Type;
+			BufferUsage::Bits Usage;
+		};
+
+		struct SamplerToResolve
+		{
+			const Sampler* SamplerHandle;
+			uint32_t Binding;
+			UniformType Type;
 		};
 
 		std::vector<DescriptorWriteInfo> descriptorWrites;
 		std::vector<BufferWriteInfo> bufferWriteInfos;
 		std::vector<ImageWriteInfo> imageWriteInfos;
-		std::vector<AttachmentResolveInfo> attachmentWriteInfos;
+		std::vector<BufferToResolve> buffersToResolve;
+		std::vector<ImageToResolve> imagesToResolve;
+		std::vector<SamplerToResolve> samplersToResolve;
 
 		size_t AllocateBinding(const Buffer& buffer, UniformType type);
 		size_t AllocateBinding(const Image& image, ImageView view, UniformType type);
 		size_t AllocateBinding(const Image& image, const Sampler& sampler, ImageView view, UniformType type);
 		size_t AllocateBinding(const Sampler& sampler);
 	public:
-		DescriptorBinding& Bind(uint32_t binding, const Buffer& buffer, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const Image& image, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, const std::string& name, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, const std::string& name, UniformType type, ImageView view);
+		DescriptorBinding& Bind(uint32_t binding, const std::string& name, const Sampler& sampler, UniformType type);
+		DescriptorBinding& Bind(uint32_t binding, const std::string& name, const Sampler& sampler, UniformType type, ImageView view);
+
 		DescriptorBinding& Bind(uint32_t binding, const Sampler& sampler, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const Image& image, const Sampler& sampler, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, const Image& image, UniformType type, ImageView view);
-		DescriptorBinding& Bind(uint32_t binding, const Image& image, const Sampler& sampler, UniformType type, ImageView view);
 
-		DescriptorBinding& Bind(uint32_t binding, ArrayView<BufferReference> buffers, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, ArrayView<Buffer> buffers, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, ArrayView<Image> images, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, ArrayView<ImageReference> images, UniformType type, ImageView view);
-		DescriptorBinding& Bind(uint32_t binding, ArrayView<Image> images, UniformType type, ImageView view);
-		DescriptorBinding& Bind(uint32_t binding, ArrayView<SamplerReference> samplers, UniformType type);
-		DescriptorBinding& Bind(uint32_t binding, ArrayView<Sampler> samplers, UniformType type);
-
-		DescriptorBinding& Bind(uint32_t binding, const std::string& attachment, UniformType type, ImageView view);
-		DescriptorBinding& Bind(uint32_t binding, const std::string& attachment, const Sampler& sampler, UniformType type, ImageView view);
-		void ResolveAttachments(const std::unordered_map<std::string, Image>& mappings);
-		void ResolveAttachments(const std::unordered_map<std::string, ImageReference>& mappings);
+		void Resolve(const ResolveInfo& resolveInfo);
 
 		void Write(const vk::DescriptorSet& descriptorSet) const;
-		const auto& GetBufferDescriptors() const { return this->bufferWriteInfos; }
-		const auto& GetImageDescriptors() const { return this->imageWriteInfos; }
-		const auto& GetAttachmentDescriptors() const { return this->attachmentWriteInfos; }
+		const auto& GetBoundBuffers() const { return this->buffersToResolve; }
+		const auto& GetBoundImages() const { return this->imagesToResolve; }
 	};
 }

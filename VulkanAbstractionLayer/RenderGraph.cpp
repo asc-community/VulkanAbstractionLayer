@@ -47,12 +47,16 @@ namespace VulkanAbstractionLayer
         }
     }
 
-    void RenderGraph::ExecuteRenderGraphNode(const RenderGraphNode& node, CommandBuffer& commandBuffer)
+    void RenderGraph::ExecuteRenderGraphNode(RenderGraphNode& node, CommandBuffer& commandBuffer, ResolveInfo& resolve)
     {
         RenderPassState state{ *this, commandBuffer, node.PassNative };
-         
+
+        node.PassCustom->ResolveResources(resolve);
+        node.Descriptors.Resolve(resolve);
+        node.Descriptors.Write(node.PassNative.DescriptorSet);
+
         node.PassCustom->BeforeRender(state);
-        node.PipelineBarrierCallback(commandBuffer);
+        node.PipelineBarrierCallback(commandBuffer, resolve);
 
         commandBuffer.BeginPass(node.PassNative);
         node.PassCustom->OnRender(state);
@@ -65,10 +69,15 @@ namespace VulkanAbstractionLayer
     {
         this->InitializeOnFirstFrame(commandBuffer);
 
-        for (const auto& node : this->nodes)
+        ResolveInfo resolve;
+        for (const auto& [attachmentName, attachment] : this->attachments)
         {
-            CommandBuffer command{ commandBuffer };
-            this->ExecuteRenderGraphNode(node, command);
+            resolve.Resolve(attachmentName, attachment);
+        }
+
+        for (auto& node : this->nodes)
+        {
+            this->ExecuteRenderGraphNode(node, commandBuffer, resolve);
         }
     }
 

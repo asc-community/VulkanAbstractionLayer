@@ -126,6 +126,7 @@ namespace VulkanAbstractionLayer
     
         void TransferLayout(const Image& image, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout);
         void TransferLayout(ArrayView<ImageReference> images, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout);
+        void TransferLayout(ArrayView<Image> images, ImageUsage::Bits oldLayout, ImageUsage::Bits newLayout);
 
         template<typename... Buffers>
         void BindVertexBuffers(const Buffers&... vertexBuffers)

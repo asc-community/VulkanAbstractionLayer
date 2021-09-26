@@ -105,21 +105,22 @@ public:
             },
         };
 
-        // declare external graph resources (buffers, images, attachments) with their initial state
-        pipeline.DeclareBuffer(uniformBuffer);
-        pipeline.DeclareImages(textures, ImageUsage::TRANSFER_DESTIONATION);
-        pipeline.DeclareAttachment("Output", Format::R8G8B8A8_UNORM);
-        pipeline.DeclareAttachment("OutputDepth", Format::D32_SFLOAT_S8_UINT);
-
         // describe descriptor bindings per descriptor set
         pipeline.DescriptorBindings
-            .Bind(0, uniformBuffer, UniformType::UNIFORM_BUFFER)
+            .Bind(0, "UniformBuffer", UniformType::UNIFORM_BUFFER)
             .Bind(1, textureSampler, UniformType::SAMPLER)
-            .Bind(2, textures, UniformType::SAMPLED_IMAGE);
+            .Bind(2, "Textures", UniformType::SAMPLED_IMAGE);
 
         // add output attachments
         pipeline.AddOutputAttachment("Output", ClearColor{ 0.5f, 0.8f, 1.0f, 1.0f });
         pipeline.AddOutputAttachment("OutputDepth", ClearDepthSpencil{ });
+    }
+
+    virtual void ResolveResources(ResolveState state) override
+    {
+        // resolve resource names to exact resources
+        state.Resolve("UniformBuffer", uniformBuffer);
+        state.Resolve("Textures", textures);
     }
     
     virtual void OnRender(RenderPassState state) override
