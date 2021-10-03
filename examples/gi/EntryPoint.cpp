@@ -946,22 +946,22 @@ int main()
 
             sharedResources.CurrentProbeIndex = (sharedResources.CurrentProbeIndex + 1) % sharedResources.ReflectionProbes.Cubemaps.size();
 
-            auto mouseMovement = ImGui::GetMouseDragDelta(MouseButton::RIGHT, 0.0f);
-            ImGui::ResetMouseDragDelta(MouseButton::RIGHT);
+            auto mouseMovement = ImGui::GetMouseDragDelta((ImGuiMouseButton)MouseButton::RIGHT, 0.0f);
+            ImGui::ResetMouseDragDelta((ImGuiMouseButton)MouseButton::RIGHT);
             camera.Rotate(Vector2{ -mouseMovement.x, -mouseMovement.y } *dt);
 
             Vector3 movementDirection{ 0.0f };
-            if (ImGui::IsKeyDown(KeyCode::W))
+            if (ImGui::IsKeyDown((int)KeyCode::W))
                 movementDirection += Vector3{ 1.0f,  0.0f,  0.0f };
-            if (ImGui::IsKeyDown(KeyCode::A))
+            if (ImGui::IsKeyDown((int)KeyCode::A))
                 movementDirection += Vector3{ 0.0f,  0.0f, -1.0f };
-            if (ImGui::IsKeyDown(KeyCode::S))
+            if (ImGui::IsKeyDown((int)KeyCode::S))
                 movementDirection += Vector3{ -1.0f,  0.0f,  0.0f };
-            if (ImGui::IsKeyDown(KeyCode::D))
+            if (ImGui::IsKeyDown((int)KeyCode::D))
                 movementDirection += Vector3{ 0.0f,  0.0f,  1.0f };
-            if (ImGui::IsKeyDown(KeyCode::SPACE))
+            if (ImGui::IsKeyDown((int)KeyCode::SPACE))
                 movementDirection += Vector3{ 0.0f,  1.0f,  0.0f };
-            if (ImGui::IsKeyDown(KeyCode::LEFT_SHIFT))
+            if (ImGui::IsKeyDown((int)KeyCode::LEFT_SHIFT))
                 movementDirection += Vector3{ 0.0f, -1.0f,  0.0f };
             if (movementDirection != Vector3{ 0.0f }) movementDirection = Normalize(movementDirection);
             camera.Move(movementDirection * dt);

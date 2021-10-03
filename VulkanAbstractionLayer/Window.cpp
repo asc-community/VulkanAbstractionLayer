@@ -63,10 +63,20 @@ namespace VulkanAbstractionLayer
         glfwSetWindowPos(this->handle, (int)options.Position.x, (int)options.Position.y);
         glfwSetWindowUserPointer(this->handle, (void*)this);
         glfwSetWindowSizeCallback(this->handle, [](GLFWwindow* handle, int width, int height)
-        {
-            auto& window = *(Window*)glfwGetWindowUserPointer(handle);
-            if(window.onResize) window.onResize(window, Vector2((float)width, (float)height));
-        });
+            {
+                auto& window = *(Window*)glfwGetWindowUserPointer(handle);
+                if (window.onResize) window.onResize(window, Vector2((float)width, (float)height));
+            });
+        glfwSetKeyCallback(this->handle, [](GLFWwindow* handle, int key, int scancode, int action, int mods)
+            {
+                auto& window = *(Window*)glfwGetWindowUserPointer(handle);
+                if (window.onKeyChanged) window.onKeyChanged(window, (KeyCode)key, action == GLFW_PRESS);
+            });
+        glfwSetMouseButtonCallback(this->handle, [](GLFWwindow* handle, int button, int action, int mods)
+            {
+                auto& window = *(Window*)glfwGetWindowUserPointer(handle);
+                if (window.onMouseChanged) window.onMouseChanged(window, (MouseButton)button, action == GLFW_PRESS);
+            });
     }
 
     Window::Window(Window&& other) noexcept
@@ -115,6 +125,11 @@ namespace VulkanAbstractionLayer
         return glfwWindowShouldClose(this->handle);
     }
 
+    void Window::Close()
+    {
+        glfwSetWindowShouldClose(this->handle, true);
+    }
+
     Vector2 Window::GetSize() const
     {
         int width = 0, height = 0;
@@ -139,13 +154,86 @@ namespace VulkanAbstractionLayer
         return Vector2((float)x, (float)y);
     }
 
+    void Window::SetCursorPosition(Vector2 position)
+    {
+        glfwSetCursorPos(this->handle, (int)position.x, (int)position.y);
+    }
+
+    Vector2 Window::GetCursorPosition() const
+    {
+        double x = 0, y = 0;
+        glfwGetCursorPos(this->handle, &x, &y);
+        return Vector2((float)x, (float)y);
+    }
+
+    bool Window::IsKeyPressed(KeyCode key) const
+    {
+        return glfwGetKey(this->handle, (int)key) == GLFW_PRESS;
+    }
+
+    bool Window::IsKeyReleased(KeyCode key) const
+    {
+        return glfwGetKey(this->handle, (int)key) == GLFW_RELEASE;
+    }
+
+    bool Window::IsMousePressed(MouseButton button) const
+    {
+        return glfwGetMouseButton(this->handle, (int)button) == GLFW_PRESS;
+    }
+
+    bool Window::IsMouseReleased(MouseButton button) const
+    {
+        return glfwGetMouseButton(this->handle, (int)button) == GLFW_RELEASE;
+    }
+
+    CursorMode Window::GetCursorMode() const
+    {
+        return (CursorMode)glfwGetInputMode(this->handle, GLFW_CURSOR);
+    }
+
+    void Window::SetCursorMode(CursorMode mode)
+    {
+        glfwSetInputMode(this->handle, GLFW_CURSOR, (int)mode);
+    }
+
+    float Window::GetTimeSinceCreation() const
+    {
+        return (float)glfwGetTime();
+    }
+
+    void Window::SetTimeSinceCreation(float time)
+    {
+        return glfwSetTime((float)time);
+    }
+
     void Window::OnResize(std::function<void(Window&, Vector2)> callback)
     {
         this->onResize = std::move(callback);
     }
 
+    void Window::OnKeyChanged(std::function<void(Window&, KeyCode, bool)> callback)
+    {
+        this->onKeyChanged = std::move(callback);
+    }
+
+    void Window::OnMouseChanged(std::function<void(Window&, MouseButton, bool)> callback)
+    {
+        this->onMouseChanged = std::move(callback);
+    }
+
     const WindowSurface& Window::CreateWindowSurface(const VulkanContext& context)
     {
         return CreateVulkanSurface(this->handle, context);
+    }
+
+    void Window::SetContext(GLFWwindow* window)
+    {
+        this->handle = window;
+        glfwMakeContextCurrent(window);
+    }
+
+    void Window::SetTitle(const char* title)
+    {
+        glfwSetWindowTitle(this->handle, title);
     }
 }

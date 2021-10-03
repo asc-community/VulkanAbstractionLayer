@@ -54,7 +54,7 @@ namespace VulkanAbstractionLayer
         auto layers = vk::enumerateInstanceLayerProperties();
         for (const char* layerName : options.Layers)
         {
-            options.InfoCallback(layerName);
+            options.InfoCallback("- " + std::string(layerName));
 
             auto layerIt = std::find_if(layers.begin(), layers.end(),
                 [layerName](const vk::LayerProperties& layer)
@@ -77,7 +77,7 @@ namespace VulkanAbstractionLayer
         auto extensions = vk::enumerateInstanceExtensionProperties();
         for (const char* extensionName : options.Extensions)
         {
-            options.InfoCallback(extensionName);
+            options.InfoCallback("- " + std::string(extensionName));
 
             auto layerIt = std::find_if(extensions.begin(), extensions.end(),
                 [extensionName](const vk::ExtensionProperties& extension)
@@ -182,7 +182,7 @@ namespace VulkanAbstractionLayer
         {
             auto properties = device.getProperties();
 
-            options.InfoCallback("checking " + std::string(properties.deviceName.data()) + "...");
+            options.InfoCallback("- checking " + std::string(properties.deviceName.data()) + "...");
 
             if (properties.apiVersion < this->apiVersion)
             {

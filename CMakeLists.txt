@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(VULKAN_ABSTRACTION_LAYER_BUILD_EXAMPLES "build examples" ON)
+option(VULKAN_ABSTRACTION_LAYER_BUILD_GLFW "build glfw library" ON)
 
 set(SOURCES 
 "VulkanAbstractionLayer/Window.cpp"
@@ -32,30 +33,44 @@ set(SOURCES
 "submodules/imgui/imgui_widgets.cpp"
 "submodules/imgui/backends/imgui_impl_vulkan.cpp"
 "submodules/imgui/backends/imgui_impl_glfw.cpp"
-"submodules/spirv-reflect/spirv_reflect.c" "VulkanAbstractionLayer/DescriptorCache.h" "VulkanAbstractionLayer/DescriptorCache.cpp" "VulkanAbstractionLayer/Sampler.cpp" "VulkanAbstractionLayer/DescriptorBinding.cpp" "VulkanAbstractionLayer/StageBuffer.cpp"  "VulkanAbstractionLayer/Pipeline.cpp" "VulkanAbstractionLayer/ComputeShader.cpp")
+"submodules/spirv-reflect/spirv_reflect.c"
+"VulkanAbstractionLayer/DescriptorCache.h"
+"VulkanAbstractionLayer/DescriptorCache.cpp"
+"VulkanAbstractionLayer/Sampler.cpp"
+"VulkanAbstractionLayer/DescriptorBinding.cpp" 
+"VulkanAbstractionLayer/StageBuffer.cpp"  
+"VulkanAbstractionLayer/Pipeline.cpp" 
+"VulkanAbstractionLayer/ComputeShader.cpp"
+)
 
 find_package(Vulkan REQUIRED FATAL_ERROR)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw)
+
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang)
-set(GLFW_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw/include)
-set(GLM_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glm)
-set(IMGUI_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/imgui)
-set(GLSLANG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang/glslang/Public ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang/SPIRV)
-set(VMA_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/VulkanMemoryAllocator/src)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw)
+
+set(GLM_INCLUDE_DIR           ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glm)
+set(GLFW_INCLUDE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glfw/include)
+set(IMGUI_INCLUDE_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/submodules/imgui)
+set(GLSLANG_INCLUDE_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang/glslang/Public ${CMAKE_CURRENT_SOURCE_DIR}/submodules/glslang/SPIRV)
+set(VMA_INCLUDE_DIR           ${CMAKE_CURRENT_SOURCE_DIR}/submodules/VulkanMemoryAllocator/src)
 set(TINYOBJLOADER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/tinyobjloader)
-set(SPAN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/span/include)
+set(SPAN_INCLUDE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/submodules/span/include)
 set(SPIRV_REFLECT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/spirv-reflect)
-set(STB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/stb)
-set(TINYGLTF_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/tinygltf)
+set(STB_INCLUDE_DIR           ${CMAKE_CURRENT_SOURCE_DIR}/submodules/stb)
+set(TINYGLTF_INCLUDE_DIR      ${CMAKE_CURRENT_SOURCE_DIR}/submodules/tinygltf)
 set(TINYDDSLOADER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/submodules/tinyddsloader)
 
-add_library(${CMAKE_PROJECT_NAME} STATIC ${SOURCES})
+if(WIN32)
+    set_target_properties(glfw PROPERTIES IMPORT_SUFFIX ".lib")
+endif()
+
+add_library(VulkanAbstractionLayer STATIC ${SOURCES})
 
 set(VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${Vulkan_INCLUDE_DIR} 
-    ${GLFW_INCLUDE_DIR} 
     ${GLM_INCLUDE_DIR} 
+    ${GLFW_INCLUDE_DIR} 
     ${IMGUI_INCLUDE_DIR}
     ${VMA_INCLUDE_DIR}
     ${GLSLANG_INCLUDE_DIR}
@@ -69,8 +84,8 @@ set(VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR
 
 set(VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR ${VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR} PARENT_SCOPE)
 
-target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC ${VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR})
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw MachineIndependent SPIRV)
+target_include_directories(VulkanAbstractionLayer PUBLIC ${VULKAN_ABSTRACTION_LAYER_INCLUDE_DIR})
+target_link_libraries(VulkanAbstractionLayer PUBLIC ${Vulkan_LIBRARIES} glfw MachineIndependent SPIRV)
 
 # examples
 if(VULKAN_ABSTRACTION_LAYER_BUILD_EXAMPLES)
