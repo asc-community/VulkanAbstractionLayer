@@ -103,10 +103,11 @@ namespace VulkanAbstractionLayer
     RenderGraph::~RenderGraph()
     {
         auto& vulkan = GetCurrentVulkanContext();
+        auto& device = vulkan.GetDevice();
+        device.waitIdle();
 
         for (const auto& node : this->nodes)
         {
-            auto& device = vulkan.GetDevice();
             auto& pass = node.PassNative;
             if ((bool)pass.Pipeline)         device.destroyPipeline(pass.Pipeline);
             if ((bool)pass.PipelineLayout)   device.destroyPipelineLayout(pass.PipelineLayout);
