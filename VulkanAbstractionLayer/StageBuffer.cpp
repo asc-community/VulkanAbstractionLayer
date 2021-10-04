@@ -40,7 +40,11 @@ namespace VulkanAbstractionLayer
 	{
 		assert(this->currentOffset + byteSize <= this->buffer.GetByteSize());
 
-		this->buffer.CopyData(data, byteSize, this->currentOffset);
+		if (data != nullptr)
+		{
+			this->buffer.CopyData(data, byteSize, this->currentOffset);
+		}
+
 		this->currentOffset += byteSize;
 		return Allocation{ byteSize, this->currentOffset - byteSize };
 	}

@@ -47,6 +47,7 @@ namespace VulkanAbstractionLayer
     {
         std::vector<VirtualFrame> virtualFrames;
         uint32_t presentImageIndex = 0;
+        bool isFrameRunning = false;
         size_t currentFrame = 0;
     public:
         void Init(size_t frameCount, size_t stageBufferSize);
@@ -58,6 +59,7 @@ namespace VulkanAbstractionLayer
         const VirtualFrame& GetCurrentFrame() const;
         const VirtualFrame& GetNextFrame() const;
         uint32_t GetPresentImageIndex() const;
+        bool IsFrameRunning() const;
         void EndFrame();
     };
 }
