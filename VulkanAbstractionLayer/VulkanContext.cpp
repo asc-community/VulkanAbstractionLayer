@@ -347,6 +347,13 @@ namespace VulkanAbstractionLayer
 
         this->commandPool = this->device.createCommandPool(commandPoolCreateInfo);
 
+        vk::CommandBufferAllocateInfo commandBufferAllocateInfo;
+        commandBufferAllocateInfo
+            .setLevel(vk::CommandBufferLevel::ePrimary)
+            .setCommandPool(this->commandPool)
+            .setCommandBufferCount(1);
+        this->immediateCommandBuffer = CommandBuffer{ this->device.allocateCommandBuffers(commandBufferAllocateInfo).front() };
+
         options.InfoCallback("created command buffer pool");
 
         this->descriptorCache.Init();
@@ -442,6 +449,11 @@ namespace VulkanAbstractionLayer
         return this->virtualFrames.GetCurrentFrame().StagingBuffer;
     }
 
+    CommandBuffer& VulkanContext::GetImmediateCommandBuffer()
+    {
+        return this->immediateCommandBuffer;
+    }
+
     void VulkanContext::SubmitCommandsImmediate(const CommandBuffer& commands)
     {
         vk::SubmitInfo submitInfo;
@@ -450,6 +462,11 @@ namespace VulkanAbstractionLayer
         auto waitResult = this->device.waitForFences(this->immediateFence, false, UINT64_MAX);
         assert(waitResult == vk::Result::eSuccess);
         this->device.resetFences(this->immediateFence);
+    }
+
+    bool VulkanContext::IsFrameRunning() const
+    {
+        return this->virtualFrames.IsFrameRunning();
     }
 
     void VulkanContext::EndFrame()

@@ -52,6 +52,7 @@ namespace VulkanAbstractionLayer
 		void Reset();
 		Buffer& GetBuffer() { return this->buffer; }
 		const Buffer& GetBuffer() const { return this->buffer; }
+		uint32_t GetCurrentOffset() const { return this->currentOffset; }
 
 		template<typename T>
 		Allocation Submit(ArrayView<const T> view)

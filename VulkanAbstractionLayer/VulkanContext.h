@@ -92,6 +92,7 @@ namespace VulkanAbstractionLayer
         vk::Semaphore renderingFinishedSemaphore;
         vk::Fence immediateFence;
         vk::CommandPool commandPool;
+        CommandBuffer immediateCommandBuffer{ { } };
         vk::SwapchainKHR swapchain;
         vk::DebugUtilsMessengerEXT debugUtilsMessenger;
         vk::DispatchLoaderDynamic dynamicLoader;
@@ -136,11 +137,13 @@ namespace VulkanAbstractionLayer
         void InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options);
         void RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight);
         void StartFrame();
+        bool IsFrameRunning() const;
         const Image& AcquireCurrentSwapchainImage(ImageUsage::Bits usage);
         CommandBuffer& GetCurrentCommandBuffer();
         StageBuffer& GetCurrentStageBuffer();
         size_t GetVirtualFrameCount() const { return this->virtualFrames.GetFrameCount(); }
         void SubmitCommandsImmediate(const CommandBuffer& commands);
+        CommandBuffer& GetImmediateCommandBuffer();
         void EndFrame();
     };
 

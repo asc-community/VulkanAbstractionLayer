@@ -81,6 +81,8 @@ namespace VulkanAbstractionLayer
         vulkanContext.GetDevice().resetFences(frame.CommandQueueFence);
 
         frame.Commands.Begin();
+
+        this->isFrameRunning = true;
     }
 
     void VirtualFrameProvider::EndFrame()
@@ -141,6 +143,7 @@ namespace VulkanAbstractionLayer
         assert(presetSucceeded == vk::Result::eSuccess);
 
         this->currentFrame = (this->currentFrame + 1) % this->virtualFrames.size();
+        this->isFrameRunning = false;
     }
 
     VirtualFrame& VirtualFrameProvider::GetCurrentFrame()
@@ -163,13 +166,13 @@ namespace VulkanAbstractionLayer
         return this->virtualFrames[(this->currentFrame + 1) % this->virtualFrames.size()];
     }
 
+    bool VirtualFrameProvider::IsFrameRunning() const
+    {
+        return this->isFrameRunning;
+    }
+
     uint32_t VirtualFrameProvider::GetPresentImageIndex() const
     {
         return this->presentImageIndex;
-    }
-
-    size_t VirtualFrameProvider::GetFrameCount() const
-    {
-        return this->virtualFrames.size();
     }
 }
