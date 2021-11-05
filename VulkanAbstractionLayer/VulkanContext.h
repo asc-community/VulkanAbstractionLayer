@@ -93,6 +93,8 @@ namespace VulkanAbstractionLayer
         vk::Fence immediateFence;
         vk::CommandPool commandPool;
         vk::SwapchainKHR swapchain;
+        vk::DebugUtilsMessengerEXT debugUtilsMessenger;
+        vk::DispatchLoaderDynamic dynamicLoader;
         VmaAllocator allocator = { };
         std::vector<Image> swapchainImages;
         std::vector<ImageUsage::Bits> swapchainImageUsages;
@@ -137,6 +139,7 @@ namespace VulkanAbstractionLayer
         const Image& AcquireCurrentSwapchainImage(ImageUsage::Bits usage);
         CommandBuffer& GetCurrentCommandBuffer();
         StageBuffer& GetCurrentStageBuffer();
+        size_t GetVirtualFrameCount() const { return this->virtualFrames.GetFrameCount(); }
         void SubmitCommandsImmediate(const CommandBuffer& commands);
         void EndFrame();
     };

@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(VULKAN_ABSTRACTION_LAYER_BUILD_EXAMPLES "build examples" ON)
-option(VULKAN_ABSTRACTION_LAYER_BUILD_GLFW "build glfw library" ON)
 
 set(SOURCES 
 "VulkanAbstractionLayer/Window.cpp"

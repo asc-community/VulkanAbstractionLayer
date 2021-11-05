@@ -48,8 +48,8 @@ namespace VulkanAbstractionLayer
         init_info.QueueFamily = vulkanContext.GetQueueFamilyIndex();
         init_info.Queue = vulkanContext.GetGraphicsQueue();
         init_info.PipelineCache = vk::PipelineCache{ };
-        init_info.DescriptorPool = vulkanContext.GetDescriptorCache().GetDescriptorPool();
         init_info.Allocator = nullptr;
+        init_info.InFlyFrameCount = vulkanContext.GetVirtualFrameCount();
         init_info.MinImageCount = vulkanContext.GetPresentImageCount();
         init_info.ImageCount = vulkanContext.GetPresentImageCount();
         init_info.CheckVkResultFn = nullptr;
@@ -87,19 +87,14 @@ namespace VulkanAbstractionLayer
         ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
     }
 
-    ImTextureID ImGuiVulkanContext::RegisterImage(const vk::ImageView& imageView, const vk::Sampler& sampler)
+    ImTextureID ImGuiVulkanContext::GetTextureId(const Image& image)
     {
-        return ImGui_ImplVulkan_AddTexture(sampler, imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        return (ImTextureID)image.GetNativeView(ImageView::NATIVE);
     }
 
-    ImTextureID ImGuiVulkanContext::RegisterImage(const Image& image, const Sampler& sampler)
+    ImTextureID ImGuiVulkanContext::GetTextureId(const vk::ImageView& view)
     {
-        return ImGuiVulkanContext::RegisterImage(image.GetNativeView(ImageView::NATIVE), sampler.GetNativeHandle());
-    }
-
-    void ImGuiVulkanContext::UnregisterImage(ImTextureID id)
-    {
-        ImGui_ImplVulkan_RemoveTexture(id);
+        return (ImTextureID)view;
     }
 
     void ImGuiVulkanContext::EndFrame()

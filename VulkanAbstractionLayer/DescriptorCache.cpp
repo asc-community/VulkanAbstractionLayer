@@ -31,14 +31,6 @@
 
 namespace VulkanAbstractionLayer
 {
-    bool IsLayoutSubSet(const std::vector<Uniform>& uniforms, const std::vector<Uniform>& subuniforms)
-    {
-        return std::all_of(subuniforms.begin(), subuniforms.end(), [&uniforms](const Uniform& uniform)
-        {
-            return std::find(uniforms.begin(), uniforms.end(), uniform) != uniforms.end();
-        });
-    }
-
 	void DescriptorCache::Init()
 	{
         auto& vulkan = GetCurrentVulkanContext();

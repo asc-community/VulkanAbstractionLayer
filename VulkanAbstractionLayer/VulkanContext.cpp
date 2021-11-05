@@ -34,9 +34,26 @@
 #include <algorithm>
 #include <cstring>
 #include <optional>
+#include <iostream>
 
 namespace VulkanAbstractionLayer
 {
+    static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void* pUserData) 
+    {
+        std::cerr << pCallbackData->pMessage << std::endl;
+        if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+        {
+            #if defined(WIN32)
+            __debugbreak();
+            #endif
+        }
+        return VK_FALSE;
+    }
+
     bool CheckVulkanPresentationSupport(const vk::Instance& instance, const vk::PhysicalDevice& physicalDevice, uint32_t familyQueueIndex);
 
     constexpr vk::PhysicalDeviceType DeviceTypeMapping[] = {
@@ -122,10 +139,13 @@ namespace VulkanAbstractionLayer
             .setEngineVersion(VK_MAKE_VERSION(1, 0, 0))
             .setApiVersion(VK_MAKE_VERSION(options.VulkanApiMajorVersion, options.VulkanApiMinorVersion, 0));
     
+        auto extensions = options.Extensions;
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
         vk::InstanceCreateInfo instanceCreateInfo;
         instanceCreateInfo
             .setPApplicationInfo(&applicationInfo)
-            .setPEnabledExtensionNames(options.Extensions)
+            .setPEnabledExtensionNames(extensions)
             .setPEnabledLayerNames(options.Layers);
 
         CheckRequestedExtensions(options);
@@ -157,6 +177,7 @@ namespace VulkanAbstractionLayer
         if ((bool)this->renderingFinishedSemaphore) this->device.destroySemaphore(this->renderingFinishedSemaphore);
         if ((bool)this->immediateFence) this->device.destroyFence(this->immediateFence);
         if ((bool)this->device) this->device.destroy();
+        if ((bool)this->debugUtilsMessenger) this->instance.destroyDebugUtilsMessengerEXT(this->debugUtilsMessenger, nullptr, this->dynamicLoader);
         if ((bool)this->surface) this->instance.destroySurfaceKHR(this->surface);
         if ((bool)this->instance) this->instance.destroy();
         this->presentImageCount = { };
@@ -289,6 +310,15 @@ namespace VulkanAbstractionLayer
         this->deviceQueue = this->device.getQueue(this->queueFamilyIndex, 0);
 
         options.InfoCallback("created logical device and device queues");
+
+        this->dynamicLoader.init(this->instance, this->device);
+
+        vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfo;
+        debugUtilsMessengerCreateInfo
+            .setMessageSeverity(vk::DebugUtilsMessageSeverityFlagBitsEXT::eError | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning)
+            .setMessageType(vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance)
+            .setPfnUserCallback(ValidationLayerCallback);
+        this->debugUtilsMessenger = this->instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfo, nullptr, this->dynamicLoader);
 
         VmaAllocatorCreateInfo allocatorInfo = {};
         allocatorInfo.vulkanApiVersion = this->apiVersion;

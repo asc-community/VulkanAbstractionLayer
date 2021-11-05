@@ -906,33 +906,6 @@ int main()
     
     ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass").PassNative.RenderPassHandle);
 
-    std::map<VkImage, ImTextureID> ImGuiRegisteredImages;
-    for (const auto& mesh : sharedResources.WorldMeshes)
-    {
-        for (const auto& material : mesh.Materials)
-        {
-            auto& albedoTexture = mesh.Textures[material.AlbedoIndex];
-            auto& normalTexture = mesh.Textures[material.NormalIndex];
-            auto& metallicRoughnessTexture = mesh.Textures[material.MetallicRoughnessIndex];
-            
-            if (ImGuiRegisteredImages.find(albedoTexture.GetNativeHandle()) == ImGuiRegisteredImages.end())
-                ImGuiRegisteredImages.emplace(
-                    albedoTexture.GetNativeHandle(),
-                    ImGuiVulkanContext::RegisterImage(albedoTexture, ImGuiImageSampler)
-                );
-            if (ImGuiRegisteredImages.find(normalTexture.GetNativeHandle()) == ImGuiRegisteredImages.end())
-                ImGuiRegisteredImages.emplace(
-                    normalTexture.GetNativeHandle(),
-                    ImGuiVulkanContext::RegisterImage(normalTexture, ImGuiImageSampler)
-                );
-            if (ImGuiRegisteredImages.find(metallicRoughnessTexture.GetNativeHandle()) == ImGuiRegisteredImages.end())
-                ImGuiRegisteredImages.emplace(
-                    metallicRoughnessTexture.GetNativeHandle(),
-                    ImGuiVulkanContext::RegisterImage(metallicRoughnessTexture, ImGuiImageSampler)
-                );
-        }
-    }
-
     while (!window.ShouldClose())
     {
         window.PollEvents();
@@ -1029,11 +1002,11 @@ int main()
                     ImGui::DragFloat("roughness scale", &material.RoughnessScale, 0.01f, 0.0f, 1.0f);
                     ImGui::DragFloat("metallic scale", &material.MetallicScale, 0.01f, 0.0f, 1.0f);
                     ImGui::TableNextColumn();
-                    ImGui::Image(ImGuiRegisteredImages.at(mesh.Textures[material.AlbedoIndex].GetNativeHandle()), { 128.0f, 128.0f });
+                    ImGui::Image(ImGuiVulkanContext::GetTextureId(mesh.Textures[material.AlbedoIndex]), { 128.0f, 128.0f });
                     ImGui::TableNextColumn();
-                    ImGui::Image(ImGuiRegisteredImages.at(mesh.Textures[material.NormalIndex].GetNativeHandle()), { 128.0f, 128.0f });
+                    ImGui::Image(ImGuiVulkanContext::GetTextureId(mesh.Textures[material.NormalIndex]), { 128.0f, 128.0f });
                     ImGui::TableNextColumn();
-                    ImGui::Image(ImGuiRegisteredImages.at(mesh.Textures[material.MetallicRoughnessIndex].GetNativeHandle()), { 128.0f, 128.0f });
+                    ImGui::Image(ImGuiVulkanContext::GetTextureId(mesh.Textures[material.MetallicRoughnessIndex]), { 128.0f, 128.0f });
 
                     ImGui::EndTable();
 

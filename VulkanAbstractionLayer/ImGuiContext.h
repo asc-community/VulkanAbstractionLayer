@@ -42,8 +42,8 @@ namespace VulkanAbstractionLayer
 {
     class VulkanContext;
     class Window;
-    class Sampler;
     class Image;
+    class RenderPass;
 
     class ImGuiVulkanContext
     {
@@ -52,9 +52,8 @@ namespace VulkanAbstractionLayer
         static void Destroy();
         static void StartFrame();
         static void RenderFrame(const vk::CommandBuffer& commandBuffer);
-        static ImTextureID RegisterImage(const vk::ImageView& imageView, const vk::Sampler& sampler);
-        static ImTextureID RegisterImage(const Image& image, const Sampler& sampler);
-        static void UnregisterImage(ImTextureID id);
+        static ImTextureID GetTextureId(const Image& image);
+        static ImTextureID GetTextureId(const vk::ImageView& view);
         static void EndFrame();
     };
 }
