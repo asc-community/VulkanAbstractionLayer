@@ -171,6 +171,11 @@ namespace VulkanAbstractionLayer
         return this->isFrameRunning;
     }
 
+    size_t VirtualFrameProvider::GetFrameCount() const
+    {
+        return this->virtualFrames.size();
+    }
+
     uint32_t VirtualFrameProvider::GetPresentImageIndex() const
     {
         return this->presentImageIndex;

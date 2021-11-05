@@ -60,6 +60,7 @@ namespace VulkanAbstractionLayer
         const VirtualFrame& GetNextFrame() const;
         uint32_t GetPresentImageIndex() const;
         bool IsFrameRunning() const;
+        size_t GetFrameCount() const;
         void EndFrame();
     };
 }
