@@ -31,9 +31,9 @@ void WindowErrorCallback(const std::string& message)
 
 constexpr size_t MaxMaterialCount = 256;
 constexpr size_t MaxMeshCount = 256;
-constexpr size_t ProbeResolution = 256;
-constexpr Vector3 ProbeGridSize = { 1.0f, 1.0f, 3.0f };
-Vector3 ProbeGridDensity = { 545.0f, 535.0f, 400.0 };
+constexpr size_t ProbeResolution = 1024;
+constexpr Vector3 ProbeGridSize = { 3.0f, 1.0f, 3.0f };
+Vector3 ProbeGridDensity = { 185.0f, 535.0f, 400.0 };
 Vector3 ProbeGridOffset = { -50.0f, 600.0f, 50.0f };
 bool DrawProbes = false;
 

@@ -196,7 +196,7 @@ void main()
 
     Fragment fragment;
     fragment.Albedo = pow(albedoColor.rgb, vec3(GAMMA));
-    fragment.Normal = vNormalMatrix * vec3(2.0 * normalColor.rgb - 1.0);
+    fragment.Normal = normalize(vNormalMatrix * vec3(2.0 * normalColor.rgb - 1.0));
     fragment.Metallic = material.MetallicScale * (1.0 - metallicRoughnessColor.b);
     fragment.Roughness = material.RoughnessScale * metallicRoughnessColor.g;
 
