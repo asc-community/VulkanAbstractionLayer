@@ -30,6 +30,7 @@
 
 #include <vulkan/vulkan.hpp>
 #include <vector>
+#include <functional>
 
 #include "VirtualFrame.h"
 #include "DescriptorCache.h"

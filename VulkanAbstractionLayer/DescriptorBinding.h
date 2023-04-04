@@ -30,6 +30,7 @@
 
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 #include "Buffer.h"
 #include "Image.h"

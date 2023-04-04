@@ -690,21 +690,20 @@ int main()
     ImGuiVulkanContext::Init(window, renderGraph->GetNodeByName("ImGuiPass").PassNative.RenderPassHandle);
 
     std::unordered_map<uint32_t, ImTextureID> imguiMappings;
-    Sampler imguiSampler = Sampler{ Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::CLAMP_TO_EDGE, Sampler::MipFilter::LINEAR };
     for (const auto& material : sharedResources.Materials)
     {
         if (imguiMappings.find(material.AlbedoTextureIndex) == imguiMappings.end())
         {
             imguiMappings.emplace(
                 material.AlbedoTextureIndex,
-                ImGuiVulkanContext::RegisterImage(sharedResources.Textures[material.AlbedoTextureIndex], imguiSampler)
+                ImGuiVulkanContext::GetTextureId(sharedResources.Textures[material.AlbedoTextureIndex])
             );
         }
         if (imguiMappings.find(material.NormalTextureIndex) == imguiMappings.end())
         {
             imguiMappings.emplace(
                 material.NormalTextureIndex,
-                ImGuiVulkanContext::RegisterImage(sharedResources.Textures[material.NormalTextureIndex], imguiSampler)
+                ImGuiVulkanContext::GetTextureId(sharedResources.Textures[material.NormalTextureIndex])
             );
         }
     }

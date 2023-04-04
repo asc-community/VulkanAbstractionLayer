@@ -454,7 +454,6 @@ int main()
     };
 
     LoadModelGLTF(sharedResources.Sponza, "../models/Sponza/glTF/Sponza.gltf");
-    Sampler ImGuiImageSampler(Sampler::MinFilter::LINEAR, Sampler::MagFilter::LINEAR, Sampler::AddressMode::REPEAT, Sampler::MipFilter::LINEAR);
     LoadImage(sharedResources.LookupLTCMatrix, "../textures/ltc_matrix.dds", ImageOptions::DEFAULT);
     LoadImage(sharedResources.LookupLTCAmplitude, "../textures/ltc_amplitude.dds", ImageOptions::DEFAULT);
     LoadImage(sharedResources.LightTextures.emplace_back(), "../textures/white_filtered.dds", ImageOptions::MIPMAPS);
@@ -510,17 +509,17 @@ int main()
         if (ImGuiRegisteredImages.find(material.AlbedoIndex) == ImGuiRegisteredImages.end())
             ImGuiRegisteredImages.emplace(
                 material.AlbedoIndex,
-                ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.AlbedoIndex], ImGuiImageSampler)
+                ImGuiVulkanContext::GetTextureId(sharedResources.Sponza.Textures[material.AlbedoIndex])
             );
         if (ImGuiRegisteredImages.find(material.NormalIndex) == ImGuiRegisteredImages.end())
             ImGuiRegisteredImages.emplace(
                 material.NormalIndex,
-                ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.NormalIndex], ImGuiImageSampler)
+                ImGuiVulkanContext::GetTextureId(sharedResources.Sponza.Textures[material.NormalIndex])
             );
         if (ImGuiRegisteredImages.find(material.MetallicRoughnessIndex) == ImGuiRegisteredImages.end())
             ImGuiRegisteredImages.emplace(
                 material.MetallicRoughnessIndex,
-                ImGuiVulkanContext::RegisterImage(sharedResources.Sponza.Textures[material.MetallicRoughnessIndex], ImGuiImageSampler)
+                ImGuiVulkanContext::GetTextureId(sharedResources.Sponza.Textures[material.MetallicRoughnessIndex])
             );
     }
 
