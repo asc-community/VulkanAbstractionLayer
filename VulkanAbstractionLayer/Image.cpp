@@ -270,7 +270,7 @@ namespace VulkanAbstractionLayer
         if (this->layerCount > 1)
         {
             this->cubemapImageViews.resize(this->layerCount);
-            imageViewCreateInfo.setViewType(vk::ImageViewType::e2D);
+            imageViewCreateInfo.setViewType(vk::ImageViewType::e2DArray);
         }
         uint32_t layer = 0;
         for (auto& imageViewLayer : this->cubemapImageViews)
