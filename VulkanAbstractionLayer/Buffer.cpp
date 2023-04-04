@@ -135,6 +135,7 @@ namespace VulkanAbstractionLayer
         this->Destroy();
 
         this->handle = other.handle;
+        this->byteSize = other.byteSize;
         this->allocation = other.allocation;
         this->mappedMemory = other.mappedMemory;
 
