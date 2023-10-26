@@ -179,3 +179,6 @@ while (!window.ShouldClose())
 *textured light from [LTC paper](https://eheitzresearch.wordpress.com/415-2/)*
 ![cloth-simulation](preview/cloth-simulation.png)
 *cloth simulation based on compute shader*
+![rigidBodySim](preview/rigidBodySim.gif)
+Rigid body simulation based on impulse method, project link: https://github.com/fall2019/RigidBodySim
+
