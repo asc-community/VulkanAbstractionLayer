@@ -141,9 +141,18 @@ namespace VulkanAbstractionLayer
     
         auto extensions = options.Extensions;
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#ifdef __APPLE__
+        extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME );
+        extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME );
+#endif
+        vk::InstanceCreateFlags flags;
+#ifdef __APPLE__
+        flags = vk::InstanceCreateFlags { VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR };
+#endif
 
         vk::InstanceCreateInfo instanceCreateInfo;
         instanceCreateInfo
+            .setFlags(flags)
             .setPApplicationInfo(&applicationInfo)
             .setPEnabledExtensionNames(extensions)
             .setPEnabledLayerNames(options.Layers);
@@ -257,12 +266,13 @@ namespace VulkanAbstractionLayer
         this->surfaceFormat = surfaceFormats.front();
         for (const auto& format : surfaceFormats)
         {
-            if (format.format == vk::Format::eR8G8B8A8Unorm || format.format == vk::Format::eB8G8R8A8Unorm)
+            if (format.format == vk::Format::eB8G8R8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
                 this->surfaceFormat = format;
         }
 
         options.InfoCallback("selected surface present mode: " + vk::to_string(this->surfacePresentMode));
         options.InfoCallback("selected surface format: " + vk::to_string(this->surfaceFormat.format));
+        options.InfoCallback("selected surface color space: " + vk::to_string(this->surfaceFormat.colorSpace));
         options.InfoCallback("present image count: " + std::to_string(this->presentImageCount));
 
         // logical device and device queue
@@ -276,15 +286,24 @@ namespace VulkanAbstractionLayer
         deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
         deviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
         deviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
+        
+#ifdef __APPLE__
+        deviceExtensions.push_back("VK_KHR_portability_subset");
+#endif
 
         vk::PhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures;
         descriptorIndexingFeatures.descriptorBindingPartiallyBound                    = true;
         descriptorIndexingFeatures.shaderInputAttachmentArrayDynamicIndexing          = true;
         descriptorIndexingFeatures.shaderUniformTexelBufferArrayDynamicIndexing       = true;
         descriptorIndexingFeatures.shaderStorageTexelBufferArrayDynamicIndexing       = true;
+#ifdef __APPLE__
+        descriptorIndexingFeatures.shaderUniformBufferArrayNonUniformIndexing         = false;
+        descriptorIndexingFeatures.shaderStorageBufferArrayNonUniformIndexing         = false;
+#else
         descriptorIndexingFeatures.shaderUniformBufferArrayNonUniformIndexing         = true;
-        descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing          = true;
         descriptorIndexingFeatures.shaderStorageBufferArrayNonUniformIndexing         = true;
+#endif
+        descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing          = true;
         descriptorIndexingFeatures.shaderStorageImageArrayNonUniformIndexing          = true;
         descriptorIndexingFeatures.shaderInputAttachmentArrayNonUniformIndexing       = true;
         descriptorIndexingFeatures.shaderUniformTexelBufferArrayNonUniformIndexing    = true;

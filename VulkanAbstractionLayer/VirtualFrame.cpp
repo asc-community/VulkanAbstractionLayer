@@ -140,7 +140,7 @@ namespace VulkanAbstractionLayer
             .setImageIndices(this->presentImageIndex);
 
         auto presetSucceeded = vulkanContext.GetPresentQueue().presentKHR(presentInfo);
-        assert(presetSucceeded == vk::Result::eSuccess);
+        assert(presetSucceeded == vk::Result::eSuccess || presetSucceeded == vk::Result::eSuboptimalKHR);
 
         this->currentFrame = (this->currentFrame + 1) % this->virtualFrames.size();
         this->isFrameRunning = false;
