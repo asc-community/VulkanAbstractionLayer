@@ -145,7 +145,7 @@ namespace VulkanAbstractionLayer
         extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME );
         extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME );
 #endif
-        vk::InstanceCreateFlags flags;
+        vk::InstanceCreateFlags flags { };
 #ifdef __APPLE__
         flags = vk::InstanceCreateFlags { VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR };
 #endif
@@ -266,7 +266,10 @@ namespace VulkanAbstractionLayer
         this->surfaceFormat = surfaceFormats.front();
         for (const auto& format : surfaceFormats)
         {
-            if (format.format == vk::Format::eB8G8R8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+            if (format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear &&
+                (format.format == vk::Format::eB8G8R8Srgb ||
+                format.format == vk::Format::eR8G8B8A8Unorm ||
+                format.format == vk::Format::eB8G8R8A8Unorm))
                 this->surfaceFormat = format;
         }
 
