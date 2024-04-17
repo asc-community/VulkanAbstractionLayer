@@ -2,3 +2,4 @@ out
 .vs
 *.spv
 build/
+.DS_Store

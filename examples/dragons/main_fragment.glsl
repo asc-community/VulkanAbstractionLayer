@@ -42,7 +42,7 @@ layout(set = 0, binding = 3) uniform uMaterialBuffer
 };
 
 layout(set = 0, binding = 4) uniform sampler uImageSampler;
-layout(set = 0, binding = 5) uniform texture2D uTextures[4096];
+layout(set = 0, binding = 5) uniform texture2D uTextures[64];
 
 layout(set = 0, binding = 6) uniform sampler2D uShadowTexture;
 layout(set = 0, binding = 7) uniform sampler2D uBRDFLUT;
