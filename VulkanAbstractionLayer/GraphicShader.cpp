@@ -43,14 +43,39 @@ namespace VulkanAbstractionLayer
         auto& device = vulkan.GetDevice();
         if ((bool)this->vertexShader) device.destroyShaderModule(this->vertexShader);
         if ((bool)this->fragmentShader) device.destroyShaderModule(this->fragmentShader);
+        if ((bool)this->tessControlShader) device.destroyShaderModule(this->tessControlShader);
+        if ((bool)this->tessEvalShader) device.destroyShaderModule(this->tessEvalShader);
 
         this->vertexShader = vk::ShaderModule{ };
         this->fragmentShader = vk::ShaderModule{ };
+        this->tessControlShader = vk::ShaderModule{ };
+        this->tessEvalShader = vk::ShaderModule{ };
     }
 
     GraphicShader::GraphicShader(const ShaderData& vertex, const ShaderData& fragment)
     {
         this->Init(vertex, fragment);
+    }
+
+    GraphicShader::GraphicShader(const ShaderData& vertex, const ShaderData& tessControl, const ShaderData& tessEval, const ShaderData& fragment)
+	    :GraphicShader(std::move(vertex),std::move(fragment))
+    {
+        auto& context = GetCurrentVulkanContext();
+        auto& device = context.GetDevice();
+
+        assert(!tessControl.Bytecode.empty());
+        vk::ShaderModuleCreateInfo tessControlShaderInfo;
+        tessControlShaderInfo.setCode(tessControl.Bytecode);
+        this->tessControlShader = device.createShaderModule(tessControlShaderInfo);
+
+        assert(!tessEval.Bytecode.empty());
+        vk::ShaderModuleCreateInfo tessEvalShaderInfo;
+        tessEvalShaderInfo.setCode(tessEval.Bytecode);
+        this->tessEvalShader = device.createShaderModule(tessEvalShaderInfo);
+        
+        this->shaderUniforms.push_back(ShaderUniforms{ tessControl.DescriptorSets[0], ShaderType::TESS_CONTROL });
+        this->shaderUniforms.push_back(ShaderUniforms{ tessEval.DescriptorSets[0], ShaderType::TESS_EVALUATION });
+        
     }
 
     void GraphicShader::Init(const ShaderData& vertex, const ShaderData& fragment)
@@ -84,6 +109,14 @@ namespace VulkanAbstractionLayer
 
         other.vertexShader = vk::ShaderModule{ };
         other.fragmentShader = vk::ShaderModule{ };
+
+        if((bool)other.tessControlShader)
+        {
+            this->tessControlShader = other.tessControlShader;
+            this->tessEvalShader = other.tessEvalShader;
+            other.tessControlShader = VkShaderModule{};
+            other.tessEvalShader = VkShaderModule{};
+        }
     }
 
     GraphicShader& GraphicShader::operator=(GraphicShader&& other) noexcept
@@ -97,6 +130,14 @@ namespace VulkanAbstractionLayer
 
         other.vertexShader = vk::ShaderModule{ };
         other.fragmentShader = vk::ShaderModule{ };
+
+        if ((bool)other.tessControlShader)
+        {
+            this->tessControlShader = other.tessControlShader;
+            this->tessEvalShader = other.tessEvalShader;
+            other.tessControlShader = VkShaderModule{};
+            other.tessEvalShader = VkShaderModule{};
+        }
 
         return *this;
     }
@@ -119,9 +160,13 @@ namespace VulkanAbstractionLayer
             return this->vertexShader;
         case ShaderType::FRAGMENT:
             return this->fragmentShader;
+        case ShaderType::TESS_CONTROL:
+            return this->tessControlShader;
+        case ShaderType::TESS_EVALUATION:
+            return this->tessEvalShader;
         default:
             assert(false);
-            return this->fragmentShader;
+            return this->vertexShader;
         }
     }
 }

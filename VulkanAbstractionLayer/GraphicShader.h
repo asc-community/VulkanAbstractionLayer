@@ -36,6 +36,8 @@ namespace VulkanAbstractionLayer
     {
         vk::ShaderModule vertexShader;
         vk::ShaderModule fragmentShader;
+        vk::ShaderModule tessControlShader;
+        vk::ShaderModule tessEvalShader;
         std::vector<ShaderUniforms> shaderUniforms;
         std::vector<TypeSPIRV> inputAttributes;
 
@@ -43,6 +45,7 @@ namespace VulkanAbstractionLayer
     public:
         GraphicShader() = default;
         GraphicShader(const ShaderData& vertex, const ShaderData& fragment);
+        GraphicShader(const ShaderData& vertex, const ShaderData& tessControl, const ShaderData& tessEval, const ShaderData& fragment);
         ~GraphicShader();
 
         void Init(const ShaderData& vertex, const ShaderData& fragment);

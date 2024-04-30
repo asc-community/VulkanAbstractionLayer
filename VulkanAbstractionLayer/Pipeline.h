@@ -44,6 +44,12 @@ namespace VulkanAbstractionLayer
         CLEAR_DEPTH_SPENCIL,
     };
 
+    enum class FillMode
+    {
+        FILL = 0,
+        FRAME_WIRE,
+    };
+
     class Pipeline
     {
     public:
@@ -96,6 +102,8 @@ namespace VulkanAbstractionLayer
         std::vector<AttachmentDeclaration> attachmentDeclarations;
         std::vector<OutputAttachment> outputAttachments;
 
+        FillMode fillMode = FillMode::FILL;
+
     public:
         std::shared_ptr<Shader> Shader;
         std::vector<VertexBinding> VertexBindings;
@@ -119,5 +127,8 @@ namespace VulkanAbstractionLayer
         const auto& GetImageDependencies() const { return this->imageDependencies; }
         const auto& GetAttachmentDeclarations() const { return this->attachmentDeclarations; }
         const auto& GetOutputAttachments() const { return this->outputAttachments; }
+
+        void SetFillMode(FillMode mode) { this->fillMode = mode; }
+        FillMode GetFillMode()const { return this->fillMode; }
     };
 }

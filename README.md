@@ -179,6 +179,8 @@ while (!window.ShouldClose())
 *textured light from [LTC paper](https://eheitzresearch.wordpress.com/415-2/)*
 ![cloth-simulation](preview/cloth-simulation.png)
 *cloth simulation based on compute shader*
+![dynamic-terrain-tessellation](preview/terrain.mp4)
+*dynamic terrain tess level based on eye distance*
 ![rigidBodySim](https://media.githubusercontent.com/media/fall2019/RigidBodySim/main/result.gif)
 Rigid body simulation based on impulse method, project link: https://github.com/fall2019/RigidBodySim
 
