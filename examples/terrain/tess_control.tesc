@@ -13,9 +13,9 @@ layout(location = 3) out mat3 oNormalMatrix[4];
 
 layout(set = 0, binding = 0) uniform uCameraBuffer
 {
-    mat4 uViewProjection;
+	mat4 uViewProjection;
 	mat4 uView;
-    vec3 uCameraPosition;
+	vec3 uCameraPosition;
 };
 layout(set = 0, binding = 1) uniform uModelBuffer
 {
@@ -54,12 +54,12 @@ void main()
 		gl_TessLevelOuter[2] = tessLv2;
 		gl_TessLevelOuter[3] = tessLv3;
 
-	    gl_TessLevelInner[0] = max(tessLv1, tessLv3);
+		gl_TessLevelInner[0] = max(tessLv1, tessLv3);
 		gl_TessLevelInner[1] = max(tessLv0, tessLv2);	
     }	
 	gl_out[gl_InvocationID].gl_Position =  gl_in[gl_InvocationID].gl_Position;
-    oPosition[gl_InvocationID] = iPosition[gl_InvocationID];
-    oTexCoord[gl_InvocationID] = iTexCoord[gl_InvocationID];
-    oMaterialIndex[gl_InvocationID] = iMaterialIndex[gl_InvocationID];
-    oNormalMatrix[gl_InvocationID] = iNormalMatrix[gl_InvocationID];
+	oPosition[gl_InvocationID] = iPosition[gl_InvocationID];
+	oTexCoord[gl_InvocationID] = iTexCoord[gl_InvocationID];
+	oMaterialIndex[gl_InvocationID] = iMaterialIndex[gl_InvocationID];
+	oNormalMatrix[gl_InvocationID] = iNormalMatrix[gl_InvocationID];
 }

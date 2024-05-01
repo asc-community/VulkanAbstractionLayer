@@ -16,7 +16,7 @@ layout(location = 3) out mat3 vNormalMatrix;
 layout(set = 0, binding = 0) uniform uCameraBuffer
 {
     mat4 uViewProjection;
-	mat4 uView;
+    mat4 uView;
     vec3 uCameraPosition;
 };
 
