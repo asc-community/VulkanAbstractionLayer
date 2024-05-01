@@ -328,7 +328,7 @@ namespace VulkanAbstractionLayer
 
         vk::DeviceCreateInfo deviceCreateInfo;
         deviceCreateInfo
-			.setPEnabledFeatures(&features)
+            .setPEnabledFeatures(&features)
             .setQueueCreateInfos(deviceQueueCreateInfo)
             .setPEnabledExtensionNames(deviceExtensions)
             .setPNext(&multiviewFeatures);
