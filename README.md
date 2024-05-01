@@ -178,9 +178,12 @@ while (!window.ShouldClose())
 ![ltc-textured](preview/ltc-textured.png)
 *textured light from [LTC paper](https://eheitzresearch.wordpress.com/415-2/)*
 ![cloth-simulation](preview/cloth-simulation.png)
-*cloth simulation based on compute shader*
-![dynamic-terrain-tessellation](preview/terrain.mp4)
-*dynamic terrain tess level based on eye distance*
+*cloth simulation based on compute shader* 
+
+https://github.com/asc-community/VulkanAbstractionLayer/assets/53587145/62c4d466-fe33-421c-b52f-77a17b6eee57 
+
+*dynamic terrain tess level based on eye distance* 
 ![rigidBodySim](https://media.githubusercontent.com/media/fall2019/RigidBodySim/main/result.gif)
 Rigid body simulation based on impulse method, project link: https://github.com/fall2019/RigidBodySim
+
 
