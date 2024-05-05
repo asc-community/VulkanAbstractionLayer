@@ -406,22 +406,38 @@ namespace VulkanAbstractionLayer
         return GetCurrentVulkanContext().GetDevice().createComputePipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
     }
 
-    static vk::Pipeline CreateGraphicPipeline(const Shader& shader, const vk::PipelineLayout& layout, ArrayView<const VertexBinding> vertexBindings, const vk::RenderPass& renderPass)
+    static vk::Pipeline CreateGraphicPipeline(const Shader& shader, const vk::PipelineLayout& layout, ArrayView<const VertexBinding> vertexBindings, const vk::RenderPass& renderPass,const FillMode& fillMode)
     {
-        std::array shaderStageCreateInfos = {
-            vk::PipelineShaderStageCreateInfo {
+        std::vector<vk::PipelineShaderStageCreateInfo> shaderStageCreateInfos;
+        shaderStageCreateInfos.push_back(vk::PipelineShaderStageCreateInfo{
                 vk::PipelineShaderStageCreateFlags{ },
                 ToNative(ShaderType::VERTEX),
                 shader.GetNativeShader(ShaderType::VERTEX),
                 "main"
-            },
-            vk::PipelineShaderStageCreateInfo {
+            });
+        shaderStageCreateInfos.push_back(
+            vk::PipelineShaderStageCreateInfo{
                 vk::PipelineShaderStageCreateFlags{ },
                 ToNative(ShaderType::FRAGMENT),
                 shader.GetNativeShader(ShaderType::FRAGMENT),
                 "main"
-            }
-        };
+            });
+
+        if ((bool)shader.GetNativeShader(ShaderType::TESS_CONTROL))
+        {
+            shaderStageCreateInfos.push_back(vk::PipelineShaderStageCreateInfo{
+                       vk::PipelineShaderStageCreateFlags{ },
+                       ToNative(ShaderType::TESS_CONTROL),
+                       shader.GetNativeShader(ShaderType::TESS_CONTROL),
+                       "main"
+                });
+            shaderStageCreateInfos.push_back(vk::PipelineShaderStageCreateInfo{
+                    vk::PipelineShaderStageCreateFlags{ },
+                    ToNative(ShaderType::TESS_EVALUATION),
+                    shader.GetNativeShader(ShaderType::TESS_EVALUATION),
+                    "main"
+                });
+        }
 
         auto vertexAttributes = shader.GetInputAttributes();
 
@@ -476,10 +492,16 @@ namespace VulkanAbstractionLayer
             .setVertexBindingDescriptions(vertexBindingDescriptions)
             .setVertexAttributeDescriptions(vertexAttributeDescriptions);
 
+        vk::PipelineTessellationStateCreateInfo tessStateCreateInfo;
+        tessStateCreateInfo.setPatchControlPoints(4);
+
         vk::PipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
+        vk::PrimitiveTopology topology = vk::PrimitiveTopology::eTriangleList;
+        if ((bool)shader.GetNativeShader(ShaderType::TESS_CONTROL))
+            topology = vk::PrimitiveTopology::ePatchList;
         inputAssemblyStateCreateInfo
             .setPrimitiveRestartEnable(false)
-            .setTopology(vk::PrimitiveTopology::eTriangleList);
+            .setTopology(topology);
 
         vk::PipelineViewportStateCreateInfo viewportStateCreateInfo;
         viewportStateCreateInfo
@@ -487,8 +509,9 @@ namespace VulkanAbstractionLayer
             .setScissorCount(1); // defined dynamic
 
         vk::PipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
+        vk::PolygonMode polyMode = fillMode == FillMode::FILL ? vk::PolygonMode::eFill : vk::PolygonMode::eLine;
         rasterizationStateCreateInfo
-            .setPolygonMode(vk::PolygonMode::eFill)
+            .setPolygonMode(polyMode)
             .setCullMode(vk::CullModeFlagBits::eBack)
             .setFrontFace(vk::FrontFace::eCounterClockwise)
             .setLineWidth(1.0f);
@@ -555,6 +578,9 @@ namespace VulkanAbstractionLayer
             .setSubpass(0)
             .setBasePipelineHandle(vk::Pipeline{ })
             .setBasePipelineIndex(0);
+
+        if ((bool)shader.GetNativeShader(ShaderType::TESS_CONTROL))
+            pipelineCreateInfo.setPTessellationState(&tessStateCreateInfo);
 
         return GetCurrentVulkanContext().GetDevice().createGraphicsPipeline(vk::PipelineCache{ }, pipelineCreateInfo).value;
     }
@@ -721,7 +747,7 @@ namespace VulkanAbstractionLayer
             passNative.PipelineLayout = CreatePipelineLayout(descriptor.SetLayout, passNative.PipelineType);
 
             if(passNative.PipelineType == vk::PipelineBindPoint::eGraphics)
-                passNative.Pipeline = CreateGraphicPipeline(*pass.Shader, passNative.PipelineLayout, pass.VertexBindings, passNative.RenderPassHandle);
+                passNative.Pipeline = CreateGraphicPipeline(*pass.Shader, passNative.PipelineLayout, pass.VertexBindings, passNative.RenderPassHandle,pass.GetFillMode());
             if(passNative.PipelineType == vk::PipelineBindPoint::eCompute)
                 passNative.Pipeline = CreateComputePipeline(*pass.Shader, passNative.PipelineLayout);
         }

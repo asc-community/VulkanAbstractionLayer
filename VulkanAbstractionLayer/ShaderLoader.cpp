@@ -194,6 +194,17 @@ namespace VulkanAbstractionLayer
             if (type.traits.numeric.vector.component_count == 4 || type.traits.numeric.matrix.column_count == 4)
                 format = type.traits.numeric.scalar.signedness ? Format::R32G32B32A32_SINT : Format::R32G32B32A32_UINT;
         }
+        if (type.type_flags & SPV_REFLECT_TYPE_FLAG_ARRAY)
+        {
+            if (type.traits.numeric.vector.component_count < 2 || type.traits.numeric.matrix.column_count < 2)
+                format = Format::R32_SFLOAT;
+            if (type.traits.numeric.vector.component_count == 2 || type.traits.numeric.matrix.column_count == 2)
+                format = Format::R32G32_SFLOAT;
+            if (type.traits.numeric.vector.component_count == 3 || type.traits.numeric.matrix.column_count == 3)
+                format = Format::R32G32B32_SFLOAT;
+            if (type.traits.numeric.vector.component_count == 4 || type.traits.numeric.matrix.column_count == 4)
+                format = Format::R32G32B32A32_SFLOAT;
+        }
         assert(format != Format::UNDEFINED);
 
         int32_t byteSize = type.traits.numeric.scalar.width / 8;

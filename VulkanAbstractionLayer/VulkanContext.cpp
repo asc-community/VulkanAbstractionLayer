@@ -322,8 +322,13 @@ namespace VulkanAbstractionLayer
         multiviewFeatures.multiview = true;
         multiviewFeatures.pNext = &descriptorIndexingFeatures;
 
+        vk::PhysicalDeviceFeatures features;
+        features.setTessellationShader(true);
+        features.setFillModeNonSolid(true);
+
         vk::DeviceCreateInfo deviceCreateInfo;
         deviceCreateInfo
+            .setPEnabledFeatures(&features)
             .setQueueCreateInfos(deviceQueueCreateInfo)
             .setPEnabledExtensionNames(deviceExtensions)
             .setPNext(&multiviewFeatures);
